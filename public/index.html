@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grande Bibliothèque numérique MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">Grande <span>Bibliothèque</span> MNA</div>
+  <nav>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/login.html">Connexion</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>La bibliothèque numérique du ministère</h1>
+  <p>Une plateforme moderne et chaleureuse pour lire, découvrir, écouter et approfondir les enseignements du ministère — accessible en un simple lien, partout dans le monde.</p>
+  <div class="actions">
+    <a href="/catalogue.html" class="btn btn-primary">Explorer les livres</a>
+    <a href="#a-propos" class="btn btn-ghost" style="background:transparent;border-color:rgba(255,255,255,0.35);color:#f4ede0;">En savoir plus</a>
+  </div>
+</section>
+
+<section class="section alt" id="a-propos">
+  <div class="container about">
+    <div class="portrait">Nom du Ministère</div>
+    <div class="bio">
+      <span class="tag">Le ministère</span>
+      <h2>Qui sommes-nous ?</h2>
+      <p>Bienvenue dans la bibliothèque numérique du ministère. Nous sommes engagés dans la transmission de la Parole à travers l'écrit, l'enseignement et l'accompagnement spirituel.</p>
+      <p>Chaque livre publié ici est une invitation à approfondir la foi, à grandir spirituellement et à découvrir la richesse des enseignements bibliques. Cette plateforme est pensée pour une expérience de lecture fluide, moderne et accessible — sur mobile, tablette ou ordinateur.</p>
+      <a href="/catalogue.html" class="btn btn-primary">Voir tous les livres</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <span class="tag">Bibliothèque</span>
+    <h2>Livres récents</h2>
+    <p class="lead">Parcourez les dernières publications. Chaque ouvrage est disponible à la lecture en ligne ; certains peuvent aussi être téléchargés selon les autorisations définies par l'administrateur.</p>
+    <div class="grid" id="books-grid">
+      <div class="book-card"><div class="body"><p>Chargement du catalogue…</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <div class="about">
+      <div>
+        <span class="tag">Lecture</span>
+        <h2>Une expérience de lecture immersive</h2>
+        <p class="lead" style="margin-bottom:0;">Chaque livre s'ouvre directement dans le site, sans quitter la page — une lecture fluide, avec navigation entre les parties et mode plein écran.</p>
+      </div>
+      <div class="grid">
+        <div class="card"><span class="icon">📖</span><h3>Lecture en ligne</h3><p>Consultation directe dans le site, sans téléchargement.</p></div>
+        <div class="card"><span class="icon">🎧</span><h3>Lecture audio</h3><p>Écoutez les livres disponibles en version audio.</p></div>
+        <div class="card"><span class="icon">🖥️</span><h3>Plein écran</h3><p>Mode immersif pour une lecture sans distraction.</p></div>
+        <div class="card"><span class="icon">📱</span><h3>Responsive</h3><p>Expérience optimisée sur mobile, tablette et ordinateur.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <span class="tag">Espace d'étude</span>
+    <h2>Un parcours guidé, livre après livre</h2>
+    <p class="lead">Chaque livre de l'espace d'étude se déverrouille partie après partie. Un petit test valide la compréhension de chaque partie, un grand test valide le livre entier — et débloque un brevet téléchargeable ainsi que le livre suivant.</p>
+    <a href="/espace-etude.html" class="btn btn-ghost">Découvrir l'espace d'étude</a>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <span class="tag">Administration</span>
+    <h2>Un panneau administrateur sécurisé</h2>
+    <p class="lead">L'équipe du ministère gère l'intégralité de la bibliothèque depuis un espace privé : ajout, modification et suppression des livres, activation du téléchargement livre par livre, gestion des ventes et des messages des lecteurs.</p>
+    <div class="admin-box">
+      <ul>
+        <li>Ajouter / modifier / supprimer un livre</li>
+        <li>Activer ou désactiver le téléchargement par livre</li>
+        <li>Gérer les ventes manuelles (mobile money / WhatsApp)</li>
+        <li>Répondre aux messages des lecteurs</li>
+        <li>Accès protégé par authentification</li>
+      </ul>
+      <div class="admin-example">
+        <strong>Exemple de contrôle</strong>
+        <div class="row">Livre A → Lecture uniquement</div>
+        <div class="row">Livre B → Lecture + Téléchargement ✓</div>
+        <div class="row">Livre C → Vente uniquement</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <span class="tag">Feuille de route</span>
+    <h2>Vision à long terme</h2>
+    <p class="lead">Cette bibliothèque est conçue pour grandir avec le ministère.</p>
+    <div class="roadmap">
+      <div class="step done" data-n="1"><h4>Phase 1 — Lancement</h4><p>Structure du site, page d'accueil, connexion à la base de données.</p></div>
+      <div class="step" data-n="2"><h4>Phase 2 — Comptes</h4><p>Authentification lecteur et administrateur.</p></div>
+      <div class="step" data-n="3"><h4>Phase 3 — Catalogue & lecteur</h4><p>Gestion des livres, lecture en ligne et téléchargement.</p></div>
+      <div class="step" data-n="4"><h4>Phase 4 — Espace d'étude</h4><p>Déverrouillage progressif, tests, brevets, notifications.</p></div>
+      <div class="step" data-n="5"><h4>Phase 5 — Vente & audio</h4><p>Vente manuelle, lecture audio, notifications email.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="cta-final container" style="max-width:1100px;">
+  <h2>Prêt à explorer la bibliothèque ?</h2>
+  <p class="lead" style="margin-left:auto;margin-right:auto;">Un simple lien suffit pour que les lecteurs du monde entier accèdent aux enseignements du ministère.</p>
+  <div class="actions">
+    <a href="/catalogue.html" class="btn btn-primary">Explorer les livres</a>
+    <a href="/login.html" class="btn btn-ghost" style="background:transparent;border-color:rgba(255,255,255,0.35);color:#f4ede0;">Créer un compte</a>
+  </div>
+  <span class="note">💡 Accès universel : partagez un simple lien et vos lecteurs accèdent instantanément à la bibliothèque.</span>
+</div>
+
+<footer>Grande Bibliothèque numérique MNA — © 2026</footer>
+
+<script>
+fetch('/api/books')
+  .then(r => r.json())
+  .then(books => {
+    const grid = document.getElementById('books-grid');
+    if (!books.length) {
+      grid.innerHTML = '<div class="book-card"><div class="body"><p>Aucun livre publié pour le moment. Les prochaines parutions apparaîtront ici automatiquement.</p></div></div>';
+      return;
+    }
+    grid.innerHTML = books.slice(0, 6).map(b => `
+      <div class="book-card">
+        <div class="cover">📘</div>
+        <div class="body">
+          <h3>${b.title}</h3>
+          <div class="meta">${b.author || ''}</div>
+          <p>${b.description || ''}</p>
+          <div class="actions">
+            <a href="#" class="btn btn-primary">Lire</a>
+            ${b.access_type === 'telechargeable' ? '<a href="#" class="btn btn-ghost">Télécharger</a>' : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  })
+  .catch(() => {
+    document.getElementById('books-grid').innerHTML = '<div class="book-card"><div class="body"><p>Impossible de charger le catalogue pour le moment.</p></div></div>';
+  });
+</script>
+
+</body>
+</html>
