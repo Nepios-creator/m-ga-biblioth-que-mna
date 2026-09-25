@@ -1,0 +1,15 @@
+{
+  "name": "mega-bibliotheque-mna",
+  "version": "0.1.0",
+  "description": "Grande Bibliothèque numérique MNA",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  }
+}
