@@ -5,23 +5,150 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connexion — Grande Bibliothèque numérique MNA</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .auth-wrap { max-width: 420px; margin: 70px auto; padding: 0 24px; }
+  .auth-box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 32px; }
+  .auth-box h2 { margin-bottom: 6px; }
+  .auth-box p.sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 24px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14.5px; font-family: inherit;
+  }
+  .field input:focus { outline: none; border-color: var(--blue); }
+  .auth-box .btn { width: 100%; text-align: center; margin-top: 6px; }
+  .switch-mode { text-align: center; margin-top: 18px; font-size: 14px; color: var(--ink-soft); }
+  .switch-mode a { color: var(--blue-deep); font-weight: 600; cursor: pointer; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .hidden { display: none; }
+</style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><a href="/">Grande <span>Bibliothèque</span> MNA</a></div>
-  <nav>
-    <a href="/catalogue.html">Catalogue</a>
-    <a href="/espace-etude.html">Espace d'étude</a>
-  </nav>
+  <div class="brand">Grande <span>Bibliothèque</span> MNA</div>
+  <nav><a href="/">Accueil</a><a href="/catalogue.html">Catalogue</a></nav>
 </header>
 
-<section class="hero">
-  <h1>Connexion</h1>
-  <p>Le système de comptes (lecteur / administrateur) arrive en phase 2 du projet.</p>
-</section>
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div id="logged-out">
+      <h2 id="form-title">Connexion</h2>
+      <p class="sub" id="form-sub">Accédez à votre compte lecteur.</p>
+      <div id="msg-box"></div>
+
+      <form id="login-form">
+        <div class="field"><label>Email</label><input type="email" id="login-email" required></div>
+        <div class="field"><label>Mot de passe</label><input type="password" id="login-password" required></div>
+        <button type="submit" class="btn btn-primary">Se connecter</button>
+      </form>
+
+      <form id="register-form" class="hidden">
+        <div class="field"><label>Nom complet</label><input type="text" id="reg-name"></div>
+        <div class="field"><label>Email</label><input type="email" id="reg-email" required></div>
+        <div class="field"><label>Mot de passe (6 caractères min.)</label><input type="password" id="reg-password" required></div>
+        <button type="submit" class="btn btn-primary">Créer mon compte</button>
+      </form>
+
+      <div class="switch-mode">
+        <span id="to-register">Pas encore de compte ? <a>Créer un compte</a></span>
+        <span id="to-login" class="hidden">Déjà un compte ? <a>Se connecter</a></span>
+      </div>
+    </div>
+
+    <div id="logged-in" class="hidden">
+      <h2>Bienvenue !</h2>
+      <p class="sub" id="welcome-msg"></p>
+      <a href="/admin.html" class="btn btn-primary" id="admin-link" style="display:block;text-align:center;margin-bottom:10px;">Ouvrir le panneau admin</a>
+      <button class="btn btn-ghost" id="logout-btn" style="width:100%;">Se déconnecter</button>
+    </div>
+  </div>
+</div>
 
 <footer>Grande Bibliothèque numérique MNA — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function showMsg(text, type) {
+  $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+function refreshView() {
+  const token = localStorage.getItem('mna_token');
+  const userRaw = localStorage.getItem('mna_user');
+  if (token && userRaw) {
+    const user = JSON.parse(userRaw);
+    $('logged-out').classList.add('hidden');
+    $('logged-in').classList.remove('hidden');
+    $('welcome-msg').textContent = `Connecté en tant que ${user.full_name || user.email} (${user.role === 'admin' ? 'administrateur' : 'lecteur'}).`;
+    $('admin-link').style.display = user.role === 'admin' ? 'block' : 'none';
+  } else {
+    $('logged-out').classList.remove('hidden');
+    $('logged-in').classList.add('hidden');
+  }
+}
+
+$('to-register').addEventListener('click', () => {
+  $('login-form').classList.add('hidden');
+  $('register-form').classList.remove('hidden');
+  $('to-register').classList.add('hidden');
+  $('to-login').classList.remove('hidden');
+  $('form-title').textContent = 'Créer un compte';
+  $('form-sub').textContent = 'Inscrivez-vous pour accéder à la bibliothèque.';
+});
+$('to-login').addEventListener('click', () => {
+  $('register-form').classList.add('hidden');
+  $('login-form').classList.remove('hidden');
+  $('to-login').classList.add('hidden');
+  $('to-register').classList.remove('hidden');
+  $('form-title').textContent = 'Connexion';
+  $('form-sub').textContent = 'Accédez à votre compte lecteur.';
+});
+
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('login-email').value, password = $('login-password').value;
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) return showMsg(data.message || 'Erreur de connexion', 'error');
+    localStorage.setItem('mna_token', data.token);
+    localStorage.setItem('mna_user', JSON.stringify(data.user));
+    refreshView();
+  } catch (err) { showMsg('Erreur réseau', 'error'); }
+});
+
+$('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const full_name = $('reg-name').value, email = $('reg-email').value, password = $('reg-password').value;
+  try {
+    const r = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name, email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) return showMsg(data.message || 'Erreur d\'inscription', 'error');
+    localStorage.setItem('mna_token', data.token);
+    localStorage.setItem('mna_user', JSON.stringify(data.user));
+    refreshView();
+  } catch (err) { showMsg('Erreur réseau', 'error'); }
+});
+
+$('logout-btn').addEventListener('click', () => {
+  localStorage.removeItem('mna_token');
+  localStorage.removeItem('mna_user');
+  refreshView();
+});
+
+refreshView();
+</script>
 
 </body>
 </html>
