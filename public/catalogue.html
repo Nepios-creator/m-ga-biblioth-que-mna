@@ -42,7 +42,7 @@ fetch('/api/books')
     }
     grid.innerHTML = books.map(b => `
       <div class="book-card">
-        <div class="cover">📘</div>
+        <div class="cover" style="padding:0;"><img src="/api/books/${b.id}/cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" style="width:100%;height:100%;object-fit:cover;"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">📘</span></div>
         <div class="body">
           <h3>${b.title}</h3>
           <div class="meta">${b.author || ''}</div>
