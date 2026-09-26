@@ -87,6 +87,24 @@ router.post('/books/:id/pdf', upload.single('pdf'), async (req, res) => {
   }
 });
 
+// Téléverser la couverture d'un livre (image)
+router.post('/books/:id/cover', upload.single('cover'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Aucun fichier reçu' });
+  if (!req.file.mimetype.startsWith('image/')) {
+    return res.status(400).json({ message: 'Le fichier doit être une image' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE books SET cover_data = $1, cover_mime = $2 WHERE id = $3 RETURNING id, title',
+      [req.file.buffer, req.file.mimetype, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Livre introuvable' });
+    res.json({ message: 'Couverture téléversée avec succès', book: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Supprimer un livre
 router.delete('/books/:id', async (req, res) => {
   try {
