@@ -144,8 +144,8 @@ fetch('/api/books')
           <div class="meta">${b.author || ''}</div>
           <p>${b.description || ''}</p>
           <div class="actions">
-            <a href="#" class="btn btn-primary">Lire</a>
-            ${b.access_type === 'telechargeable' ? '<a href="#" class="btn btn-ghost">Télécharger</a>' : ''}
+            <a href="/api/books/${b.id}/read" target="_blank" class="btn btn-primary">Lire</a>
+            ${b.access_type === 'telechargeable' ? `<a href="/api/books/${b.id}/download" class="btn btn-ghost">Télécharger</a>` : ''}
           </div>
         </div>
       </div>
