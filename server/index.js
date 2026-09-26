@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db/pool');
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +32,9 @@ app.get('/api/books', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
