@@ -33,6 +33,20 @@ app.get('/api/books', async (req, res) => {
   }
 });
 
+// Sert l'image de couverture d'un livre
+app.get('/api/books/:id/cover', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT cover_data, cover_mime FROM books WHERE id = $1', [req.params.id]);
+    const book = result.rows[0];
+    if (!book || !book.cover_data) return res.status(404).end();
+    res.setHeader('Content-Type', book.cover_mime || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(book.cover_data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Sert le PDF d'un livre pour lecture en ligne (dans le navigateur, sans téléchargement forcé)
 app.get('/api/books/:id/read', async (req, res) => {
   try {
