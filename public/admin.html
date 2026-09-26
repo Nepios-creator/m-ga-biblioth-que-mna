@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panneau admin — Grande Bibliothèque numérique MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; margin-bottom: 30px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14.5px; font-family: inherit;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .book-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid var(--line); gap: 10px;
+  }
+  .book-row:last-child { border-bottom: none; }
+  .book-row .info strong { display: block; }
+  .book-row .info span { font-size: 12.5px; color: var(--ink-soft); }
+  .book-row button {
+    border: none; background: #fdeaea; color: #a33; padding: 6px 12px;
+    border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Grande <span>Bibliothèque</span> MNA</div>
+  <nav><a href="/">Accueil</a><a href="/catalogue.html">Catalogue</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel">
+      <h2>Accès refusé</h2>
+      <p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p>
+    </div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Panneau administrateur</h1>
+    <p style="color:var(--ink-soft);margin-bottom:28px;">Ajoutez, modifiez ou supprimez les livres de la bibliothèque.</p>
+
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Ajouter un livre</h2>
+      <div id="msg-box"></div>
+      <form id="book-form">
+        <div class="field"><label>Titre *</label><input type="text" id="f-title" required></div>
+        <div class="row2">
+          <div class="field"><label>Auteur</label><input type="text" id="f-author"></div>
+          <div class="field"><label>Format source</label>
+            <select id="f-format"><option value="">—</option><option value="pdf">PDF</option><option value="word">Word</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Description</label><textarea id="f-description" rows="3"></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Accès</label>
+            <select id="f-access">
+              <option value="lecture_en_ligne">Lecture en ligne</option>
+              <option value="telechargeable">Téléchargeable</option>
+              <option value="a_vendre">À vendre</option>
+            </select>
+          </div>
+          <div class="field"><label>Prix (si à vendre)</label><input type="number" step="0.01" id="f-price"></div>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="f-audio" style="width:auto;margin-right:6px;">Disponible en audio</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Ajouter le livre</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Livres existants</h2>
+      <div id="books-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const user = userRaw ? JSON.parse(userRaw) : null;
+
+if (!token || !user || user.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  loadBooks();
+}
+
+function showMsg(text, type) {
+  $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+async function loadBooks() {
+  const r = await fetch('/api/admin/books', { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) { $('books-list').innerHTML = '<p>Erreur de chargement.</p>'; return; }
+  const books = await r.json();
+  if (!books.length) {
+    $('books-list').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre pour le moment.</p>';
+    return;
+  }
+  $('books-list').innerHTML = books.map(b => `
+    <div class="book-row">
+      <div class="info"><strong>${b.title}</strong><span>${b.author || 'Auteur non précisé'} · ${b.access_type}</span></div>
+      <button data-id="${b.id}" class="delete-btn">Supprimer</button>
+    </div>
+  `).join('');
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Supprimer ce livre ?')) return;
+      await fetch(`/api/admin/books/${btn.dataset.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      loadBooks();
+    });
+  });
+}
+
+$('book-form') && $('book-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    title: $('f-title').value,
+    author: $('f-author').value,
+    source_format: $('f-format').value || null,
+    description: $('f-description').value,
+    access_type: $('f-access').value,
+    price: $('f-price').value ? parseFloat($('f-price').value) : null,
+    has_audio: $('f-audio').checked,
+  };
+  const r = await fetch('/api/admin/books', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (!r.ok) return showMsg(data.message || 'Erreur', 'error');
+  showMsg('Livre ajouté avec succès !', 'success');
+  $('book-form').reset();
+  loadBooks();
+});
+</script>
+
+</body>
+</html>
