@@ -1,8 +1,10 @@
 const express = require('express');
+const multer = require('multer');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25 Mo max
 
 // Toutes les routes ci-dessous exigent d'être connecté ET admin
 router.use(requireAuth, requireAdmin);
@@ -62,6 +64,24 @@ router.put('/books/:id', async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Livre introuvable' });
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Téléverser le fichier PDF d'un livre (remplace le fichier existant s'il y en avait un)
+router.post('/books/:id/pdf', upload.single('pdf'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Aucun fichier reçu' });
+  if (req.file.mimetype !== 'application/pdf') {
+    return res.status(400).json({ message: 'Le fichier doit être un PDF' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE books SET pdf_data = $1, pdf_filename = $2 WHERE id = $3 RETURNING id, title',
+      [req.file.buffer, req.file.originalname, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Livre introuvable' });
+    res.json({ message: 'PDF téléversé avec succès', book: result.rows[0] });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
