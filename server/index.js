@@ -33,6 +33,44 @@ app.get('/api/books', async (req, res) => {
   }
 });
 
+// Sert le PDF d'un livre pour lecture en ligne (dans le navigateur, sans téléchargement forcé)
+app.get('/api/books/:id/read', async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT title, pdf_data, pdf_filename, access_type FROM books WHERE id = $1 AND access_type != 'a_vendre'",
+      [req.params.id]
+    );
+    const book = result.rows[0];
+    if (!book || !book.pdf_data) {
+      return res.status(404).json({ message: 'Fichier non disponible' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${book.pdf_filename || 'livre.pdf'}"`);
+    res.send(book.pdf_data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Télécharge le PDF d'un livre (uniquement si autorisé par l'administrateur)
+app.get('/api/books/:id/download', async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT title, pdf_data, pdf_filename FROM books WHERE id = $1 AND access_type = 'telechargeable'",
+      [req.params.id]
+    );
+    const book = result.rows[0];
+    if (!book || !book.pdf_data) {
+      return res.status(404).json({ message: 'Téléchargement non disponible pour ce livre' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${book.pdf_filename || 'livre.pdf'}"`);
+    res.send(book.pdf_data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
