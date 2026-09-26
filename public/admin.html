@@ -113,15 +113,34 @@ async function loadBooks() {
     return;
   }
   $('books-list').innerHTML = books.map(b => `
-    <div class="book-row">
-      <div class="info"><strong>${b.title}</strong><span>${b.author || 'Auteur non précisé'} · ${b.access_type}</span></div>
-      <button data-id="${b.id}" class="delete-btn">Supprimer</button>
+    <div class="book-row" style="flex-wrap:wrap;">
+      <div class="info"><strong>${b.title}</strong><span>${b.author || 'Auteur non précisé'} · ${b.access_type} · ${b.pdf_filename ? 'PDF: ' + b.pdf_filename : 'Aucun PDF'}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="file" accept="application/pdf" data-id="${b.id}" class="pdf-input" style="width:auto;font-size:12px;">
+        <button data-id="${b.id}" class="delete-btn">Supprimer</button>
+      </div>
     </div>
   `).join('');
   document.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('Supprimer ce livre ?')) return;
       await fetch(`/api/admin/books/${btn.dataset.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      loadBooks();
+    });
+  });
+  document.querySelectorAll('.pdf-input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('pdf', file);
+      showMsg('Téléversement du PDF en cours…', 'success');
+      const r = await fetch(`/api/admin/books/${input.dataset.id}/pdf`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData,
+      });
+      const data = await r.json();
+      if (!r.ok) return showMsg(data.message || 'Erreur de téléversement', 'error');
+      showMsg('PDF téléversé avec succès !', 'success');
       loadBooks();
     });
   });
