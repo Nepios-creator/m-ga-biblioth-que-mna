@@ -63,6 +63,11 @@
       <div class="panel" id="book-panel"></div>
     </div>
 
+    <div id="view-read" class="hidden">
+      <button class="btn btn-ghost" id="back-from-read" style="margin-bottom:18px;">← Retour</button>
+      <div class="panel" id="read-panel"></div>
+    </div>
+
     <div id="view-quiz" class="hidden">
       <button class="btn btn-ghost" id="back-from-quiz" style="margin-bottom:18px;">← Retour</button>
       <div class="panel" id="quiz-panel"></div>
@@ -98,7 +103,7 @@ if (!token || !user) {
 }
 
 function showView(name) {
-  ['view-list', 'view-book', 'view-quiz'].forEach(v => $(v).classList.add('hidden'));
+  ['view-list', 'view-book', 'view-read', 'view-quiz'].forEach(v => $(v).classList.add('hidden'));
   $(`view-${name}`).classList.remove('hidden');
 }
 
@@ -127,6 +132,7 @@ async function openBook(id) {
   const r = await fetch(`/api/study/books/${id}`, { headers: authHeaders });
   const data = await r.json();
   if (!r.ok) { alert(data.message); return; }
+  currentBookId = id;
   showView('book');
   const { book, progress, parts, all_parts_done } = data;
   $('book-panel').innerHTML = `
@@ -135,12 +141,12 @@ async function openBook(id) {
     ${parts.map(p => `
       <div class="part-row ${p.unlocked ? '' : 'locked'}">
         <div><strong>Partie ${p.part_index}</strong> — ${p.title}<br>
-          <span style="font-size:12.5px;color:var(--ink-soft);">Pages ${p.page_start}–${p.page_end}</span>
+          <span style="font-size:12.5px;color:var(--ink-soft);">${p.has_read ? '✅ Lue' : ''}</span>
         </div>
         ${p.unlocked ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="/api/books/${book.id}/read#page=${p.page_start}" target="_blank" class="btn btn-ghost">Lire</a>
-            <button class="btn btn-primary" onclick="openPartQuiz(${p.id}, '${p.title.replace(/'/g, "\\'")}')">Test</button>
+            <button class="btn btn-ghost" onclick="openPartReader(${p.id}, '${p.title.replace(/'/g, "\\'")}', ${p.part_index})">📖 Lire</button>
+            ${p.has_read ? `<button class="btn btn-primary" onclick="openPartQuiz(${p.id}, '${p.title.replace(/'/g, "\\'")}')">Test</button>` : ''}
           </div>` : '<span class="badge locked">🔒</span>'}
       </div>
     `).join('')}
@@ -155,6 +161,23 @@ async function openBook(id) {
   `;
 }
 
+async function openPartReader(partId, title, partIndex) {
+  showView('read');
+  $('read-panel').innerHTML = `
+    <h2 style="margin-bottom:14px;">Partie ${partIndex} — ${title}</h2>
+    <iframe src="/api/study/parts/${partId}/read" style="width:100%;height:65vh;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;"></iframe>
+    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px;">Lisez cette partie en entier, puis confirmez pour débloquer son test.</p>
+    <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
+  `;
+  $('confirm-read-btn').addEventListener('click', async () => {
+    await fetch(`/api/study/parts/${partId}/mark-read`, { method: 'POST', headers: authHeaders });
+    openBook(currentBookId);
+  });
+}
+
+$('back-from-read') && $('back-from-read').addEventListener('click', () => openBook(currentBookId));
+
+let currentBookId = null;
 let currentQuizContext = null;
 
 async function openPartQuiz(partId, title) {
