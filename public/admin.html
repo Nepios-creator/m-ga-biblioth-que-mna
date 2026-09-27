@@ -93,6 +93,17 @@
       <h2 style="margin-bottom:16px;">Messages des lecteurs</h2>
       <div id="messages-admin-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
     </div>
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Connaissances de l'assistant IA</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Ajoutez ici le résumé ou le texte d'un livre pour que l'assistant biblique puisse s'en servir pour répondre.</p>
+      <div id="knowledge-msg"></div>
+      <form id="knowledge-form" style="margin-bottom:18px;">
+        <div class="field"><label>Titre</label><input type="text" id="k-title" required placeholder="Ex : Nom du livre — Chapitre 1"></div>
+        <div class="field"><label>Contenu</label><textarea id="k-content" rows="4" required placeholder="Résumé ou extrait du texte…"></textarea></div>
+        <button type="submit" class="btn btn-primary">Ajouter</button>
+      </form>
+      <div id="knowledge-list"></div>
+    </div>
   </div>
 </div>
 
@@ -233,6 +244,42 @@ async function loadAdminMessages() {
   });
 }
 if (token && user && user.role === 'admin') loadAdminMessages();
+
+async function loadKnowledge() {
+  const r = await fetch('/api/admin/knowledge', { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) { $('knowledge-list').innerHTML = '<p>Erreur de chargement.</p>'; return; }
+  const items = await r.json();
+  if (!items.length) { $('knowledge-list').innerHTML = '<p style="color:var(--ink-soft);">Aucune connaissance ajoutée pour le moment.</p>'; return; }
+  $('knowledge-list').innerHTML = items.map(k => `
+    <div class="book-row">
+      <div class="info"><strong>${k.title}</strong><span>${k.preview}…</span></div>
+      <button data-id="${k.id}" class="delete-knowledge-btn">Supprimer</button>
+    </div>
+  `).join('');
+  document.querySelectorAll('.delete-knowledge-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Supprimer cette connaissance ?')) return;
+      await fetch(`/api/admin/knowledge/${btn.dataset.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      loadKnowledge();
+    });
+  });
+}
+
+$('knowledge-form') && $('knowledge-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = $('k-title').value, content = $('k-content').value;
+  const r = await fetch('/api/admin/knowledge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, content }),
+  });
+  const data = await r.json();
+  if (!r.ok) { $('knowledge-msg').innerHTML = `<div class="msg error">${data.message}</div>`; return; }
+  $('knowledge-msg').innerHTML = '<div class="msg success">Connaissance ajoutée !</div>';
+  $('knowledge-form').reset();
+  loadKnowledge();
+});
+if (token && user && user.role === 'admin') loadKnowledge();
 </script>
 
 </body>
