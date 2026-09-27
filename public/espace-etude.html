@@ -3,26 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Espace d'étude — Grande Bibliothèque numérique MNA</title>
+<title>Espace d'étude — Ministère de la Nouvelle Alliance</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 24px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; margin-bottom: 22px; }
+  .study-book { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .study-book:last-child { border-bottom: none; }
+  .study-book.locked { opacity: 0.5; }
+  .study-book h3 { font-size: 17px; margin-bottom: 4px; }
+  .study-book .meta { font-size: 13px; color: var(--ink-soft); }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; }
+  .badge.locked { background: #f2ece0; color: var(--ink-soft); }
+  .badge.unlocked { background: #e8f1fa; color: var(--blue-deep); }
+  .badge.done { background: #e8f6ec; color: #2a7a44; }
+  .part-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .part-row:last-child { border-bottom: none; }
+  .part-row.locked { opacity: 0.45; }
+  .quiz-q { margin-bottom: 20px; }
+  .quiz-q p { font-weight: 600; margin-bottom: 10px; }
+  .quiz-choice { display: block; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .quiz-choice input { margin-right: 8px; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .hidden { display: none; }
+  textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 14.5px; }
+  .msg-item { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .msg-item .reply { margin-top: 8px; padding: 10px; background: var(--paper); border-radius: 8px; }
+</style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
   <nav>
     <a href="/a-propos.html">À propos</a>
     <a href="/catalogue.html">Catalogue</a>
-    <a href="/login.html">Connexion</a>
+    <a href="/login.html">Mon compte</a>
   </nav>
 </header>
 
-<section class="hero">
-  <h1>Espace d'étude</h1>
-  <p>Un parcours guidé, livre après livre, partie après partie. La progression, les tests et les brevets seront activés en phase 4 du projet.</p>
-</section>
+<div class="wrap">
+  <div id="logged-out" class="hidden panel">
+    <h2>Espace d'étude</h2>
+    <p style="color:var(--ink-soft);">Connectez-vous ou créez un compte pour accéder aux livres de formation, suivre votre progression et obtenir vos brevets.</p>
+    <a href="/login.html" class="btn btn-primary">Se connecter / Créer un compte</a>
+  </div>
 
-<footer>Grande Bibliothèque numérique MNA — © 2026</footer>
+  <div id="app" class="hidden">
+    <div id="view-list">
+      <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Espace d'étude</h1>
+      <p style="color:var(--ink-soft);margin-bottom:24px;">Un parcours guidé, livre après livre. Chaque partie lue débloque un test ; chaque livre achevé délivre un brevet.</p>
+      <div class="panel" id="books-panel"><p>Chargement…</p></div>
+    </div>
+
+    <div id="view-book" class="hidden">
+      <button class="btn btn-ghost" id="back-to-list" style="margin-bottom:18px;">← Retour</button>
+      <div class="panel" id="book-panel"></div>
+    </div>
+
+    <div id="view-quiz" class="hidden">
+      <button class="btn btn-ghost" id="back-from-quiz" style="margin-bottom:18px;">← Retour</button>
+      <div class="panel" id="quiz-panel"></div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:12px;">Un message pour le ministère</h2>
+      <div id="msg-box"></div>
+      <form id="message-form" style="margin-bottom:20px;">
+        <textarea id="msg-body" rows="3" placeholder="Écrivez votre message ici…" required></textarea>
+        <button type="submit" class="btn btn-primary" style="margin-top:10px;">Envoyer</button>
+      </form>
+      <div id="messages-list"></div>
+    </div>
+  </div>
+</div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const user = userRaw ? JSON.parse(userRaw) : null;
+const authHeaders = { Authorization: `Bearer ${token}` };
+
+if (!token || !user) {
+  $('logged-out').classList.remove('hidden');
+} else {
+  $('app').classList.remove('hidden');
+  loadBooks();
+  loadMessages();
+}
+
+function showView(name) {
+  ['view-list', 'view-book', 'view-quiz'].forEach(v => $(v).classList.add('hidden'));
+  $(`view-${name}`).classList.remove('hidden');
+}
+
+async function loadBooks() {
+  const r = await fetch('/api/study/books', { headers: authHeaders });
+  const books = await r.json();
+  if (!r.ok) { $('books-panel').innerHTML = `<p>${books.message || 'Erreur'}</p>`; return; }
+  if (!books.length) { $('books-panel').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre dans l\'espace d\'étude pour le moment.</p>'; return; }
+  $('books-panel').innerHTML = books.map(b => `
+    <div class="study-book ${b.unlocked ? '' : 'locked'}">
+      <div>
+        <h3>${b.title}</h3>
+        <div class="meta">${b.author || ''} · ${b.total_parts} partie(s)</div>
+      </div>
+      <div style="text-align:right;">
+        ${b.certificate_issued ? '<span class="badge done">Brevet obtenu</span><br>' : ''}
+        ${b.unlocked
+          ? `<button class="btn btn-primary" style="margin-top:6px;" onclick="openBook(${b.id})">${b.certificate_issued ? 'Revoir' : 'Continuer'}</button>`
+          : '<span class="badge locked">Verrouillé</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openBook(id) {
+  const r = await fetch(`/api/study/books/${id}`, { headers: authHeaders });
+  const data = await r.json();
+  if (!r.ok) { alert(data.message); return; }
+  showView('book');
+  const { book, progress, parts, all_parts_done } = data;
+  $('book-panel').innerHTML = `
+    <h2 style="margin-bottom:4px;">${book.title}</h2>
+    <p style="color:var(--ink-soft);margin-bottom:20px;">${book.description || ''}</p>
+    ${parts.map(p => `
+      <div class="part-row ${p.unlocked ? '' : 'locked'}">
+        <div><strong>Partie ${p.part_index}</strong> — ${p.title}<br>
+          <span style="font-size:12.5px;color:var(--ink-soft);">Pages ${p.page_start}–${p.page_end}</span>
+        </div>
+        ${p.unlocked ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="/api/books/${book.id}/read#page=${p.page_start}" target="_blank" class="btn btn-ghost">Lire</a>
+            <button class="btn btn-primary" onclick="openPartQuiz(${p.id}, '${p.title.replace(/'/g, "\\'")}')">Test</button>
+          </div>` : '<span class="badge locked">🔒</span>'}
+      </div>
+    `).join('')}
+    ${all_parts_done && !progress.grand_test_passed ? `
+      <div style="margin-top:20px;text-align:center;">
+        <button class="btn btn-primary" onclick="openGrandQuiz(${book.id}, '${book.title.replace(/'/g, "\\'")}')">Passer le grand test final</button>
+      </div>` : ''}
+    ${progress.certificate_issued ? `
+      <div style="margin-top:20px;text-align:center;">
+        <a href="/api/study/books/${book.id}/certificate" target="_blank" class="btn btn-primary">🎓 Télécharger mon brevet</a>
+      </div>` : ''}
+  `;
+}
+
+let currentQuizContext = null;
+
+async function openPartQuiz(partId, title) {
+  const r = await fetch(`/api/study/parts/${partId}/quiz`, { headers: authHeaders });
+  const questions = await r.json();
+  if (!r.ok) { alert(questions.message); return; }
+  currentQuizContext = { type: 'part', id: partId };
+  renderQuiz(title, questions);
+}
+
+async function openGrandQuiz(bookId, title) {
+  const r = await fetch(`/api/study/books/${bookId}/grand-quiz`, { headers: authHeaders });
+  const questions = await r.json();
+  if (!r.ok) { alert(questions.message); return; }
+  currentQuizContext = { type: 'grand', id: bookId };
+  renderQuiz('Grand test — ' + title, questions);
+}
+
+function renderQuiz(title, questions) {
+  showView('quiz');
+  $('quiz-panel').innerHTML = `
+    <h2 style="margin-bottom:20px;">${title}</h2>
+    <form id="quiz-form">
+      ${questions.map(q => `
+        <div class="quiz-q">
+          <p>${q.question_text}</p>
+          ${q.choices.map((c, i) => `
+            <label class="quiz-choice"><input type="radio" name="q${q.id}" value="${i}" required> ${c}</label>
+          `).join('')}
+        </div>
+      `).join('')}
+      <button type="submit" class="btn btn-primary">Valider mes réponses</button>
+    </form>
+    <div id="quiz-result"></div>
+  `;
+  $('quiz-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const answers = {};
+    questions.forEach(q => {
+      const checked = document.querySelector(`input[name="q${q.id}"]:checked`);
+      answers[q.id] = checked ? parseInt(checked.value) : -1;
+    });
+    const url = currentQuizContext.type === 'part'
+      ? `/api/study/parts/${currentQuizContext.id}/quiz`
+      : `/api/study/books/${currentQuizContext.id}/grand-quiz`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ answers }),
+    });
+    const result = await r.json();
+    $('quiz-result').innerHTML = `
+      <div class="msg ${result.passed ? 'success' : 'error'}">
+        ${result.passed ? '✅ Réussi !' : '❌ Non réussi.'} Score : ${result.score}% (${result.correct}/${result.total})
+        ${result.passed ? '' : ' — Relisez la partie puis retentez le test.'}
+      </div>
+      <button class="btn btn-ghost" onclick="showView('list'); loadBooks();">Retour à la liste des livres</button>
+    `;
+  });
+}
+
+$('back-to-list').addEventListener('click', () => { showView('list'); loadBooks(); });
+$('back-from-quiz').addEventListener('click', () => { showView('list'); loadBooks(); });
+
+// Messagerie
+function showMsg(text, type) {
+  $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+$('message-form') && $('message-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = $('msg-body').value;
+  const r = await fetch('/api/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ body }),
+  });
+  const data = await r.json();
+  if (!r.ok) return showMsg(data.message || 'Erreur', 'error');
+  showMsg(data.acknowledgement, 'success');
+  $('msg-body').value = '';
+  loadMessages();
+});
+
+async function loadMessages() {
+  const r = await fetch('/api/messages', { headers: authHeaders });
+  if (!r.ok) return;
+  const messages = await r.json();
+  if (!messages.length) { $('messages-list').innerHTML = ''; return; }
+  $('messages-list').innerHTML = messages.map(m => `
+    <div class="msg-item">
+      <div>${m.body}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">${m.status === 'repondu' ? '✅ Répondu' : '⏳ En attente de réponse'}</div>
+      ${m.reply_body ? `<div class="reply"><strong>Réponse du ministère :</strong> ${m.reply_body}</div>` : ''}
+    </div>
+  `).join('');
+}
+</script>
 
 </body>
 </html>
