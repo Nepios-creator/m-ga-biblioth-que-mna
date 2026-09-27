@@ -33,6 +33,8 @@
 <footer>Grande Bibliothèque numérique MNA — © 2026</footer>
 
 <script>
+if (!localStorage.getItem('mna_token')) { window.location.href = '/login.html'; }
+
 fetch('/api/books')
   .then(r => r.json())
   .then(books => {
