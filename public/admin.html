@@ -97,9 +97,17 @@
       <h2 style="margin-bottom:16px;">Connaissances de l'assistant IA</h2>
       <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Ajoutez ici le résumé ou le texte d'un livre pour que l'assistant biblique puisse s'en servir pour répondre.</p>
       <div id="knowledge-msg"></div>
+
+      <div style="background:var(--paper);padding:16px;border-radius:10px;margin-bottom:20px;">
+        <label style="font-size:13.5px;font-weight:600;display:block;margin-bottom:8px;">📎 Nourrir l'IA directement avec un PDF ou Word</label>
+        <input type="file" id="k-file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="margin-bottom:8px;">
+        <input type="text" id="k-file-title" placeholder="Titre (optionnel — sinon le nom du fichier)" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;">
+        <button type="button" class="btn btn-primary" id="k-file-upload-btn" style="padding:8px 16px;font-size:13px;">Téléverser et intégrer à l'IA</button>
+      </div>
+
       <form id="knowledge-form" style="margin-bottom:18px;">
-        <div class="field"><label>Titre</label><input type="text" id="k-title" required placeholder="Ex : Nom du livre — Chapitre 1"></div>
-        <div class="field"><label>Contenu</label><textarea id="k-content" rows="4" required placeholder="Résumé ou extrait du texte…"></textarea></div>
+        <div class="field"><label>Ou ajouter un texte manuellement</label><input type="text" id="k-title" required placeholder="Titre — Ex : Nom du livre, Chapitre 1"></div>
+        <div class="field"><textarea id="k-content" rows="4" required placeholder="Résumé ou extrait du texte…"></textarea></div>
         <button type="submit" class="btn btn-primary">Ajouter</button>
       </form>
       <div id="knowledge-list"></div>
@@ -265,8 +273,7 @@ async function loadKnowledge() {
   });
 }
 
-$('knowledge-form') && $('knowledge-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+$('knowledge-form') && $('knowledge-form').addEventListener('submit', async (e) => {  e.preventDefault();
   const title = $('k-title').value, content = $('k-content').value;
   const r = await fetch('/api/admin/knowledge', {
     method: 'POST',
@@ -280,6 +287,23 @@ $('knowledge-form') && $('knowledge-form').addEventListener('submit', async (e) 
   loadKnowledge();
 });
 if (token && user && user.role === 'admin') loadKnowledge();
+
+$('k-file-upload-btn') && $('k-file-upload-btn').addEventListener('click', async () => {
+  const file = $('k-file').files[0];
+  if (!file) { $('knowledge-msg').innerHTML = '<div class="msg error">Choisissez un fichier PDF ou Word</div>'; return; }
+  const formData = new FormData();
+  formData.append('file', file);
+  if ($('k-file-title').value) formData.append('title', $('k-file-title').value);
+  $('knowledge-msg').innerHTML = '<div class="msg success">Extraction et intégration en cours…</div>';
+  const r = await fetch('/api/admin/knowledge/upload', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData,
+  });
+  const data = await r.json();
+  if (!r.ok) { $('knowledge-msg').innerHTML = `<div class="msg error">${data.message}</div>`; return; }
+  $('knowledge-msg').innerHTML = `<div class="msg success">${data.message}</div>`;
+  $('k-file').value = ''; $('k-file-title').value = '';
+  loadKnowledge();
+});
 </script>
 
 </body>
