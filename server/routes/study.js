@@ -1,13 +1,30 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const { PDFDocument: PDFLibDocument } = require('pdf-lib');
 const pool = require('../db/pool');
-const { requireAuth } = require('../lib/auth-middleware');
+const { requireAuth, JWT_SECRET } = require('../lib/auth-middleware');
 
 const router = express.Router();
-router.use(requireAuth);
 
 const PASS_THRESHOLD = 0.7; // 70% pour réussir un test
+
+// Génère un lien de lecture à durée limitée (10 min) pour une partie — permet d'ouvrir le PDF
+// dans un nouvel onglet (le navigateur mobile gère mal les PDF affichés en iframe avec jeton d'en-tête)
+router.get('/parts/:partId/read-link', requireAuth, async (req, res) => {
+  try {
+    const part = (await pool.query('SELECT * FROM book_parts WHERE id=$1', [req.params.partId])).rows[0];
+    if (!part) return res.status(404).json({ message: 'Partie introuvable' });
+    const progress = await ensureProgress(req.user.id, part.book_id);
+    if (!progress.unlocked || part.part_index > progress.current_part_index) {
+      return res.status(403).json({ message: 'Cette partie n\'est pas encore déverrouillée' });
+    }
+    const readToken = jwt.sign({ userId: req.user.id, partId: part.id, purpose: 'part-read' }, JWT_SECRET, { expiresIn: '10m' });
+    res.json({ url: `/api/study/parts/${part.id}/read?token=${readToken}` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // S'assure qu'un user_progress existe pour ce livre, et le crée déverrouillé si c'est le tout premier livre de l'espace d'étude
 async function ensureProgress(userId, bookId) {
@@ -28,7 +45,7 @@ async function ensureProgress(userId, bookId) {
 }
 
 // Liste des livres de l'espace d'étude avec statut de déverrouillage pour le lecteur connecté
-router.get('/books', async (req, res) => {
+router.get('/books', requireAuth, async (req, res) => {
   try {
     const books = (await pool.query('SELECT * FROM books WHERE is_study_book=true ORDER BY order_index ASC NULLS LAST, id ASC')).rows;
     const result = [];
@@ -51,7 +68,7 @@ router.get('/books', async (req, res) => {
 });
 
 // Détail d'un livre : ses parties avec leur statut verrouillé/déverrouillé
-router.get('/books/:id', async (req, res) => {
+router.get('/books/:id', requireAuth, async (req, res) => {
   try {
     const book = (await pool.query('SELECT * FROM books WHERE id=$1 AND is_study_book=true', [req.params.id])).rows[0];
     if (!book) return res.status(404).json({ message: 'Livre introuvable' });
@@ -76,7 +93,7 @@ router.get('/books/:id', async (req, res) => {
 });
 
 // Contenu (résumé + pages à lire) d'une partie, si déverrouillée
-router.get('/parts/:partId', async (req, res) => {
+router.get('/parts/:partId', requireAuth, async (req, res) => {
   try {
     const part = (await pool.query('SELECT * FROM book_parts WHERE id=$1', [req.params.partId])).rows[0];
     if (!part) return res.status(404).json({ message: 'Partie introuvable' });
@@ -93,9 +110,20 @@ router.get('/parts/:partId', async (req, res) => {
 // Sert UNIQUEMENT les pages de cette partie (extraites du PDF complet) — empêche de lire la suite du livre
 router.get('/parts/:partId/read', async (req, res) => {
   try {
+    const { token } = req.query;
+    if (!token) return res.status(401).json({ message: 'Connexion requise' });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ message: 'Lien expiré, veuillez recharger la page' });
+    }
+    if (decoded.purpose !== 'part-read' || String(decoded.partId) !== String(req.params.partId)) {
+      return res.status(401).json({ message: 'Lien invalide' });
+    }
     const part = (await pool.query('SELECT * FROM book_parts WHERE id=$1', [req.params.partId])).rows[0];
     if (!part) return res.status(404).json({ message: 'Partie introuvable' });
-    const progress = await ensureProgress(req.user.id, part.book_id);
+    const progress = await ensureProgress(decoded.userId, part.book_id);
     if (!progress.unlocked || part.part_index > progress.current_part_index) {
       return res.status(403).json({ message: 'Cette partie n\'est pas encore déverrouillée' });
     }
@@ -121,6 +149,8 @@ router.get('/parts/:partId/read', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+router.use(requireAuth);
 
 // Marque une partie comme lue — condition requise avant de pouvoir passer son test
 router.post('/parts/:partId/mark-read', async (req, res) => {
