@@ -144,4 +144,36 @@ router.put('/messages/:id', async (req, res) => {
   }
 });
 
+// Voir toutes les connaissances de l'assistant IA
+router.get('/knowledge', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, title, LEFT(content, 120) AS preview, created_at FROM ai_knowledge ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Ajouter une connaissance (résumé, extrait, ou texte d'un livre) pour l'assistant IA
+router.post('/knowledge', async (req, res) => {
+  const { title, content } = req.body;
+  if (!title || !content) return res.status(400).json({ message: 'Titre et contenu requis' });
+  try {
+    const result = await pool.query('INSERT INTO ai_knowledge (title, content) VALUES ($1,$2) RETURNING id, title', [title, content]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Supprimer une connaissance
+router.delete('/knowledge/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM ai_knowledge WHERE id = $1', [req.params.id]);
+    res.status(204).end();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
