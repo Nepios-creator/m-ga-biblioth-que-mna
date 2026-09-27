@@ -165,26 +165,17 @@ async function openPartReader(partId, title, partIndex) {
   showView('read');
   $('read-panel').innerHTML = `
     <h2 style="margin-bottom:14px;">Partie ${partIndex} — ${title}</h2>
-    <div id="pdf-loading" style="padding:40px;text-align:center;color:var(--ink-soft);">Chargement du PDF…</div>
-    <iframe id="pdf-frame" class="hidden" style="width:100%;height:65vh;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;"></iframe>
-    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px;">Lisez cette partie en entier, puis confirmez pour débloquer son test.</p>
+    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px;">Le PDF de cette partie s'ouvre dans un nouvel onglet. Lisez-la en entier, revenez ici, puis confirmez pour débloquer le test.</p>
+    <a href="#" id="open-pdf-link" target="_blank" class="btn btn-primary" style="margin-bottom:20px;">📖 Ouvrir la partie à lire</a><br>
     <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
   `;
   try {
-    const r = await fetch(`/api/study/parts/${partId}/read`, { headers: authHeaders });
-    if (!r.ok) {
-      const err = await r.json();
-      $('pdf-loading').textContent = err.message || 'Erreur de chargement du PDF';
-      return;
-    }
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    $('pdf-loading').classList.add('hidden');
-    const frame = $('pdf-frame');
-    frame.src = url;
-    frame.classList.remove('hidden');
+    const r = await fetch(`/api/study/parts/${partId}/read-link`, { headers: authHeaders });
+    const data = await r.json();
+    if (!r.ok) { alert(data.message); return; }
+    $('open-pdf-link').href = data.url;
   } catch (err) {
-    $('pdf-loading').textContent = 'Erreur de chargement du PDF';
+    alert('Erreur lors de la préparation du lien de lecture');
   }
   $('confirm-read-btn').addEventListener('click', async () => {
     await fetch(`/api/study/parts/${partId}/mark-read`, { method: 'POST', headers: authHeaders });
