@@ -4,6 +4,8 @@ const path = require('path');
 const pool = require('./db/pool');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const studyRoutes = require('./routes/study');
+const messagesRoutes = require('./routes/messages');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -87,6 +89,8 @@ app.get('/api/books/:id/download', async (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/study', studyRoutes);
+app.use('/api/messages', messagesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
