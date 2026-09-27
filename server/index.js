@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db/pool');
+const { requireAuth } = require('./lib/auth-middleware');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const studyRoutes = require('./routes/study');
@@ -24,8 +25,8 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Liste publique des livres du catalogue (hors espace d'étude)
-app.get('/api/books', async (req, res) => {
+// Liste des livres du catalogue (hors espace d'étude) — réservé aux membres connectés
+app.get('/api/books', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, title, author, description, cover_url, access_type, price, has_audio FROM books WHERE is_study_book = false ORDER BY created_at DESC"
@@ -50,8 +51,8 @@ app.get('/api/books/:id/cover', async (req, res) => {
   }
 });
 
-// Sert le PDF d'un livre pour lecture en ligne (dans le navigateur, sans téléchargement forcé)
-app.get('/api/books/:id/read', async (req, res) => {
+// Sert le PDF d'un livre pour lecture en ligne — réservé aux membres connectés
+app.get('/api/books/:id/read', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT title, pdf_data, pdf_filename, access_type, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
@@ -72,8 +73,8 @@ app.get('/api/books/:id/read', async (req, res) => {
   }
 });
 
-// Télécharge le PDF d'un livre (uniquement si autorisé par l'administrateur)
-app.get('/api/books/:id/download', async (req, res) => {
+// Télécharge le PDF d'un livre — réservé aux membres connectés
+app.get('/api/books/:id/download', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT title, pdf_data, pdf_filename, is_study_book FROM books WHERE id = $1 AND access_type = 'telechargeable'",
