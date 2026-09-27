@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant biblique — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .chat-wrap { max-width: 720px; margin: 0 auto; padding: 30px 24px 20px; }
+  .chat-box {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    height: 60vh; overflow-y: auto; padding: 20px; margin-bottom: 16px;
+  }
+  .bubble { max-width: 80%; padding: 12px 16px; border-radius: 14px; margin-bottom: 12px; font-size: 14.5px; line-height: 1.5; }
+  .bubble.user { background: var(--blue); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+  .bubble.assistant { background: var(--paper); color: var(--ink); border-bottom-left-radius: 4px; white-space: pre-wrap; }
+  .bubble.sources { font-size: 11.5px; color: var(--ink-soft); margin-top: -6px; margin-bottom: 12px; }
+  .chat-input-row { display: flex; gap: 10px; padding: 0 0 40px; }
+  .chat-input-row textarea {
+    flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+    font-family: inherit; font-size: 14.5px; resize: none;
+  }
+  .intro { text-align: center; color: var(--ink-soft); font-size: 14px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/assistant.html">Assistant biblique</a>
+  </nav>
+</header>
+
+<div class="chat-wrap">
+  <h1 style="font-family:'Fraunces',serif;text-align:center;margin-bottom:6px;">🕊️ Assistant biblique</h1>
+  <p class="intro">Posez une question de foi ou de doctrine — l'assistant répond à partir des livres du MNA et d'une connaissance biblique saine.</p>
+
+  <div class="chat-box" id="chat-box">
+    <div class="bubble assistant">Bienvenue ! Je suis l'assistant du Ministère de la Nouvelle Alliance. Posez-moi une question biblique ou spirituelle — par exemple sur la grâce, la loi, ou les enseignements des livres du site.</div>
+  </div>
+
+  <form class="chat-input-row" id="chat-form">
+    <textarea id="chat-input" rows="2" placeholder="Écrivez votre question ici…" required></textarea>
+    <button type="submit" class="btn btn-primary" id="chat-send">Envoyer</button>
+  </form>
+</div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let history = [];
+
+function addBubble(text, cls) {
+  const div = document.createElement('div');
+  div.className = `bubble ${cls}`;
+  div.textContent = text;
+  $('chat-box').appendChild(div);
+  $('chat-box').scrollTop = $('chat-box').scrollHeight;
+  return div;
+}
+
+$('chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = $('chat-input').value.trim();
+  if (!question) return;
+  addBubble(question, 'user');
+  $('chat-input').value = '';
+  $('chat-send').disabled = true;
+  const loadingBubble = addBubble('…', 'assistant');
+
+  try {
+    const r = await fetch('/api/assistant/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, history }),
+    });
+    const data = await r.json();
+    loadingBubble.remove();
+    if (!r.ok) {
+      addBubble(data.message || 'Une erreur est survenue.', 'assistant');
+    } else {
+      addBubble(data.answer, 'assistant');
+      if (data.sources && data.sources.length) {
+        const src = document.createElement('div');
+        src.className = 'bubble sources';
+        src.textContent = 'Sources : ' + data.sources.join(', ');
+        $('chat-box').appendChild(src);
+      }
+      history.push({ role: 'user', content: question });
+      history.push({ role: 'assistant', content: data.answer });
+    }
+  } catch (err) {
+    loadingBubble.remove();
+    addBubble('Erreur de connexion à l\'assistant.', 'assistant');
+  }
+  $('chat-send').disabled = false;
+  $('chat-box').scrollTop = $('chat-box').scrollHeight;
+});
+</script>
+
+</body>
+</html>
