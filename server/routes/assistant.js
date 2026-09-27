@@ -33,7 +33,7 @@ async function retrieveContext(question) {
 router.post('/ask', async (req, res) => {
   const { question, history } = req.body;
   if (!question || !question.trim()) return res.status(400).json({ message: 'Question vide' });
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.MISTRAL_API_KEY) {
     return res.status(503).json({ message: 'L\'assistant n\'est pas encore configuré (clé API manquante).' });
   }
   try {
@@ -43,29 +43,28 @@ router.post('/ask', async (req, res) => {
       : '(Aucun extrait pertinent trouvé dans la bibliothèque pour cette question — réponds avec une connaissance biblique générale.)';
 
     const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
       ...(Array.isArray(history) ? history.slice(-6) : []),
       { role: 'user', content: `Extraits disponibles :\n\n${contextText}\n\nQuestion du lecteur : ${question}` },
     ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'mistral-small-latest',
         max_tokens: 800,
-        system: SYSTEM_PROMPT,
         messages,
       }),
     });
     const data = await response.json();
     if (!response.ok) {
-      return res.status(502).json({ message: data.error?.message || 'Erreur de l\'assistant' });
+      return res.status(502).json({ message: data.message || data.error?.message || 'Erreur de l\'assistant' });
     }
-    const answer = data.content?.map(b => b.text || '').join('') || 'Désolé, je n\'ai pas pu répondre.';
+    const answer = data.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu répondre.';
     res.json({ answer, sources: context.map(c => c.title) });
   } catch (err) {
     res.status(500).json({ message: err.message });
