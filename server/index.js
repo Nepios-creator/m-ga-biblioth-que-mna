@@ -53,12 +53,15 @@ app.get('/api/books/:id/cover', async (req, res) => {
 app.get('/api/books/:id/read', async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT title, pdf_data, pdf_filename, access_type FROM books WHERE id = $1 AND access_type != 'a_vendre'",
+      "SELECT title, pdf_data, pdf_filename, access_type, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
       [req.params.id]
     );
     const book = result.rows[0];
     if (!book || !book.pdf_data) {
       return res.status(404).json({ message: 'Fichier non disponible' });
+    }
+    if (book.is_study_book) {
+      return res.status(403).json({ message: 'Ce livre fait partie de l\'espace d\'étude : lisez-le partie par partie depuis /espace-etude.html' });
     }
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${book.pdf_filename || 'livre.pdf'}"`);
@@ -72,12 +75,15 @@ app.get('/api/books/:id/read', async (req, res) => {
 app.get('/api/books/:id/download', async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT title, pdf_data, pdf_filename FROM books WHERE id = $1 AND access_type = 'telechargeable'",
+      "SELECT title, pdf_data, pdf_filename, is_study_book FROM books WHERE id = $1 AND access_type = 'telechargeable'",
       [req.params.id]
     );
     const book = result.rows[0];
     if (!book || !book.pdf_data) {
       return res.status(404).json({ message: 'Téléchargement non disponible pour ce livre' });
+    }
+    if (book.is_study_book) {
+      return res.status(403).json({ message: 'Ce livre fait partie de l\'espace d\'étude et ne peut pas être téléchargé directement' });
     }
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${book.pdf_filename || 'livre.pdf'}"`);
