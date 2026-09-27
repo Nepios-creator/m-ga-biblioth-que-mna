@@ -1,5 +1,7 @@
 const express = require('express');
 const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
 
@@ -163,6 +165,47 @@ router.post('/knowledge', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// Nourrir l'assistant IA directement à partir d'un fichier PDF ou Word — extrait le texte et le découpe en morceaux exploitables
+router.post('/knowledge/upload', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Aucun fichier reçu' });
+  const baseTitle = req.body.title || req.file.originalname.replace(/\.(pdf|docx?)$/i, '');
+  try {
+    let fullText = '';
+    if (req.file.mimetype === 'application/pdf') {
+      const parsed = await pdfParse(req.file.buffer);
+      fullText = parsed.text;
+    } else if (
+      req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      req.file.originalname.toLowerCase().endsWith('.docx')
+    ) {
+      const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+      fullText = result.value;
+    } else {
+      return res.status(400).json({ message: 'Format non supporté — utilisez un PDF ou un fichier Word (.docx)' });
+    }
+
+    fullText = fullText.replace(/\n{3,}/g, '\n\n').trim();
+    if (!fullText) return res.status(400).json({ message: 'Aucun texte n\'a pu être extrait de ce fichier' });
+
+    // Découpe en morceaux d'environ 4000 caractères pour rester exploitable par l'assistant
+    const CHUNK_SIZE = 4000;
+    const chunks = [];
+    for (let i = 0; i < fullText.length; i += CHUNK_SIZE) {
+      chunks.push(fullText.slice(i, i + CHUNK_SIZE));
+    }
+
+    const inserted = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const title = chunks.length > 1 ? `${baseTitle} (partie ${i + 1}/${chunks.length})` : baseTitle;
+      const result = await pool.query('INSERT INTO ai_knowledge (title, content) VALUES ($1,$2) RETURNING id, title', [title, chunks[i]]);
+      inserted.push(result.rows[0]);
+    }
+    res.status(201).json({ message: `${chunks.length} morceau(x) ajouté(s) à la base de connaissances`, items: inserted });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de l\'extraction du texte : ' + err.message });
   }
 });
 
