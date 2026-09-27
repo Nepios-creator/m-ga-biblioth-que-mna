@@ -165,10 +165,27 @@ async function openPartReader(partId, title, partIndex) {
   showView('read');
   $('read-panel').innerHTML = `
     <h2 style="margin-bottom:14px;">Partie ${partIndex} — ${title}</h2>
-    <iframe src="/api/study/parts/${partId}/read" style="width:100%;height:65vh;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;"></iframe>
+    <div id="pdf-loading" style="padding:40px;text-align:center;color:var(--ink-soft);">Chargement du PDF…</div>
+    <iframe id="pdf-frame" class="hidden" style="width:100%;height:65vh;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;"></iframe>
     <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px;">Lisez cette partie en entier, puis confirmez pour débloquer son test.</p>
     <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
   `;
+  try {
+    const r = await fetch(`/api/study/parts/${partId}/read`, { headers: authHeaders });
+    if (!r.ok) {
+      const err = await r.json();
+      $('pdf-loading').textContent = err.message || 'Erreur de chargement du PDF';
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    $('pdf-loading').classList.add('hidden');
+    const frame = $('pdf-frame');
+    frame.src = url;
+    frame.classList.remove('hidden');
+  } catch (err) {
+    $('pdf-loading').textContent = 'Erreur de chargement du PDF';
+  }
   $('confirm-read-btn').addEventListener('click', async () => {
     await fetch(`/api/study/parts/${partId}/mark-read`, { method: 'POST', headers: authHeaders });
     openBook(currentBookId);
