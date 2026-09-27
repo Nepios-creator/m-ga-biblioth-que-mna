@@ -47,10 +47,17 @@ fetch('/api/books')
           <h3>${b.title}</h3>
           <div class="meta">${b.author || ''}</div>
           <p>${b.description || ''}</p>
-          <div class="actions">
-            <a href="/api/books/${b.id}/read" target="_blank" class="btn btn-primary">Lire</a>
-            ${b.access_type === 'telechargeable' ? `<a href="/api/books/${b.id}/download" class="btn btn-ghost">Télécharger</a>` : ''}
-          </div>
+          ${b.access_type === 'a_vendre' ? `
+            <div style="font-weight:700;color:var(--gold-deep);margin-bottom:10px;">${b.price ? Number(b.price).toFixed(2) + ' $' : 'Prix sur demande'}</div>
+            <div class="actions">
+              <a href="https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre : ' + b.title)}" target="_blank" class="btn btn-primary">Acheter via WhatsApp</a>
+            </div>
+          ` : `
+            <div class="actions">
+              <a href="/api/books/${b.id}/read" target="_blank" class="btn btn-primary">Lire</a>
+              ${b.access_type === 'telechargeable' ? `<a href="/api/books/${b.id}/download" class="btn btn-ghost">Télécharger</a>` : ''}
+            </div>
+          `}
         </div>
       </div>
     `).join('');
