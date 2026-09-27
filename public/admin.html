@@ -77,6 +77,9 @@
         <div class="field">
           <label><input type="checkbox" id="f-audio" style="width:auto;margin-right:6px;">Disponible en audio</label>
         </div>
+        <div class="field">
+          <label><input type="checkbox" id="f-study" style="width:auto;margin-right:6px;">Livre de l'espace d'étude (déverrouillage progressif)</label>
+        </div>
         <button type="submit" class="btn btn-primary">Ajouter le livre</button>
       </form>
     </div>
@@ -84,6 +87,11 @@
     <div class="panel">
       <h2 style="margin-bottom:16px;">Livres existants</h2>
       <div id="books-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Messages des lecteurs</h2>
+      <div id="messages-admin-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
     </div>
   </div>
 </div>
@@ -179,6 +187,7 @@ $('book-form') && $('book-form').addEventListener('submit', async (e) => {
     access_type: $('f-access').value,
     price: $('f-price').value ? parseFloat($('f-price').value) : null,
     has_audio: $('f-audio').checked,
+    is_study_book: $('f-study').checked,
   };
   const r = await fetch('/api/admin/books', {
     method: 'POST',
@@ -191,6 +200,39 @@ $('book-form') && $('book-form').addEventListener('submit', async (e) => {
   $('book-form').reset();
   loadBooks();
 });
+
+async function loadAdminMessages() {
+  const r = await fetch('/api/admin/messages', { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) { $('messages-admin-list').innerHTML = '<p>Erreur de chargement.</p>'; return; }
+  const messages = await r.json();
+  if (!messages.length) { $('messages-admin-list').innerHTML = '<p style="color:var(--ink-soft);">Aucun message pour le moment.</p>'; return; }
+  $('messages-admin-list').innerHTML = messages.map(m => `
+    <div class="book-row" style="flex-direction:column;align-items:flex-start;">
+      <div><strong>${m.full_name || m.email}</strong> <span style="font-size:12px;color:var(--ink-soft);">— ${m.email} — ${new Date(m.created_at).toLocaleDateString('fr-FR')}</span></div>
+      <div style="margin:8px 0;">${m.body}</div>
+      ${m.status === 'repondu'
+        ? `<div style="background:var(--paper);padding:10px;border-radius:8px;font-size:14px;width:100%;"><strong>Votre réponse :</strong> ${m.reply_body}</div>`
+        : `<div style="width:100%;">
+            <textarea class="reply-input" data-id="${m.id}" rows="2" placeholder="Écrire une réponse…" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;"></textarea>
+            <button class="btn btn-primary reply-btn" data-id="${m.id}" style="margin-top:6px;padding:7px 14px;font-size:13px;">Répondre</button>
+          </div>`}
+    </div>
+  `).join('');
+  document.querySelectorAll('.reply-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const textarea = document.querySelector(`.reply-input[data-id="${btn.dataset.id}"]`);
+      const reply_body = textarea.value.trim();
+      if (!reply_body) return;
+      await fetch(`/api/admin/messages/${btn.dataset.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reply_body }),
+      });
+      loadAdminMessages();
+    });
+  });
+}
+if (token && user && user.role === 'admin') loadAdminMessages();
 </script>
 
 </body>
