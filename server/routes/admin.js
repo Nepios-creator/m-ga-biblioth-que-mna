@@ -115,4 +115,33 @@ router.delete('/books/:id', async (req, res) => {
   }
 });
 
+// Voir tous les messages des lecteurs
+router.get('/messages', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT m.*, u.email, u.full_name FROM messages m
+       JOIN users u ON u.id = m.user_id ORDER BY m.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Répondre à un message
+router.put('/messages/:id', async (req, res) => {
+  const { reply_body } = req.body;
+  if (!reply_body) return res.status(400).json({ message: 'La réponse ne peut pas être vide' });
+  try {
+    const result = await pool.query(
+      "UPDATE messages SET reply_body=$1, status='repondu', replied_at=now() WHERE id=$2 RETURNING *",
+      [reply_body, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Message introuvable' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
