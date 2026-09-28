@@ -35,9 +35,11 @@
   /* Lecteur intégré */
   .reader-stage { position: relative; margin: 0 auto 12px; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
   .reader-stage canvas { display: block; width: 100%; height: auto; }
-  .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; opacity: 0.25; line-height: 1; }
+  .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; line-height: 1; }
   .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-  .textLayer ::selection { background: rgba(201,162,75,0.9); }
+  .textLayer ::selection { background: rgba(201,162,75,0.45); }
+  .textLayer mark.hl { background: rgba(255,208,0,0.42); color: transparent; border-radius: 2px; }
+  .textLayer mark.note { background: rgba(70,150,255,0.35); color: transparent; border-radius: 2px; }
   .reader-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .reader-nav .btn { padding: 8px 14px; font-size: 13px; }
   .sel-bar { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 16px; user-select: none; -webkit-user-select: none; }
@@ -285,6 +287,7 @@ async function renderPage(n, savePosition = true) {
   textLayer.style.height = Math.floor(viewport.height) + 'px';
   const textContent = await page.getTextContent();
   await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayer, viewport, textDivs: [] }).promise;
+  applyHighlights();
 
   if (savePosition) {
     fetch(`/api/study/parts/${st.partId}/position`, {
@@ -292,6 +295,55 @@ async function renderPage(n, savePosition = true) {
       body: JSON.stringify({ page_number: n }),
     });
   }
+}
+
+
+function escHtml(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// Colore directement sur la page les passages surlignés / commentés de la page affichée
+function applyHighlights() {
+  const st = readerState;
+  const layer = $('text-layer');
+  const spans = Array.from(layer.querySelectorAll('span'));
+  spans.forEach(sp => {
+    if (sp.dataset.orig === undefined) sp.dataset.orig = sp.textContent;
+    else sp.textContent = sp.dataset.orig;
+  });
+  let stripped = '';
+  const map = [];
+  spans.forEach((sp, si) => {
+    const t = sp.dataset.orig;
+    for (let ci = 0; ci < t.length; ci++) {
+      if (!/\s/.test(t[ci])) { stripped += t[ci]; map.push([si, ci]); }
+    }
+  });
+  const marks = spans.map(sp => new Array(sp.dataset.orig.length).fill(null));
+  st.annotations
+    .filter(a => a.page_number === st.page && a.quote_text && a.type !== 'favorite')
+    .forEach(a => {
+      const q = a.quote_text.replace(/\s+/g, '');
+      if (!q) return;
+      const idx = stripped.indexOf(q);
+      if (idx < 0) return;
+      for (let k = idx; k < idx + q.length; k++) {
+        const [si, ci] = map[k];
+        if (a.type === 'note' || !marks[si][ci]) marks[si][ci] = a.type === 'note' ? 'note' : 'hl';
+      }
+    });
+  spans.forEach((sp, si) => {
+    const m = marks[si];
+    if (!m.some(Boolean)) return;
+    const t = sp.dataset.orig;
+    let html = '', i = 0;
+    while (i < t.length) {
+      let j = i;
+      while (j < t.length && m[j] === m[i]) j++;
+      const chunk = escHtml(t.slice(i, j));
+      html += m[i] ? `<mark class="${m[i]}">${chunk}</mark>` : chunk;
+      i = j;
+    }
+    sp.innerHTML = html;
+  });
 }
 
 function wireReaderControls() {
@@ -318,6 +370,8 @@ function wireReaderControls() {
     if (r.ok) {
       st.annotations.push(await r.json());
       renderAnnotations();
+      applyHighlights();
+      window.getSelection().removeAllRanges();
     } else {
       const err = await r.json(); alert(err.message || 'Erreur');
     }
@@ -375,6 +429,7 @@ async function deleteAnnotation(id) {
   await fetch(`/api/study/annotations/${id}`, { method: 'DELETE', headers: authHeaders });
   readerState.annotations = readerState.annotations.filter(a => a.id !== id);
   renderAnnotations();
+  applyHighlights();
 }
 
 $('back-from-read') && $('back-from-read').addEventListener('click', () => openBook(currentBookId));
