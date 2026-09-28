@@ -330,4 +330,77 @@ router.get('/books/:id/certificate', async (req, res) => {
   }
 });
 
+// ---------- Annotations (surlignages, commentaires, favoris) ----------
+
+router.get('/parts/:partId/annotations', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, page_number, quote_text, note, type, created_at FROM study_annotations WHERE user_id=$1 AND part_id=$2 ORDER BY page_number, id',
+      [req.user.id, req.params.partId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/parts/:partId/annotations', async (req, res) => {
+  const { page_number, quote_text, note, type } = req.body;
+  const allowed = ['highlight', 'note', 'favorite'];
+  if (!allowed.includes(type)) return res.status(400).json({ message: 'Type invalide' });
+  try {
+    const part = (await pool.query('SELECT * FROM book_parts WHERE id=$1', [req.params.partId])).rows[0];
+    if (!part) return res.status(404).json({ message: 'Partie introuvable' });
+    const progress = await ensureProgress(req.user.id, part.book_id);
+    if (!progress.unlocked || part.part_index > progress.current_part_index) {
+      return res.status(403).json({ message: 'Cette partie n\'est pas encore déverrouillée' });
+    }
+    const result = await pool.query(
+      'INSERT INTO study_annotations (user_id, part_id, page_number, quote_text, note, type) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [req.user.id, part.id, page_number || null, quote_text || null, note || null, type]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete('/annotations/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM study_annotations WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    res.status(204).end();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ---------- Position de lecture (reprise) ----------
+
+router.get('/parts/:partId/position', async (req, res) => {
+  try {
+    const row = (await pool.query(
+      'SELECT page_number, updated_at FROM reading_positions WHERE user_id=$1 AND part_id=$2',
+      [req.user.id, req.params.partId]
+    )).rows[0];
+    res.json(row || null);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/parts/:partId/position', async (req, res) => {
+  const { page_number } = req.body;
+  if (!page_number) return res.status(400).json({ message: 'Page requise' });
+  try {
+    await pool.query(
+      `INSERT INTO reading_positions (user_id, part_id, page_number, updated_at) VALUES ($1,$2,$3,now())
+       ON CONFLICT (user_id, part_id) DO UPDATE SET page_number=$3, updated_at=now()`,
+      [req.user.id, req.params.partId, page_number]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
