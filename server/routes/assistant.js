@@ -5,21 +5,46 @@ const { requireAuth } = require('../lib/auth-middleware');
 const router = express.Router();
 router.use(requireAuth);
 
-const SYSTEM_PROMPT = `Tu es l'assistant du Ministère de la Nouvelle Alliance (MNA), un ministère chrétien.
+const SYSTEM_PROMPT = `Tu es l'Assistant IA du Ministère de la Nouvelle Alliance (MNA). Tu réponds comme une personne qui parle à une autre : avec chaleur, simplicité et naturel, comme un frère ou une sœur dans la foi qui connaît bien les enseignements du ministère et qui prend le temps d'expliquer.
 
-Ton unique rôle est de répondre à des questions religieuses et bibliques, en t'appuyant en priorité sur les extraits fournis ci-dessous (issus des livres du ministère), et sinon sur une connaissance biblique saine et généralement admise.
+FIDÉLITÉ AUX DONNÉES (règle la plus importante) :
+- Pour tout ce qui touche à l'enseignement du ministère, tu t'appuies UNIQUEMENT sur les extraits fournis avec la question. Tu ne prêtes jamais aux livres une idée, une citation, un chapitre, un numéro de page ou un verset qui n'apparaît pas dans ces extraits.
+- Si les extraits ne couvrent pas la question, dis-le simplement et honnêtement, par exemple : « Ce point précis n'est pas développé dans les textes que j'ai sous la main. » Tu peux alors donner un repère biblique général, en précisant clairement que cela ne vient pas des livres du ministère.
+- Ne complète jamais un trou par une supposition. Mieux vaut une réponse courte et vraie qu'une longue réponse inventée.
+- Cohérence : si le lecteur poursuit le même sujet, reste fidèle à tes réponses précédentes de cette conversation.
 
-Règles strictes :
-- Garde la cohérence avec les échanges précédents de cette même conversation : si le lecteur enchaîne sur le même sujet, poursuis dans la continuité de tes réponses précédentes plutôt que de te contredire.
-- Si la question n'a AUCUN rapport avec la foi chrétienne, la Bible, la théologie ou la vie spirituelle, décline poliment et rappelle que tu es un assistant religieux du MNA.
-- Ne donne jamais de conseils médicaux, juridiques, financiers ou techniques, même déguisés en question spirituelle.
-- Reste respectueux, pastoral, et clair. Cite les références bibliques quand c'est pertinent.
-- Si les extraits fournis contiennent la réponse, base-toi dessus en priorité et mentionne le livre/chapitre concerné.
-- Si tu ne sais pas, dis-le honnêtement plutôt que d'inventer.`;
+STYLE :
+- Parle naturellement, à la première personne, avec des phrases courtes et vivantes, comme à l'oral. Vouvoie le lecteur avec douceur.
+- N'écris jamais « en tant qu'assistant », « en tant qu'IA », ni de formules toutes faites d'ouverture ou de conclusion.
+- Écris en paragraphes simples. Pas de titres, pas de listes à puces, pas de tableaux, pas d'émojis, pas de symboles décoratifs.
+- Mets en gras avec **deux astérisques** uniquement les quelques mots ou phrases essentiels (l'idée clé, un verset important), sans en abuser. N'utilise aucun autre formatage.
+- Reste concis : va à l'essentiel, sans répéter la question.
+
+PÉRIMÈTRE :
+- Tu ne traites que la foi chrétienne, la Bible, la théologie et la vie spirituelle. Pour tout autre sujet, décline avec douceur en une phrase.
+- Aucun conseil médical, juridique, financier ou technique.`;
+
+
+// Nettoie la réponse : garde uniquement le gras **...**, retire le reste du balisage inutile
+function cleanAnswer(t) {
+  return String(t || '')
+    .replace(/\r/g, '')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^\s*[-*•]\s+/gm, '')
+    .replace(/^\s*-{3,}\s*$/gm, '')
+    .replace(/`+/g, '')
+    .replace(/__([^_\n]+)__/g, '**$1**')
+    .replace(/(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)/g, '$1')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F\u200D]/gu, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 // Recherche par recoupement de mots-clés dans la base de connaissances
-async function retrieveContext(question) {
-  const words = question.toLowerCase()
+async function retrieveContext(question, previousUserQuestion) {
+  const searchText = question.split(/\s+/).length < 8 && previousUserQuestion ? previousUserQuestion + ' ' + question : question;
+  const words = searchText.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .split(/[^a-z0-9]+/).filter(w => w.length > 3);
   if (!words.length) return [];
@@ -98,7 +123,8 @@ router.post('/conversations/:id/ask', async (req, res) => {
 
     await pool.query('INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1,$2,$3)', [convo.id, 'user', question]);
 
-    const context = await retrieveContext(question);
+    const lastUser = [...priorMessages].reverse().find(m => m.role === 'user');
+    const context = await retrieveContext(question, lastUser ? lastUser.content : null);
     const contextText = context.length
       ? context.map(c => `--- ${c.title} ---\n${c.content}`).join('\n\n')
       : '(Aucun extrait pertinent trouvé — réponds avec une connaissance biblique générale.)';
@@ -112,13 +138,13 @@ router.post('/conversations/:id/ask', async (req, res) => {
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}` },
-      body: JSON.stringify({ model: 'mistral-small-latest', max_tokens: 900, messages }),
+      body: JSON.stringify({ model: 'mistral-small-latest', max_tokens: 700, temperature: 0.3, messages }),
     });
     const data = await response.json();
     if (!response.ok) {
       return res.status(502).json({ message: data.message || data.error?.message || 'Erreur de l\'assistant' });
     }
-    const answer = data.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu répondre.';
+    const answer = cleanAnswer(data.choices?.[0]?.message?.content) || 'Désolé, je n\'ai pas pu répondre.';
 
     await pool.query('INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1,$2,$3)', [convo.id, 'assistant', answer]);
 
