@@ -31,7 +31,27 @@
   textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 14.5px; }
   .msg-item { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .msg-item .reply { margin-top: 8px; padding: 10px; background: var(--paper); border-radius: 8px; }
+
+  /* Lecteur intégré */
+  .reader-stage { position: relative; margin: 0 auto 12px; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .reader-stage canvas { display: block; width: 100%; height: auto; }
+  .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; opacity: 0.25; line-height: 1; }
+  .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+  .textLayer ::selection { background: rgba(201,162,75,0.9); }
+  .reader-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .reader-nav .btn { padding: 8px 14px; font-size: 13px; }
+  .sel-bar { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 16px; user-select: none; -webkit-user-select: none; }
+  .sel-bar .sel-text { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; font-style: italic; min-height: 18px; }
+  .sel-bar .sel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sel-bar .sel-actions .btn { padding: 7px 12px; font-size: 12.5px; }
+  .anno-item { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .anno-item:last-child { border-bottom: none; }
+  .anno-item .q { font-style: italic; color: var(--ink); }
+  .anno-item .n { margin-top: 4px; color: var(--ink-soft); }
+  .anno-item .a-actions { margin-top: 6px; display: flex; gap: 12px; }
+  .anno-item .a-actions button { background: none; border: none; color: var(--blue-deep); font-size: 12px; cursor: pointer; padding: 0; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -161,26 +181,200 @@ async function openBook(id) {
   `;
 }
 
+let readerState = null;
+
 async function openPartReader(partId, title, partIndex) {
   showView('read');
+  readerState = { partId, title, partIndex, pdf: null, page: 1, total: 0, selection: '', annotations: [] };
   $('read-panel').innerHTML = `
     <h2 style="margin-bottom:14px;">Partie ${partIndex} — ${title}</h2>
-    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px;">Le PDF de cette partie s'ouvre dans un nouvel onglet. Lisez-la en entier, revenez ici, puis confirmez pour débloquer le test.</p>
-    <a href="#" id="open-pdf-link" target="_blank" class="btn btn-primary" style="margin-bottom:20px;">📖 Ouvrir la partie à lire</a><br>
-    <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
+    <div id="resume-box"></div>
+    <div id="reader-loading" style="padding:30px;text-align:center;color:var(--ink-soft);">Chargement de la partie…</div>
+    <div id="reader-main" class="hidden">
+      <div class="reader-nav">
+        <button class="btn btn-ghost" id="prev-page">← Précédente</button>
+        <span id="page-indicator" style="font-size:13.5px;color:var(--ink-soft);"></span>
+        <button class="btn btn-ghost" id="next-page">Suivante →</button>
+      </div>
+      <div class="reader-stage" id="reader-stage">
+        <canvas id="reader-canvas"></canvas>
+        <div class="textLayer" id="text-layer"></div>
+      </div>
+      <div class="sel-bar">
+        <div class="sel-text" id="sel-text">Sélectionnez du texte dans la page pour le surligner, le commenter ou le partager.</div>
+        <div class="sel-actions">
+          <button class="btn btn-ghost" id="btn-highlight">🖍 Surligner</button>
+          <button class="btn btn-ghost" id="btn-comment">💬 Commenter</button>
+          <button class="btn btn-ghost" id="btn-share">↗️ Partager</button>
+          <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (cette page)</button>
+        </div>
+      </div>
+      <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
+      <div id="anno-list" style="margin-bottom:20px;"></div>
+      <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
+    </div>
   `;
+
   try {
-    const r = await fetch(`/api/study/parts/${partId}/read-link`, { headers: authHeaders });
-    const data = await r.json();
-    if (!r.ok) { alert(data.message); return; }
-    $('open-pdf-link').href = data.url;
+    const linkRes = await fetch(`/api/study/parts/${partId}/read-link`, { headers: authHeaders });
+    const linkData = await linkRes.json();
+    if (!linkRes.ok) { $('reader-loading').textContent = linkData.message || 'Erreur'; return; }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    readerState.pdf = await pdfjsLib.getDocument({ url: linkData.url, disableRange: true, disableStream: true }).promise;
+    readerState.total = readerState.pdf.numPages;
+
+    const [posRes, annoRes] = await Promise.all([
+      fetch(`/api/study/parts/${partId}/position`, { headers: authHeaders }),
+      fetch(`/api/study/parts/${partId}/annotations`, { headers: authHeaders }),
+    ]);
+    const pos = await posRes.json();
+    readerState.annotations = await annoRes.json();
+
+    $('reader-loading').classList.add('hidden');
+    $('reader-main').classList.remove('hidden');
+    renderAnnotations();
+    wireReaderControls();
+
+    if (pos && pos.page_number > 1 && pos.page_number <= readerState.total) {
+      $('resume-box').innerHTML = `
+        <div class="msg success" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span>Vous vous étiez arrêté à la page ${pos.page_number} sur ${readerState.total}.</span>
+          <span style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px;" id="resume-yes">Reprendre</button>
+            <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" id="resume-no">Depuis le début</button>
+          </span>
+        </div>`;
+      $('resume-yes').addEventListener('click', () => { $('resume-box').innerHTML = ''; renderPage(pos.page_number); });
+      $('resume-no').addEventListener('click', () => { $('resume-box').innerHTML = ''; renderPage(1); });
+      renderPage(1, false);
+    } else {
+      renderPage(1);
+    }
   } catch (err) {
-    alert('Erreur lors de la préparation du lien de lecture');
+    $('reader-loading').textContent = 'Erreur de chargement de la partie';
   }
+}
+
+async function renderPage(n, savePosition = true) {
+  const st = readerState;
+  st.page = n;
+  st.selection = '';
+  $('sel-text').textContent = 'Sélectionnez du texte dans la page pour le surligner, le commenter ou le partager.';
+  $('page-indicator').textContent = `Page ${n} / ${st.total}`;
+
+  const page = await st.pdf.getPage(n);
+  const stage = $('reader-stage');
+  const baseViewport = page.getViewport({ scale: 1 });
+  const cssScale = stage.clientWidth / baseViewport.width;
+  const outputScale = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale: cssScale });
+  const canvas = $('reader-canvas');
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.height = Math.floor(viewport.height) + 'px';
+  const ctx = canvas.getContext('2d');
+  await page.render({
+    canvasContext: ctx, viewport,
+    transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
+  }).promise;
+
+  const textLayer = $('text-layer');
+  textLayer.innerHTML = '';
+  textLayer.style.width = Math.floor(viewport.width) + 'px';
+  textLayer.style.height = Math.floor(viewport.height) + 'px';
+  const textContent = await page.getTextContent();
+  await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayer, viewport, textDivs: [] }).promise;
+
+  if (savePosition) {
+    fetch(`/api/study/parts/${st.partId}/position`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ page_number: n }),
+    });
+  }
+}
+
+function wireReaderControls() {
+  const st = readerState;
+  $('prev-page').addEventListener('click', () => { if (st.page > 1) renderPage(st.page - 1); });
+  $('next-page').addEventListener('click', () => { if (st.page < st.total) renderPage(st.page + 1); });
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    const node = sel.anchorNode && (sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentNode : sel.anchorNode);
+    if (text && node && node.closest && node.closest('#text-layer')) {
+      st.selection = text.replace(/\s+/g, ' ');
+      $('sel-text').textContent = '« ' + (st.selection.length > 200 ? st.selection.slice(0, 200) + '…' : st.selection) + ' »';
+    }
+  });
+
+  async function saveAnnotation(type, note) {
+    const r = await fetch(`/api/study/parts/${st.partId}/annotations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ page_number: st.page, quote_text: st.selection || null, note: note || null, type }),
+    });
+    if (r.ok) {
+      st.annotations.push(await r.json());
+      renderAnnotations();
+    } else {
+      const err = await r.json(); alert(err.message || 'Erreur');
+    }
+  }
+
+  $('btn-highlight').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage dans la page.');
+    saveAnnotation('highlight');
+  });
+  $('btn-comment').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage à commenter.');
+    const note = prompt('Votre commentaire :');
+    if (note && note.trim()) saveAnnotation('note', note.trim());
+  });
+  $('btn-favorite').addEventListener('click', () => saveAnnotation('favorite'));
+  $('btn-share').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage à partager.');
+    shareQuote(st.selection);
+  });
   $('confirm-read-btn').addEventListener('click', async () => {
-    await fetch(`/api/study/parts/${partId}/mark-read`, { method: 'POST', headers: authHeaders });
+    await fetch(`/api/study/parts/${st.partId}/mark-read`, { method: 'POST', headers: authHeaders });
     openBook(currentBookId);
   });
+}
+
+function shareQuote(text) {
+  const full = `« ${text} »\n— Ministère de la Nouvelle Alliance (${location.origin})`;
+  if (navigator.share) navigator.share({ text: full }).catch(() => {});
+  else navigator.clipboard.writeText(full).then(() => alert('Extrait copié !'));
+}
+
+function renderAnnotations() {
+  const st = readerState;
+  const icons = { highlight: '🖍', note: '💬', favorite: '⭐' };
+  if (!st.annotations.length) {
+    $('anno-list').innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Aucune annotation pour le moment.</p>';
+    return;
+  }
+  $('anno-list').innerHTML = st.annotations.map(a => `
+    <div class="anno-item">
+      <div>${icons[a.type]} <span style="font-size:12px;color:var(--ink-soft);">page ${a.page_number || '—'}</span></div>
+      ${a.quote_text ? `<div class="q">« ${a.quote_text} »</div>` : ''}
+      ${a.note ? `<div class="n">${a.note}</div>` : ''}
+      <div class="a-actions">
+        <button onclick="renderPage(${a.page_number || 1})">Aller à la page</button>
+        ${a.quote_text ? `<button onclick="shareQuote(${JSON.stringify(a.quote_text).replace(/"/g, '&quot;')})">Partager</button>` : ''}
+        <button onclick="deleteAnnotation(${a.id})">Supprimer</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteAnnotation(id) {
+  if (!confirm('Supprimer cette annotation ?')) return;
+  await fetch(`/api/study/annotations/${id}`, { method: 'DELETE', headers: authHeaders });
+  readerState.annotations = readerState.annotations.filter(a => a.id !== id);
+  renderAnnotations();
 }
 
 $('back-from-read') && $('back-from-read').addEventListener('click', () => openBook(currentBookId));
