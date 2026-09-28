@@ -219,4 +219,14 @@ router.delete('/knowledge/:id', async (req, res) => {
   }
 });
 
+// Relance manuellement la génération de citations pour un livre (utile après ajout d'un nouveau livre)
+router.post('/quotes/generate/:bookId', async (req, res) => {
+  try {
+    await pool.query('UPDATE books SET quotes_generated_at = NULL WHERE id=$1', [req.params.bookId]);
+    res.json({ message: 'Génération relancée — les nouvelles citations apparaîtront automatiquement dans les minutes qui suivent.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
