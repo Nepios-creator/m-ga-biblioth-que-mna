@@ -149,6 +149,23 @@ section.section p.lead { color: var(--ink-soft); max-width: 640px; margin-bottom
 
 footer { border-top: 1px solid var(--line); padding: 40px 24px; text-align: center; color: var(--ink-soft); font-size: 14px; }
 
+/* Citation du jour — affiche */
+.quote-poster {
+  position: relative; max-width: 640px; margin: 0 auto; border-radius: 20px; overflow: hidden;
+  padding: 56px 40px 40px; text-align: center; color: #f4ede0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(230,180,90,0.30), transparent 50%),
+    radial-gradient(circle at 85% 80%, rgba(230,180,90,0.16), transparent 55%),
+    linear-gradient(160deg, var(--bg) 0%, var(--bg-soft) 100%);
+  border: 1px solid rgba(201,162,75,0.35);
+}
+.quote-poster .quote-mark { font-family: 'Fraunces', serif; font-size: 64px; color: var(--gold); line-height: 1; margin-bottom: 6px; opacity: 0.85; }
+.quote-poster .quote-text { font-family: 'Fraunces', serif; font-size: 24px; line-height: 1.5; color: #fbf3e3; margin-bottom: 30px; }
+.quote-poster .author-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.quote-poster .author-row img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); }
+.quote-poster .author-name { font-size: 13.5px; font-weight: 600; color: #ecdfc4; }
+.quote-poster .author-role { font-size: 11.5px; color: #c9b896; }
+
 @media (max-width: 640px) {
   .hero h1 { font-size: 32px; }
   nav { display: none; }
