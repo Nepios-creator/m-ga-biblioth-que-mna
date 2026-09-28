@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/admin');
 const studyRoutes = require('./routes/study');
 const messagesRoutes = require('./routes/messages');
 const assistantRoutes = require('./routes/assistant');
+const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,7 +101,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/quotes', quotesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
+  // Génère automatiquement les citations manquantes, sans aucune action requise de l'administrateur
+  autoGenerateMissingQuotes();
+  setInterval(autoGenerateMissingQuotes, 15 * 60 * 1000); // revérifie toutes les 15 minutes (nouveaux livres, relances)
 });
