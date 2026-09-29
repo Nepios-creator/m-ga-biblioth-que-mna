@@ -33,6 +33,9 @@
   .disclaimer { font-size: 11.5px; color: var(--ink-soft); text-align: center; padding-top: 8px; }
   @media (max-width: 720px) { .chat-layout { grid-template-columns: 1fr; height: auto; } .sidebar { border-right: none; border-bottom: 1px solid var(--line); max-height: 160px; } }
 </style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
 </head>
 <body>
 
@@ -226,5 +229,6 @@ $('chat-input').addEventListener('keydown', (e) => {
 loadConvoList();
 </script>
 
+<script src="/js/pwa.js"></script>
 </body>
 </html>
