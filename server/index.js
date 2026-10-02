@@ -2,13 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db/pool');
-const { requireAuth } = require('./lib/auth-middleware');
+const { requireAuth, JWT_SECRET } = require('./lib/auth-middleware');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const studyRoutes = require('./routes/study');
 const messagesRoutes = require('./routes/messages');
 const assistantRoutes = require('./routes/assistant');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
+const { fillMissingPartContent } = require('./lib/fill-part-content');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,8 +54,27 @@ app.get('/api/books/:id/cover', async (req, res) => {
   }
 });
 
+// Accepte l'authentification soit par en-tête Authorization (appels JS), soit par ?token= (liens/onglets ouverts directement)
+function flexAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : req.query.token;
+  if (!token) return res.status(401).json({ message: 'Connexion requise' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Session invalide ou expirée' });
+  }
+}
+
+// Génère un lien de lecture/téléchargement à durée limitée (pour ouvrir dans un nouvel onglet)
+app.get('/api/books/:id/read-link', requireAuth, (req, res) => {
+  const token = jwt.sign({ id: req.user.id, purpose: 'book-file' }, JWT_SECRET, { expiresIn: '10m' });
+  res.json({ readUrl: `/api/books/${req.params.id}/read?token=${token}`, downloadUrl: `/api/books/${req.params.id}/download?token=${token}` });
+});
+
 // Sert le PDF d'un livre pour lecture en ligne — réservé aux membres connectés
-app.get('/api/books/:id/read', requireAuth, async (req, res) => {
+app.get('/api/books/:id/read', flexAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT title, pdf_data, pdf_filename, access_type, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
@@ -75,7 +96,7 @@ app.get('/api/books/:id/read', requireAuth, async (req, res) => {
 });
 
 // Télécharge le PDF d'un livre — réservé aux membres connectés
-app.get('/api/books/:id/download', requireAuth, async (req, res) => {
+app.get('/api/books/:id/download', flexAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT title, pdf_data, pdf_filename, is_study_book FROM books WHERE id = $1 AND access_type = 'telechargeable'",
@@ -107,5 +128,6 @@ app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
   // Génère automatiquement les citations manquantes, sans aucune action requise de l'administrateur
   autoGenerateMissingQuotes();
-  setInterval(autoGenerateMissingQuotes, 15 * 60 * 1000); // revérifie toutes les 15 minutes (nouveaux livres, relances)
+  fillMissingPartContent();
+  setInterval(() => { autoGenerateMissingQuotes(); fillMissingPartContent(); }, 15 * 60 * 1000);
 });
