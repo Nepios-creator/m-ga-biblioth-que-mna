@@ -38,7 +38,7 @@
 <script>
 if (!localStorage.getItem('mna_token')) { window.location.href = '/login.html'; }
 
-fetch('/api/books')
+fetch('/api/books', { headers: { Authorization: `Bearer ${localStorage.getItem('mna_token')}` } })
   .then(r => r.json())
   .then(books => {
     const grid = document.getElementById('books-grid');
@@ -60,8 +60,8 @@ fetch('/api/books')
             </div>
           ` : `
             <div class="actions">
-              <a href="/api/books/${b.id}/read" target="_blank" class="btn btn-primary">Lire</a>
-              ${b.access_type === 'telechargeable' ? `<a href="/api/books/${b.id}/download" class="btn btn-ghost">Télécharger</a>` : ''}
+              <button onclick="openRead(${b.id})" class="btn btn-primary">Lire</button>
+              ${b.access_type === 'telechargeable' ? `<button onclick="openDownload(${b.id})" class="btn btn-ghost">Télécharger</button>` : ''}
             </div>
           `}
         </div>
@@ -71,6 +71,13 @@ fetch('/api/books')
   .catch(() => {
     document.getElementById('books-grid').innerHTML = '<div class="card"><p>Impossible de charger le catalogue pour le moment.</p></div>';
   });
+
+async function getBookLinks(id) {
+  const r = await fetch(`/api/books/${id}/read-link`, { headers: { Authorization: `Bearer ${localStorage.getItem('mna_token')}` } });
+  return r.json();
+}
+async function openRead(id) { const links = await getBookLinks(id); window.open(links.readUrl, '_blank'); }
+async function openDownload(id) { const links = await getBookLinks(id); window.open(links.downloadUrl, '_blank'); }
 </script>
 
 <script src="/js/pwa.js"></script>

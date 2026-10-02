@@ -32,17 +32,14 @@
   .msg-item { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .msg-item .reply { margin-top: 8px; padding: 10px; background: var(--paper); border-radius: 8px; }
 
-  /* Lecteur intégré */
-  .reader-stage { position: relative; margin: 0 auto 12px; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
-  .reader-stage canvas { display: block; width: 100%; height: auto; }
-  .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; line-height: 1; }
-  .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-  .textLayer ::selection { background: rgba(201,162,75,0.45); }
-  .textLayer mark.hl { background: rgba(255,208,0,0.42); color: transparent; border-radius: 2px; }
-  .textLayer mark.note { background: rgba(70,150,255,0.35); color: transparent; border-radius: 2px; }
-  .reader-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-  .reader-nav .btn { padding: 8px 14px; font-size: 13px; }
-  .sel-bar { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 16px; user-select: none; -webkit-user-select: none; }
+  /* Lecteur intégré — vrai texte, grand et lisible */
+  .ebook-text { font-size: 19px; line-height: 1.85; color: #241e16; font-family: 'Fraunces', Georgia, serif; }
+  .ebook-text p { margin: 0 0 1.3em; }
+  .ebook-text mark.hl { background: #ffe9a8; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ebook-text mark.note { background: #cfe6ff; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ebook-text ::selection { background: rgba(201,162,75,0.5); }
+  @media (min-width: 720px) { .ebook-text { font-size: 20px; } }
+  .sel-bar { position: sticky; top: 8px; z-index: 5; background: #fffdf8; border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
   .sel-bar .sel-text { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; font-style: italic; min-height: 18px; }
   .sel-bar .sel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .sel-bar .sel-actions .btn { padding: 7px 12px; font-size: 12.5px; }
@@ -53,7 +50,6 @@
   .anno-item .a-actions { margin-top: 6px; display: flex; gap: 12px; }
   .anno-item .a-actions button { background: none; border: none; color: var(--blue-deep); font-size: 12px; cursor: pointer; padding: 0; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#16130f">
@@ -190,30 +186,22 @@ let readerState = null;
 
 async function openPartReader(partId, title, partIndex) {
   showView('read');
-  readerState = { partId, title, partIndex, pdf: null, page: 1, total: 0, selection: '', annotations: [] };
+  readerState = { partId, title, partIndex, paragraphs: [], annotations: [], selection: '', selectionPara: null };
   $('read-panel').innerHTML = `
-    <h2 style="margin-bottom:14px;">Partie ${partIndex} — ${title}</h2>
+    <h2 style="margin-bottom:10px;">Partie ${partIndex} — ${title}</h2>
     <div id="resume-box"></div>
     <div id="reader-loading" style="padding:30px;text-align:center;color:var(--ink-soft);">Chargement de la partie…</div>
     <div id="reader-main" class="hidden">
-      <div class="reader-nav">
-        <button class="btn btn-ghost" id="prev-page">← Précédente</button>
-        <span id="page-indicator" style="font-size:13.5px;color:var(--ink-soft);"></span>
-        <button class="btn btn-ghost" id="next-page">Suivante →</button>
-      </div>
-      <div class="reader-stage" id="reader-stage">
-        <canvas id="reader-canvas"></canvas>
-        <div class="textLayer" id="text-layer"></div>
-      </div>
-      <div class="sel-bar">
-        <div class="sel-text" id="sel-text">Sélectionnez du texte dans la page pour le surligner, le commenter ou le partager.</div>
+      <div class="sel-bar" id="sel-bar">
+        <div class="sel-text" id="sel-text">Touchez et maintenez un mot, puis étirez pour sélectionner une phrase ou un paragraphe à surligner, commenter ou partager.</div>
         <div class="sel-actions">
           <button class="btn btn-ghost" id="btn-highlight">🖍 Surligner</button>
           <button class="btn btn-ghost" id="btn-comment">💬 Commenter</button>
           <button class="btn btn-ghost" id="btn-share">↗️ Partager</button>
-          <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (cette page)</button>
+          <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (ici)</button>
         </div>
       </div>
+      <div class="ebook-text" id="ebook-text"></div>
       <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
       <div id="anno-list" style="margin-bottom:20px;"></div>
       <button class="btn btn-primary" id="confirm-read-btn">J'ai terminé la lecture de cette partie</button>
@@ -221,154 +209,106 @@ async function openPartReader(partId, title, partIndex) {
   `;
 
   try {
-    const linkRes = await fetch(`/api/study/parts/${partId}/read-link`, { headers: authHeaders });
-    const linkData = await linkRes.json();
-    if (!linkRes.ok) { $('reader-loading').textContent = linkData.message || 'Erreur'; return; }
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    readerState.pdf = await pdfjsLib.getDocument({ url: linkData.url, disableRange: true, disableStream: true }).promise;
-    readerState.total = readerState.pdf.numPages;
-
-    const [posRes, annoRes] = await Promise.all([
+    const [partRes, posRes, annoRes] = await Promise.all([
+      fetch(`/api/study/parts/${partId}`, { headers: authHeaders }),
       fetch(`/api/study/parts/${partId}/position`, { headers: authHeaders }),
       fetch(`/api/study/parts/${partId}/annotations`, { headers: authHeaders }),
     ]);
+    const part = await partRes.json();
+    if (!partRes.ok) { $('reader-loading').textContent = part.message || 'Erreur'; return; }
     const pos = await posRes.json();
     readerState.annotations = await annoRes.json();
 
+    const raw = (part.content || '').trim();
+    readerState.paragraphs = raw
+      ? raw.split(/\n{2,}/).map(t => t.trim()).filter(Boolean)
+      : ['(Texte non encore disponible — réessayez dans quelques minutes, il est en cours de préparation.)'];
+
     $('reader-loading').classList.add('hidden');
     $('reader-main').classList.remove('hidden');
+    renderParagraphs();
     renderAnnotations();
     wireReaderControls();
 
-    if (pos && pos.page_number > 1 && pos.page_number <= readerState.total) {
+    const savedIndex = pos && pos.page_number ? pos.page_number : null;
+    if (savedIndex && savedIndex > 1 && savedIndex <= readerState.paragraphs.length) {
       $('resume-box').innerHTML = `
         <div class="msg success" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span>Vous vous étiez arrêté à la page ${pos.page_number} sur ${readerState.total}.</span>
+          <span>Vous vous étiez arrêté en cours de lecture.</span>
           <span style="display:flex;gap:8px;">
             <button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px;" id="resume-yes">Reprendre</button>
             <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" id="resume-no">Depuis le début</button>
           </span>
         </div>`;
-      $('resume-yes').addEventListener('click', () => { $('resume-box').innerHTML = ''; renderPage(pos.page_number); });
-      $('resume-no').addEventListener('click', () => { $('resume-box').innerHTML = ''; renderPage(1); });
-      renderPage(1, false);
-    } else {
-      renderPage(1);
+      $('resume-yes').addEventListener('click', () => { $('resume-box').innerHTML = ''; goToPara(savedIndex); });
+      $('resume-no').addEventListener('click', () => { $('resume-box').innerHTML = ''; });
     }
   } catch (err) {
     $('reader-loading').textContent = 'Erreur de chargement de la partie';
   }
 }
 
-async function renderPage(n, savePosition = true) {
+function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function renderParagraphs() {
   const st = readerState;
-  st.page = n;
-  st.selection = '';
-  $('sel-text').textContent = 'Sélectionnez du texte dans la page pour le surligner, le commenter ou le partager.';
-  $('page-indicator').textContent = `Page ${n} / ${st.total}`;
-
-  const page = await st.pdf.getPage(n);
-  const stage = $('reader-stage');
-  const baseViewport = page.getViewport({ scale: 1 });
-  const cssScale = stage.clientWidth / baseViewport.width;
-  const outputScale = window.devicePixelRatio || 1;
-  const viewport = page.getViewport({ scale: cssScale });
-  const canvas = $('reader-canvas');
-  canvas.width = Math.floor(viewport.width * outputScale);
-  canvas.height = Math.floor(viewport.height * outputScale);
-  canvas.style.height = Math.floor(viewport.height) + 'px';
-  const ctx = canvas.getContext('2d');
-  await page.render({
-    canvasContext: ctx, viewport,
-    transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
-  }).promise;
-
-  const textLayer = $('text-layer');
-  textLayer.innerHTML = '';
-  textLayer.style.width = Math.floor(viewport.width) + 'px';
-  textLayer.style.height = Math.floor(viewport.height) + 'px';
-  const textContent = await page.getTextContent();
-  await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayer, viewport, textDivs: [] }).promise;
+  $('ebook-text').innerHTML = st.paragraphs.map((p, i) => `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`).join('');
   applyHighlights();
-
-  if (savePosition) {
-    fetch(`/api/study/parts/${st.partId}/position`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
-      body: JSON.stringify({ page_number: n }),
-    });
-  }
 }
 
-
-function escHtml(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
-// Colore directement sur la page les passages surlignés / commentés de la page affichée
+// Colore directement les passages surlignés / commentés dans le texte, sans jamais cacher les mots
 function applyHighlights() {
   const st = readerState;
-  const layer = $('text-layer');
-  const spans = Array.from(layer.querySelectorAll('span'));
-  spans.forEach(sp => {
-    if (sp.dataset.orig === undefined) sp.dataset.orig = sp.textContent;
-    else sp.textContent = sp.dataset.orig;
-  });
-  let stripped = '';
-  const map = [];
-  spans.forEach((sp, si) => {
-    const t = sp.dataset.orig;
-    for (let ci = 0; ci < t.length; ci++) {
-      if (!/\s/.test(t[ci])) { stripped += t[ci]; map.push([si, ci]); }
-    }
-  });
-  const marks = spans.map(sp => new Array(sp.dataset.orig.length).fill(null));
-  st.annotations
-    .filter(a => a.page_number === st.page && a.quote_text && a.type !== 'favorite')
-    .forEach(a => {
-      const q = a.quote_text.replace(/\s+/g, '');
-      if (!q) return;
-      const idx = stripped.indexOf(q);
-      if (idx < 0) return;
-      for (let k = idx; k < idx + q.length; k++) {
-        const [si, ci] = map[k];
-        if (a.type === 'note' || !marks[si][ci]) marks[si][ci] = a.type === 'note' ? 'note' : 'hl';
+  st.paragraphs.forEach((text, i) => {
+    const el = document.getElementById('para-' + i);
+    if (!el) return;
+    const relevant = st.annotations.filter(a => a.quote_text && a.type !== 'favorite' && text.includes(a.quote_text));
+    if (!relevant.length) { el.innerHTML = escHtml(text); return; }
+    const marks = new Array(text.length).fill(null);
+    relevant.forEach(a => {
+      const idx = text.indexOf(a.quote_text);
+      if (idx === -1) return;
+      for (let k = idx; k < idx + a.quote_text.length; k++) {
+        if (a.type === 'note' || !marks[k]) marks[k] = a.type === 'note' ? 'note' : 'hl';
       }
     });
-  spans.forEach((sp, si) => {
-    const m = marks[si];
-    if (!m.some(Boolean)) return;
-    const t = sp.dataset.orig;
-    let html = '', i = 0;
-    while (i < t.length) {
-      let j = i;
-      while (j < t.length && m[j] === m[i]) j++;
-      const chunk = escHtml(t.slice(i, j));
-      html += m[i] ? `<mark class="${m[i]}">${chunk}</mark>` : chunk;
-      i = j;
+    let html = '', k = 0;
+    while (k < text.length) {
+      let j = k;
+      while (j < text.length && marks[j] === marks[k]) j++;
+      const chunk = escHtml(text.slice(k, j));
+      html += marks[k] ? `<mark class="${marks[k]}">${chunk}</mark>` : chunk;
+      k = j;
     }
-    sp.innerHTML = html;
+    el.innerHTML = html;
   });
+}
+
+function currentParaIndex(node) {
+  const el = node && node.nodeType === 3 ? node.parentElement : node;
+  const closest = el && el.closest ? el.closest('[data-i]') : null;
+  return closest ? Number(closest.dataset.i) : null;
 }
 
 function wireReaderControls() {
   const st = readerState;
-  $('prev-page').addEventListener('click', () => { if (st.page > 1) renderPage(st.page - 1); });
-  $('next-page').addEventListener('click', () => { if (st.page < st.total) renderPage(st.page + 1); });
 
   document.addEventListener('selectionchange', () => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
     const text = sel.toString().trim();
-    const node = sel.anchorNode && (sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentNode : sel.anchorNode);
-    if (text && node && node.closest && node.closest('#text-layer')) {
+    const container = document.getElementById('ebook-text');
+    if (text && container && container.contains(sel.anchorNode)) {
       st.selection = text.replace(/\s+/g, ' ');
-      $('sel-text').textContent = '« ' + (st.selection.length > 200 ? st.selection.slice(0, 200) + '…' : st.selection) + ' »';
+      st.selectionPara = currentParaIndex(sel.anchorNode);
+      $('sel-text').textContent = '« ' + (st.selection.length > 220 ? st.selection.slice(0, 220) + '…' : st.selection) + ' »';
     }
   });
 
   async function saveAnnotation(type, note) {
     const r = await fetch(`/api/study/parts/${st.partId}/annotations`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders },
-      body: JSON.stringify({ page_number: st.page, quote_text: st.selection || null, note: note || null, type }),
+      body: JSON.stringify({ page_number: st.selectionPara != null ? st.selectionPara + 1 : null, quote_text: st.selection || null, note: note || null, type }),
     });
     if (r.ok) {
       st.annotations.push(await r.json());
@@ -381,7 +321,7 @@ function wireReaderControls() {
   }
 
   $('btn-highlight').addEventListener('click', () => {
-    if (!st.selection) return alert('Sélectionnez d\'abord un passage dans la page.');
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage dans le texte.');
     saveAnnotation('highlight');
   });
   $('btn-comment').addEventListener('click', () => {
@@ -398,12 +338,37 @@ function wireReaderControls() {
     await fetch(`/api/study/parts/${st.partId}/mark-read`, { method: 'POST', headers: authHeaders });
     openBook(currentBookId);
   });
+
+  // Enregistre la position de lecture pendant le défilement (dépend juste du fait de lire — la reprise, elle, reste un choix)
+  let scrollTimer = null;
+  window.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const paras = document.querySelectorAll('#ebook-text p');
+      let visible = null;
+      paras.forEach(p => {
+        const r = p.getBoundingClientRect();
+        if (r.top < window.innerHeight * 0.5 && r.bottom > 0) visible = p;
+      });
+      if (visible) {
+        fetch(`/api/study/parts/${st.partId}/position`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
+          body: JSON.stringify({ page_number: Number(visible.dataset.i) + 1 }),
+        });
+      }
+    }, 1200);
+  });
 }
 
 function shareQuote(text) {
   const full = `« ${text} »\n— Ministère de la Nouvelle Alliance (${location.origin})`;
   if (navigator.share) navigator.share({ text: full }).catch(() => {});
   else navigator.clipboard.writeText(full).then(() => alert('Extrait copié !'));
+}
+
+function goToPara(n) {
+  const el = document.getElementById('para-' + (n - 1));
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderAnnotations() {
@@ -415,12 +380,12 @@ function renderAnnotations() {
   }
   $('anno-list').innerHTML = st.annotations.map(a => `
     <div class="anno-item">
-      <div>${icons[a.type]} <span style="font-size:12px;color:var(--ink-soft);">page ${a.page_number || '—'}</span></div>
-      ${a.quote_text ? `<div class="q">« ${a.quote_text} »</div>` : ''}
-      ${a.note ? `<div class="n">${a.note}</div>` : ''}
+      <div>${icons[a.type]} <span style="font-size:12px;color:var(--ink-soft);">paragraphe ${a.page_number || '—'}</span></div>
+      ${a.quote_text ? `<div class="q">« ${escHtml(a.quote_text)} »</div>` : ''}
+      ${a.note ? `<div class="n">${escHtml(a.note)}</div>` : ''}
       <div class="a-actions">
-        <button onclick="renderPage(${a.page_number || 1})">Aller à la page</button>
-        ${a.quote_text ? `<button onclick="shareQuote(${JSON.stringify(a.quote_text).replace(/"/g, '&quot;')})">Partager</button>` : ''}
+        <button onclick="goToPara(${a.page_number || 1})">Aller au paragraphe</button>
+        ${a.quote_text ? `<button onclick='shareQuote(${JSON.stringify(a.quote_text)})'>Partager</button>` : ''}
         <button onclick="deleteAnnotation(${a.id})">Supprimer</button>
       </div>
     </div>
