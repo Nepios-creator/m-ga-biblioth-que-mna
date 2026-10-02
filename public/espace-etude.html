@@ -33,12 +33,15 @@
   .msg-item .reply { margin-top: 8px; padding: 10px; background: var(--paper); border-radius: 8px; }
 
   /* Lecteur intégré — vrai texte, grand et lisible */
-  .ebook-text { font-size: 19px; line-height: 1.85; color: #241e16; font-family: 'Fraunces', Georgia, serif; }
+  .ebook-text { font-size: 23px; line-height: 1.85; color: #241e16; font-family: 'Fraunces', Georgia, serif; }
   .ebook-text p { margin: 0 0 1.3em; }
+  .ebook-text h2 { font-size: 1.5em; font-weight: 700; margin: 1em 0 0.6em; color: #16130f; line-height: 1.3; }
+  .ebook-text h2:first-child { margin-top: 0; }
+  .ebook-text h3 { font-size: 1.12em; font-weight: 700; font-style: italic; margin: 1.1em 0 0.5em; color: #3a2f1f; }
   .ebook-text mark.hl { background: #ffe9a8; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .ebook-text mark.note { background: #cfe6ff; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .ebook-text ::selection { background: rgba(201,162,75,0.5); }
-  @media (min-width: 720px) { .ebook-text { font-size: 20px; } }
+  @media (min-width: 720px) { .ebook-text { font-size: 24px; } }
   .sel-bar { position: sticky; top: 8px; z-index: 5; background: #fffdf8; border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
   .sel-bar .sel-text { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; font-style: italic; min-height: 18px; }
   .sel-bar .sel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -252,16 +255,21 @@ function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt
 
 function renderParagraphs() {
   const st = readerState;
-  $('ebook-text').innerHTML = st.paragraphs.map((p, i) => `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`).join('');
+  $('ebook-text').innerHTML = st.paragraphs.map((p, i) => {
+    if (p.startsWith('# ')) return `<h2 id="para-${i}" data-i="${i}">${escHtml(p.slice(2))}</h2>`;
+    if (p.startsWith('## ')) return `<h3 id="para-${i}" data-i="${i}">${escHtml(p.slice(3))}</h3>`;
+    return `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`;
+  }).join('');
   applyHighlights();
 }
 
 // Colore directement les passages surlignés / commentés dans le texte, sans jamais cacher les mots
 function applyHighlights() {
   const st = readerState;
-  st.paragraphs.forEach((text, i) => {
+  st.paragraphs.forEach((raw, i) => {
     const el = document.getElementById('para-' + i);
     if (!el) return;
+    const text = raw.startsWith('## ') ? raw.slice(3) : raw.startsWith('# ') ? raw.slice(2) : raw;
     const relevant = st.annotations.filter(a => a.quote_text && a.type !== 'favorite' && text.includes(a.quote_text));
     if (!relevant.length) { el.innerHTML = escHtml(text); return; }
     const marks = new Array(text.length).fill(null);
