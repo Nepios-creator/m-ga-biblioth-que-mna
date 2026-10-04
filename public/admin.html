@@ -154,6 +154,9 @@ async function loadBooks() {
         <label style="font-size:11px;color:var(--ink-soft);">PDF<br>
           <input type="file" accept="application/pdf" data-id="${b.id}" class="pdf-input" style="width:auto;font-size:12px;">
         </label>
+        <label style="font-size:11px;color:var(--ink-soft);">Word (texte structuré)<br>
+          <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-id="${b.id}" class="docx-input" style="width:auto;font-size:12px;">
+        </label>
         <button data-id="${b.id}" class="delete-btn">Supprimer</button>
       </div>
     </div>
@@ -178,6 +181,22 @@ async function loadBooks() {
       const data = await r.json();
       if (!r.ok) return showMsg(data.message || 'Erreur de téléversement', 'error');
       showMsg('PDF téléversé avec succès !', 'success');
+      loadBooks();
+    });
+  });
+  document.querySelectorAll('.docx-input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('docx', file);
+      showMsg('Téléversement du Word en cours…', 'success');
+      const r = await fetch(`/api/admin/books/${input.dataset.id}/docx`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData,
+      });
+      const data = await r.json();
+      if (!r.ok) return showMsg(data.message || 'Erreur de téléversement', 'error');
+      showMsg(data.message, 'success');
       loadBooks();
     });
   });
