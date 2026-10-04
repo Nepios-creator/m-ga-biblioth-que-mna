@@ -107,6 +107,22 @@ router.post('/books/:id/cover', upload.single('cover'), async (req, res) => {
   }
 });
 
+// Téléverser le fichier Word structuré d'un livre (utilisé en priorité sur le PDF pour l'espace d'étude — meilleure structure)
+router.post('/books/:id/docx', upload.single('docx'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Aucun fichier reçu' });
+  try {
+    const result = await pool.query(
+      'UPDATE books SET docx_data = $1, docx_filename = $2 WHERE id = $3 RETURNING id, title',
+      [req.file.buffer, req.file.originalname, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Livre introuvable' });
+    await pool.query('UPDATE book_parts SET content_filled = false WHERE book_id = $1', [req.params.id]);
+    res.json({ message: 'Word téléversé — le texte structuré sera généré automatiquement dans les minutes qui suivent', book: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Supprimer un livre
 router.delete('/books/:id', async (req, res) => {
   try {
