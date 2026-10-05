@@ -180,7 +180,7 @@ async function openBook(id) {
       </div>` : ''}
     ${progress.certificate_issued ? `
       <div style="margin-top:20px;text-align:center;">
-        <a href="/api/study/books/${book.id}/certificate" target="_blank" class="btn btn-primary">🎓 Télécharger mon brevet</a>
+        <button onclick="openCertificate(${book.id})" class="btn btn-primary">🎓 Télécharger mon brevet</button>
       </div>` : ''}
   `;
 }
@@ -412,6 +412,13 @@ $('back-from-read') && $('back-from-read').addEventListener('click', () => openB
 
 let currentBookId = null;
 let currentQuizContext = null;
+
+async function openCertificate(bookId) {
+  const r = await fetch(`/api/study/books/${bookId}/certificate-link`, { headers: authHeaders });
+  const data = await r.json();
+  if (!r.ok) { alert(data.message || 'Erreur'); return; }
+  window.open(data.url, '_blank');
+}
 
 async function openPartQuiz(partId, title) {
   const r = await fetch(`/api/study/parts/${partId}/quiz`, { headers: authHeaders });
