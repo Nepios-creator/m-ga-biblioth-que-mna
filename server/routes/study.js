@@ -150,6 +150,62 @@ router.get('/parts/:partId/read', async (req, res) => {
   }
 });
 
+// Lien à durée limitée pour télécharger le brevet (nécessaire car un lien ouvert dans un nouvel onglet ne peut pas transmettre le jeton de connexion)
+router.get('/books/:id/certificate-link', requireAuth, (req, res) => {
+  const token = jwt.sign({ userId: req.user.id, bookId: req.params.id, purpose: 'certificate' }, JWT_SECRET, { expiresIn: '10m' });
+  res.json({ url: `/api/study/books/${req.params.id}/certificate?token=${token}` });
+});
+
+router.get('/books/:id/certificate', async (req, res) => {
+  try {
+    let userId = req.user && req.user.id;
+    if (!userId && req.query.token) {
+      try {
+        const decoded = jwt.verify(req.query.token, JWT_SECRET);
+        if (decoded.purpose === 'certificate' && String(decoded.bookId) === String(req.params.id)) userId = decoded.userId;
+      } catch (e) { /* jeton invalide, userId reste vide */ }
+    }
+    if (!userId) return res.status(401).json({ message: 'Connexion requise' });
+    const progress = (await pool.query('SELECT * FROM user_progress WHERE user_id=$1 AND book_id=$2', [userId, req.params.id])).rows[0];
+    if (!progress || !progress.certificate_issued) {
+      return res.status(403).json({ message: 'Le brevet n\'est pas encore disponible pour ce livre' });
+    }
+    const book = (await pool.query('SELECT title FROM books WHERE id=$1', [req.params.id])).rows[0];
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="brevet.pdf"`);
+
+    const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
+    doc.pipe(res);
+
+    doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(2).stroke('#c9a24b');
+    doc.moveDown(3);
+    doc.fontSize(12).fillColor('#6b5f4d').text('MINISTÈRE DE LA NOUVELLE ALLIANCE', { align: 'center' });
+    doc.moveDown(1);
+    doc.fontSize(30).fillColor('#241e16').text('BREVET DE RÉUSSITE', { align: 'center' });
+    doc.moveDown(1.5);
+    doc.fontSize(14).fillColor('#6b5f4d').text('Ce brevet est décerné à', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(24).fillColor('#1f5386').text(req.user.full_name || req.user.email, { align: 'center' });
+    doc.moveDown(1);
+    doc.fontSize(14).fillColor('#6b5f4d').text('pour avoir achevé avec succès l\'étude du livre', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(18).fillColor('#241e16').text(book.title, { align: 'center' });
+    doc.moveDown(2);
+    doc.fontSize(11).fillColor('#6b5f4d').text(
+      `Délivré le ${new Date(progress.completed_at || new Date()).toLocaleDateString('fr-FR')} — Espace d'étude du Ministère de la Nouvelle Alliance`,
+      { align: 'center' }
+    );
+
+    doc.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ---------- Annotations (surlignages, commentaires, favoris) ----------
+
+
 router.use(requireAuth);
 
 // Marque une partie comme lue — condition requise avant de pouvoir passer son test
@@ -291,47 +347,6 @@ router.post('/books/:id/grand-quiz', async (req, res) => {
 });
 
 // Génère et sert le brevet PDF si le grand test a été réussi
-router.get('/books/:id/certificate', async (req, res) => {
-  try {
-    const progress = (await pool.query('SELECT * FROM user_progress WHERE user_id=$1 AND book_id=$2', [req.user.id, req.params.id])).rows[0];
-    if (!progress || !progress.certificate_issued) {
-      return res.status(403).json({ message: 'Le brevet n\'est pas encore disponible pour ce livre' });
-    }
-    const book = (await pool.query('SELECT title FROM books WHERE id=$1', [req.params.id])).rows[0];
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="brevet.pdf"`);
-
-    const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
-    doc.pipe(res);
-
-    doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(2).stroke('#c9a24b');
-    doc.moveDown(3);
-    doc.fontSize(12).fillColor('#6b5f4d').text('MINISTÈRE DE LA NOUVELLE ALLIANCE', { align: 'center' });
-    doc.moveDown(1);
-    doc.fontSize(30).fillColor('#241e16').text('BREVET DE RÉUSSITE', { align: 'center' });
-    doc.moveDown(1.5);
-    doc.fontSize(14).fillColor('#6b5f4d').text('Ce brevet est décerné à', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(24).fillColor('#1f5386').text(req.user.full_name || req.user.email, { align: 'center' });
-    doc.moveDown(1);
-    doc.fontSize(14).fillColor('#6b5f4d').text('pour avoir achevé avec succès l\'étude du livre', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(18).fillColor('#241e16').text(book.title, { align: 'center' });
-    doc.moveDown(2);
-    doc.fontSize(11).fillColor('#6b5f4d').text(
-      `Délivré le ${new Date(progress.completed_at || new Date()).toLocaleDateString('fr-FR')} — Espace d'étude du Ministère de la Nouvelle Alliance`,
-      { align: 'center' }
-    );
-
-    doc.end();
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// ---------- Annotations (surlignages, commentaires, favoris) ----------
-
 router.get('/parts/:partId/annotations', async (req, res) => {
   try {
     const result = await pool.query(
