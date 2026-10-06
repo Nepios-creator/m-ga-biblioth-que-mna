@@ -171,6 +171,7 @@ router.get('/books/:id/certificate', async (req, res) => {
       return res.status(403).json({ message: 'Le brevet n\'est pas encore disponible pour ce livre' });
     }
     const book = (await pool.query('SELECT title FROM books WHERE id=$1', [req.params.id])).rows[0];
+    const certUser = (await pool.query('SELECT email, full_name FROM users WHERE id=$1', [userId])).rows[0];
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="brevet.pdf"`);
@@ -186,7 +187,7 @@ router.get('/books/:id/certificate', async (req, res) => {
     doc.moveDown(1.5);
     doc.fontSize(14).fillColor('#6b5f4d').text('Ce brevet est décerné à', { align: 'center' });
     doc.moveDown(0.5);
-    doc.fontSize(24).fillColor('#1f5386').text(req.user.full_name || req.user.email, { align: 'center' });
+    doc.fontSize(24).fillColor('#1f5386').text(certUser.full_name || certUser.email, { align: 'center' });
     doc.moveDown(1);
     doc.fontSize(14).fillColor('#6b5f4d').text('pour avoir achevé avec succès l\'étude du livre', { align: 'center' });
     doc.moveDown(0.5);
@@ -199,7 +200,7 @@ router.get('/books/:id/certificate', async (req, res) => {
 
     doc.end();
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    if (res.headersSent) { res.destroy(); } else { res.status(500).json({ message: err.message }); }
   }
 });
 
