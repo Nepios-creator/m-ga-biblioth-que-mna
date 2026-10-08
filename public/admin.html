@@ -146,7 +146,7 @@ async function loadBooks() {
   $('books-list').innerHTML = books.map(b => `
     <div class="book-row" style="flex-wrap:wrap;">
       <img src="/api/books/${b.id}/cover" onerror="this.style.display='none'" style="width:38px;height:52px;object-fit:cover;border-radius:4px;background:#f2ece0;">
-      <div class="info"><strong>${b.title}</strong><span>${b.author || 'Auteur non précisé'} · ${b.access_type}${b.is_study_book ? (b.admin_locked ? ' · 🔒 Verrouillé' : ' · 🔓 Déverrouillé') : ''} · ${b.pdf_filename ? 'PDF: ' + b.pdf_filename : 'Aucun PDF'}</span></div>
+      <div class="info"><strong>${b.title}</strong><span>${b.author || 'Auteur non précisé'} · ${b.access_type} · ${b.pdf_filename ? 'PDF: ' + b.pdf_filename : 'Aucun PDF'}</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <label style="font-size:11px;color:var(--ink-soft);">Couverture<br>
           <input type="file" accept="image/*" data-id="${b.id}" class="cover-input" style="width:auto;font-size:12px;">
@@ -157,8 +157,11 @@ async function loadBooks() {
         <label style="font-size:11px;color:var(--ink-soft);">Word (texte structuré)<br>
           <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-id="${b.id}" class="docx-input" style="width:auto;font-size:12px;">
         </label>
-        ${b.is_study_book ? `<button data-id="${b.id}" class="lock-btn" style="background:${b.admin_locked ? '#e8f6ec' : '#fdeaea'};color:${b.admin_locked ? '#2a7a44' : '#a33'};">${b.admin_locked ? '🔓 Déverrouiller' : '🔒 Verrouiller'}</button>` : ''}
-        <button data-id="${b.id}" class="delete-btn">Supprimer</button>
+        ${b.is_study_book ? `
+          <button type="button" data-id="${b.id}" class="lock-btn" style="background:${b.admin_locked ? '#fdeaea' : '#e8f6ec'};color:${b.admin_locked ? '#a33' : '#2a7a44'};font-size:13px;padding:8px 14px;border:2px solid ${b.admin_locked ? '#a33' : '#2a7a44'};border-radius:8px;font-weight:700;cursor:pointer;">
+            ${b.admin_locked ? '🔒 Verrouillé — cliquer pour déverrouiller' : '🔓 Déverrouillé — cliquer pour verrouiller'}
+          </button>` : ''}
+        <button type="button" data-id="${b.id}" class="delete-btn">Supprimer</button>
       </div>
     </div>
   `).join('');
@@ -171,8 +174,17 @@ async function loadBooks() {
   });
   document.querySelectorAll('.lock-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/admin/books/${btn.dataset.id}/lock`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
-      loadBooks();
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/admin/books/${btn.dataset.id}/lock`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+        const data = await r.json();
+        if (!r.ok) { showMsg(data.message || 'Erreur', 'error'); btn.disabled = false; return; }
+        showMsg(`« ${data.title} » est maintenant ${data.admin_locked ? 'verrouillé 🔒' : 'déverrouillé 🔓'}.`, 'success');
+        loadBooks();
+      } catch (err) {
+        showMsg('Erreur réseau — réessayez.', 'error');
+        btn.disabled = false;
+      }
     });
   });
   document.querySelectorAll('.pdf-input').forEach(input => {
