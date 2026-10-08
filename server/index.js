@@ -10,7 +10,7 @@ const studyRoutes = require('./routes/study');
 const messagesRoutes = require('./routes/messages');
 const assistantRoutes = require('./routes/assistant');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
-const { fillMissingPartContent } = require('./lib/fill-part-content');
+const { fillMissingPartContent, autoSplitStudyBooks } = require('./lib/fill-part-content');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -128,6 +128,6 @@ app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
   // Génère automatiquement les citations manquantes, sans aucune action requise de l'administrateur
   autoGenerateMissingQuotes();
-  fillMissingPartContent();
-  setInterval(() => { autoGenerateMissingQuotes(); fillMissingPartContent(); }, 15 * 60 * 1000);
+  autoSplitStudyBooks().then(fillMissingPartContent);
+  setInterval(() => { autoGenerateMissingQuotes(); autoSplitStudyBooks().then(fillMissingPartContent); }, 15 * 60 * 1000);
 });
