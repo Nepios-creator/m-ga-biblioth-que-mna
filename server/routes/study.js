@@ -28,14 +28,19 @@ router.get('/parts/:partId/read-link', requireAuth, async (req, res) => {
 
 // S'assure qu'un user_progress existe pour ce livre, et le crée déverrouillé si c'est le tout premier livre de l'espace d'étude
 async function ensureProgress(userId, bookId) {
-  const existing = await pool.query('SELECT * FROM user_progress WHERE user_id=$1 AND book_id=$2', [userId, bookId]);
-  if (existing.rows.length > 0) return existing.rows[0];
+  const book = (await pool.query('SELECT order_index, admin_locked FROM books WHERE id=$1', [bookId])).rows[0];
 
-  const book = (await pool.query('SELECT order_index FROM books WHERE id=$1', [bookId])).rows[0];
+  const existing = await pool.query('SELECT * FROM user_progress WHERE user_id=$1 AND book_id=$2', [userId, bookId]);
+  if (existing.rows.length > 0) {
+    const row = existing.rows[0];
+    return book && book.admin_locked ? { ...row, unlocked: false } : row;
+  }
+
   const isFirstBook = await pool.query(
     'SELECT id FROM books WHERE is_study_book=true AND order_index = (SELECT MIN(order_index) FROM books WHERE is_study_book=true)'
   );
-  const unlocked = isFirstBook.rows.some(r => r.id === Number(bookId));
+  let unlocked = isFirstBook.rows.some(r => r.id === Number(bookId));
+  if (book && book.admin_locked) unlocked = false; // le verrou de l'administrateur prime toujours
 
   const created = await pool.query(
     'INSERT INTO user_progress (user_id, book_id, unlocked, current_part_index, unlocked_at) VALUES ($1,$2,$3,1,$4) RETURNING *',
@@ -179,7 +184,27 @@ router.get('/books/:id/certificate', async (req, res) => {
     const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
     doc.pipe(res);
 
+    const certId = `MNA-${book.id}-${userId}-${Date.now().toString(36)}`.toUpperCase();
+
+    // Fond crème (plutôt qu'une page blanche nue)
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#faf6ee');
+
+    // Filigrane répété en diagonale, sur tout le fond — rend la reproduction/falsification difficile
+    doc.save();
+    doc.rotate(-30, { origin: [doc.page.width / 2, doc.page.height / 2] });
+    doc.fontSize(26).fillColor('#c9a24b').opacity(0.13);
+    for (let y = -200; y < doc.page.height + 300; y += 70) {
+      for (let x = -200; x < doc.page.width + 300; x += 260) {
+        doc.text('MINISTÈRE DE LA NOUVELLE ALLIANCE', x, y, { lineBreak: false });
+      }
+    }
+    doc.opacity(1);
+    doc.restore();
+
+    // Bordure décorative
     doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(2).stroke('#c9a24b');
+    doc.rect(26, 26, doc.page.width - 52, doc.page.height - 52).lineWidth(0.75).stroke('#c9a24b');
+
     doc.moveDown(3);
     doc.fontSize(12).fillColor('#6b5f4d').text('MINISTÈRE DE LA NOUVELLE ALLIANCE', { align: 'center' });
     doc.moveDown(1);
@@ -197,6 +222,8 @@ router.get('/books/:id/certificate', async (req, res) => {
       `Délivré le ${new Date(progress.completed_at || new Date()).toLocaleDateString('fr-FR')} — Espace d'étude du Ministère de la Nouvelle Alliance`,
       { align: 'center' }
     );
+    doc.moveDown(0.8);
+    doc.fontSize(8).fillColor('#a89a7e').text(`Identifiant de vérification : ${certId}`, { align: 'center' });
 
     doc.end();
   } catch (err) {

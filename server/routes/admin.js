@@ -46,6 +46,20 @@ router.post('/books', async (req, res) => {
 });
 
 // Modifier un livre
+// Verrouille / déverrouille un livre de l'espace d'étude en un clic, sans le supprimer
+router.put('/books/:id/lock', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE books SET admin_locked = NOT admin_locked WHERE id=$1 RETURNING id, title, admin_locked',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Livre introuvable' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.put('/books/:id', async (req, res) => {
   const { id } = req.params;
   const {
