@@ -28,25 +28,20 @@ router.get('/parts/:partId/read-link', requireAuth, async (req, res) => {
 
 // S'assure qu'un user_progress existe pour ce livre, et le crée déverrouillé si c'est le tout premier livre de l'espace d'étude
 async function ensureProgress(userId, bookId) {
-  const book = (await pool.query('SELECT order_index, admin_locked FROM books WHERE id=$1', [bookId])).rows[0];
+  const book = (await pool.query('SELECT admin_locked FROM books WHERE id=$1', [bookId])).rows[0];
+  const unlocked = !(book && book.admin_locked); // le bouton de l'administrateur est la seule autorité, dans les deux sens
 
   const existing = await pool.query('SELECT * FROM user_progress WHERE user_id=$1 AND book_id=$2', [userId, bookId]);
   if (existing.rows.length > 0) {
     const row = existing.rows[0];
-    return book && book.admin_locked ? { ...row, unlocked: false } : row;
+    return { ...row, unlocked };
   }
-
-  const isFirstBook = await pool.query(
-    'SELECT id FROM books WHERE is_study_book=true AND order_index = (SELECT MIN(order_index) FROM books WHERE is_study_book=true)'
-  );
-  let unlocked = isFirstBook.rows.some(r => r.id === Number(bookId));
-  if (book && book.admin_locked) unlocked = false; // le verrou de l'administrateur prime toujours
 
   const created = await pool.query(
     'INSERT INTO user_progress (user_id, book_id, unlocked, current_part_index, unlocked_at) VALUES ($1,$2,$3,1,$4) RETURNING *',
     [userId, bookId, unlocked, unlocked ? new Date() : null]
   );
-  return created.rows[0];
+  return { ...created.rows[0], unlocked };
 }
 
 // Liste des livres de l'espace d'étude avec statut de déverrouillage pour le lecteur connecté
@@ -353,20 +348,15 @@ router.post('/books/:id/grand-quiz', async (req, res) => {
         'UPDATE user_progress SET grand_test_passed=true, certificate_issued=true, completed_at=now() WHERE user_id=$1 AND book_id=$2',
         [req.user.id, bookId]
       );
-      // Déverrouille le livre suivant de l'espace d'étude, s'il existe
+      // Déverrouille automatiquement le livre suivant de l'espace d'étude, s'il existe
+      // (l'administrateur garde la main : il peut le reverrouiller à tout moment avec son bouton)
       const currentBook = (await pool.query('SELECT order_index FROM books WHERE id=$1', [bookId])).rows[0];
-      const nextBook = (await pool.query(
-        'SELECT id FROM books WHERE is_study_book=true AND order_index > $1 ORDER BY order_index ASC LIMIT 1',
+      await pool.query(
+        `UPDATE books SET admin_locked = false WHERE id = (
+           SELECT id FROM books WHERE is_study_book = true AND order_index > $1 ORDER BY order_index ASC LIMIT 1
+         )`,
         [currentBook.order_index || 0]
-      )).rows[0];
-      if (nextBook) {
-        await pool.query(
-          `INSERT INTO user_progress (user_id, book_id, unlocked, current_part_index, unlocked_at)
-           VALUES ($1,$2,true,1,now())
-           ON CONFLICT (user_id, book_id) DO UPDATE SET unlocked=true, unlocked_at=now()`,
-          [req.user.id, nextBook.id]
-        );
-      }
+      );
     }
     res.json({ passed, score: Math.round(score * 100), correct, total: questions.length });
   } catch (err) {
