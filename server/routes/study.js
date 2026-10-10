@@ -8,6 +8,8 @@ const { requireAuth, JWT_SECRET } = require('../lib/auth-middleware');
 const router = express.Router();
 
 const PASS_THRESHOLD = 0.7; // 70% pour réussir un test
+const PART_QUIZ_SIZE = 10;  // questions posées à chaque petit test
+const GRAND_QUIZ_SIZE = 40; // questions posées au grand test final
 
 // Génère un lien de lecture à durée limitée (10 min) pour une partie — permet d'ouvrir le PDF
 // dans un nouvel onglet (le navigateur mobile gère mal les PDF affichés en iframe avec jeton d'en-tête)
@@ -263,8 +265,16 @@ router.get('/parts/:partId/quiz', async (req, res) => {
     if (!hasRead) {
       return res.status(403).json({ message: 'Vous devez d\'abord terminer la lecture de cette partie' });
     }
-    const questions = (await pool.query('SELECT id, question_text, choices FROM quiz_questions WHERE part_id=$1 ORDER BY id', [part.id])).rows;
-    res.json(questions);
+    // Tirage au sort de 10 questions dans la réserve de la partie — différent à chaque tentative et pour chaque lecteur
+    const questions = (await pool.query(
+      'SELECT id, question_text, choices FROM quiz_questions WHERE part_id=$1 ORDER BY random() LIMIT $2', [part.id, PART_QUIZ_SIZE]
+    )).rows;
+    if (!questions.length) return res.status(503).json({ message: 'Les questions de ce test sont en cours de préparation. Réessayez dans quelques minutes.' });
+    const session = (await pool.query(
+      'INSERT INTO quiz_sessions (user_id, book_id, part_id, question_ids) VALUES ($1,$2,$3,$4) RETURNING id',
+      [req.user.id, part.book_id, part.id, JSON.stringify(questions.map(q => q.id))]
+    )).rows[0];
+    res.json({ session_id: session.id, questions });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -284,7 +294,13 @@ router.post('/parts/:partId/quiz', async (req, res) => {
     if (!hasRead) {
       return res.status(403).json({ message: 'Vous devez d\'abord terminer la lecture de cette partie' });
     }
-    const questions = (await pool.query('SELECT id, correct_choice_index FROM quiz_questions WHERE part_id=$1', [part.id])).rows;
+    const session = (await pool.query(
+      'SELECT * FROM quiz_sessions WHERE id=$1 AND user_id=$2 AND part_id=$3 AND used=false', [req.body.session_id, req.user.id, part.id]
+    )).rows[0];
+    if (!session) return res.status(400).json({ message: 'Ce test a expiré ou a déjà été soumis. Rouvrez le test pour obtenir de nouvelles questions.' });
+    await pool.query('UPDATE quiz_sessions SET used=true WHERE id=$1', [session.id]);
+    const questions = (await pool.query('SELECT id, correct_choice_index FROM quiz_questions WHERE id = ANY($1::int[])', [session.question_ids])).rows;
+    if (!questions.length) return res.status(400).json({ message: 'Ce test n\'est plus valide. Rouvrez le test pour obtenir de nouvelles questions.' });
     let correct = 0;
     questions.forEach(q => { if (answers && answers[q.id] === q.correct_choice_index) correct++; });
     const score = questions.length ? correct / questions.length : 1;
@@ -315,8 +331,16 @@ router.get('/books/:id/grand-quiz', async (req, res) => {
     if (!progress.unlocked || progress.current_part_index <= totalParts) {
       return res.status(403).json({ message: 'Terminez d\'abord toutes les parties du livre' });
     }
-    const questions = (await pool.query('SELECT id, question_text, choices FROM quiz_questions WHERE book_id=$1 AND part_id IS NULL ORDER BY id', [req.params.id])).rows;
-    res.json(questions);
+    // Tirage au sort de 40 questions dans la grande réserve du livre
+    const questions = (await pool.query(
+      'SELECT id, question_text, choices FROM quiz_questions WHERE book_id=$1 AND part_id IS NULL ORDER BY random() LIMIT $2', [req.params.id, GRAND_QUIZ_SIZE]
+    )).rows;
+    if (!questions.length) return res.status(503).json({ message: 'Les questions de ce test sont en cours de préparation. Réessayez dans quelques minutes.' });
+    const session = (await pool.query(
+      'INSERT INTO quiz_sessions (user_id, book_id, part_id, question_ids) VALUES ($1,$2,NULL,$3) RETURNING id',
+      [req.user.id, req.params.id, JSON.stringify(questions.map(q => q.id))]
+    )).rows[0];
+    res.json({ session_id: session.id, questions });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -332,7 +356,13 @@ router.post('/books/:id/grand-quiz', async (req, res) => {
     if (!progress.unlocked || progress.current_part_index <= totalParts) {
       return res.status(403).json({ message: 'Terminez d\'abord toutes les parties du livre' });
     }
-    const questions = (await pool.query('SELECT id, correct_choice_index FROM quiz_questions WHERE book_id=$1 AND part_id IS NULL', [bookId])).rows;
+    const session = (await pool.query(
+      'SELECT * FROM quiz_sessions WHERE id=$1 AND user_id=$2 AND book_id=$3 AND part_id IS NULL AND used=false', [req.body.session_id, req.user.id, bookId]
+    )).rows[0];
+    if (!session) return res.status(400).json({ message: 'Ce test a expiré ou a déjà été soumis. Rouvrez le test pour obtenir de nouvelles questions.' });
+    await pool.query('UPDATE quiz_sessions SET used=true WHERE id=$1', [session.id]);
+    const questions = (await pool.query('SELECT id, correct_choice_index FROM quiz_questions WHERE id = ANY($1::int[])', [session.question_ids])).rows;
+    if (!questions.length) return res.status(400).json({ message: 'Ce test n\'est plus valide. Rouvrez le test pour obtenir de nouvelles questions.' });
     let correct = 0;
     questions.forEach(q => { if (answers && answers[q.id] === q.correct_choice_index) correct++; });
     const score = questions.length ? correct / questions.length : 1;
