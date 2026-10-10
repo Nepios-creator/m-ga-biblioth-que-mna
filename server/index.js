@@ -128,11 +128,20 @@ app.use('/api/quotes', quotesRoutes);
 app.listen(PORT, () => {
   console.log(`Grande Bibliothèque numérique MNA — serveur démarré sur le port ${PORT}`);
   // Génère automatiquement les citations manquantes, sans aucune action requise de l'administrateur
+  let pipelineRunning = false;
   async function runAutoPipeline() {
-    autoGenerateMissingQuotes();
-    await autoSplitStudyBooks();
-    await fillMissingPartContent();
-    await autoGenerateQuizzes();
+    if (pipelineRunning) return; // évite deux exécutions simultanées (la génération des tests peut durer plusieurs minutes)
+    pipelineRunning = true;
+    try {
+      autoGenerateMissingQuotes();
+      await autoSplitStudyBooks();
+      await fillMissingPartContent();
+      await autoGenerateQuizzes();
+    } catch (err) {
+      console.error('Erreur pipeline automatique :', err.message);
+    } finally {
+      pipelineRunning = false;
+    }
   }
   runAutoPipeline();
   setInterval(runAutoPipeline, 15 * 60 * 1000);
