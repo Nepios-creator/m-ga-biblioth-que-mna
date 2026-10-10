@@ -422,18 +422,18 @@ async function openCertificate(bookId) {
 
 async function openPartQuiz(partId, title) {
   const r = await fetch(`/api/study/parts/${partId}/quiz`, { headers: authHeaders });
-  const questions = await r.json();
-  if (!r.ok) { alert(questions.message); return; }
-  currentQuizContext = { type: 'part', id: partId };
-  renderQuiz(title, questions);
+  const data = await r.json();
+  if (!r.ok) { alert(data.message); return; }
+  currentQuizContext = { type: 'part', id: partId, sessionId: data.session_id };
+  renderQuiz(title, data.questions);
 }
 
 async function openGrandQuiz(bookId, title) {
   const r = await fetch(`/api/study/books/${bookId}/grand-quiz`, { headers: authHeaders });
-  const questions = await r.json();
-  if (!r.ok) { alert(questions.message); return; }
-  currentQuizContext = { type: 'grand', id: bookId };
-  renderQuiz('Grand test — ' + title, questions);
+  const data = await r.json();
+  if (!r.ok) { alert(data.message); return; }
+  currentQuizContext = { type: 'grand', id: bookId, sessionId: data.session_id };
+  renderQuiz('Grand test — ' + title, data.questions);
 }
 
 function renderQuiz(title, questions) {
@@ -466,9 +466,14 @@ function renderQuiz(title, questions) {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, session_id: currentQuizContext.sessionId }),
     });
     const result = await r.json();
+    if (!r.ok) {
+      $('quiz-result').innerHTML = `<div class="msg error">${result.message || 'Erreur'}</div>
+        <button class="btn btn-ghost" onclick="showView('list'); loadBooks();">Retour à la liste des livres</button>`;
+      return;
+    }
     $('quiz-result').innerHTML = `
       <div class="msg ${result.passed ? 'success' : 'error'}">
         ${result.passed ? '✅ Réussi !' : '❌ Non réussi.'} Score : ${result.score}% (${result.correct}/${result.total})
