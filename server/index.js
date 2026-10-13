@@ -12,6 +12,7 @@ const assistantRoutes = require('./routes/assistant');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
 const { fillMissingPartContent, autoSplitStudyBooks } = require('./lib/fill-part-content');
 const { autoGenerateQuizzes } = require('./lib/generate-quizzes');
+const { docxToHtml } = require('./lib/docx-to-html');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,19 +75,25 @@ app.get('/api/books/:id/read-link', requireAuth, (req, res) => {
   res.json({ readUrl: `/api/books/${req.params.id}/read?token=${token}`, downloadUrl: `/api/books/${req.params.id}/download?token=${token}` });
 });
 
-// Sert le PDF d'un livre pour lecture en ligne — réservé aux membres connectés
+// Sert un livre pour lecture en ligne — réservé aux membres connectés (PDF, ou page de lecture générée depuis le Word si le livre n'a pas de PDF)
 app.get('/api/books/:id/read', flexAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT title, pdf_data, pdf_filename, access_type, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
+      "SELECT title, pdf_data, pdf_filename, docx_data, access_type, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
       [req.params.id]
     );
     const book = result.rows[0];
-    if (!book || !book.pdf_data) {
+    if (!book || (!book.pdf_data && !book.docx_data)) {
       return res.status(404).json({ message: 'Fichier non disponible' });
     }
     if (book.is_study_book) {
       return res.status(403).json({ message: 'Ce livre fait partie de l\'espace d\'étude : lisez-le partie par partie depuis /espace-etude.html' });
+    }
+    if (!book.pdf_data) {
+      const html = await docxToHtml(book.docx_data, book.title);
+      if (!html) return res.status(404).json({ message: 'Fichier non disponible' });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(html);
     }
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${book.pdf_filename || 'livre.pdf'}"`);
