@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bible — Parole pure — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { --b-bg: #faf6ee; --b-fg: #241e16; --b-soft: #7a6f5d; --b-line: #e6dcc7; --b-card: #ffffff; --b-accent: #a67f2e; }
+  body[data-btheme="sepia"] { --b-bg: #f1e4c8; --b-fg: #3b2d17; --b-soft: #7d6a48; --b-line: #dccaa0; --b-card: #f7edd6; --b-accent: #8a6420; }
+  body[data-btheme="dark"] { --b-bg: #15120e; --b-fg: #e8dfcc; --b-soft: #a39a86; --b-line: #2e2820; --b-card: #1d1913; --b-accent: #d4a73a; }
+  body { background: var(--b-bg); }
+  body[data-btheme="dark"] header { background: #0f0d0a; }
+
+  .toolbar { position: sticky; top: 0; z-index: 20; background: var(--b-bg); border-bottom: 1px solid var(--b-line); }
+  .toolbar-in { max-width: 820px; margin: 0 auto; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+  .tb-btn { border: 1px solid var(--b-line); background: var(--b-card); color: var(--b-fg); border-radius: 999px; padding: 9px 14px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .tb-btn:active { transform: scale(.97); }
+  .tb-title { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; font-family: 'Fraunces', serif; font-size: 16px; }
+  .tb-icon { padding: 9px 12px; }
+
+  .reader { max-width: 760px; margin: 0 auto; padding: 26px 20px 150px; color: var(--b-fg); }
+  .chap-title { font-family: 'Fraunces', serif; font-size: 34px; line-height: 1.2; text-align: center; margin: 8px 0 4px; }
+  .chap-sub { text-align: center; color: var(--b-soft); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 28px; }
+  .bible-text { font-family: 'Fraunces', Georgia, serif; font-size: 28px; line-height: 1.75; overflow-wrap: anywhere; }
+  .bible-text h3 { font-size: .62em; font-weight: 700; letter-spacing: .04em; color: var(--b-accent); margin: 1.6em 0 .5em; font-family: 'Inter', sans-serif; text-transform: uppercase; }
+  .bible-text p { margin: 0 0 1em; }
+  .bible-text .v { cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .bible-text .v sup { font-family: 'Inter', sans-serif; font-size: .45em; font-weight: 700; color: var(--b-accent); margin-right: .25em; vertical-align: super; }
+  .bible-text .v .ic { font-size: .5em; vertical-align: super; margin-left: 2px; }
+  .bible-text .v.sel { background: rgba(166,127,46,.28); }
+  .bible-text .v.hl-yellow { background: #ffe9a8; color: #241e16; }
+  .bible-text .v.hl-green { background: #cdeccf; color: #241e16; }
+  .bible-text .v.hl-blue { background: #cfe6ff; color: #241e16; }
+  .bible-text .v.hl-pink { background: #ffd6e0; color: #241e16; }
+  .bible-text .v.sel { box-shadow: 0 0 0 2px var(--b-accent); }
+  .bible-text .v.flash { animation: flash 2.4s ease; }
+  @keyframes flash { 0%,60% { background: rgba(166,127,46,.5); } 100% { background: transparent; } }
+  .bible-text.per-line .v { display: block; margin-bottom: .55em; }
+
+  .nav-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--b-bg); border-top: 1px solid var(--b-line); }
+  .nav-in { max-width: 820px; margin: 0 auto; padding: 10px 14px; display: flex; gap: 10px; justify-content: space-between; }
+  .nav-in .tb-btn { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+  .nav-in .tb-btn[disabled] { opacity: .35; cursor: default; }
+
+  .sheet { position: fixed; left: 0; right: 0; bottom: 62px; z-index: 30; padding: 0 10px 10px; display: none; }
+  .sheet.on { display: block; }
+  .sheet-in { max-width: 560px; margin: 0 auto; background: var(--b-card); border: 1px solid var(--b-line); border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 12px 14px; color: var(--b-fg); }
+  .sheet-ref { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .sheet-note { font-size: 13px; color: var(--b-soft); margin-bottom: 8px; font-style: italic; }
+  .sheet-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(0,0,0,.15); cursor: pointer; }
+  .swatch.rm { background: var(--b-card); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--b-fg); }
+  .act { border: 1px solid var(--b-line); background: transparent; color: var(--b-fg); border-radius: 10px; padding: 8px 11px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600; }
+
+  .overlay { position: fixed; inset: 0; z-index: 50; background: var(--b-bg); color: var(--b-fg); overflow-y: auto; display: none; }
+  .overlay.on { display: block; }
+  .ov-in { max-width: 760px; margin: 0 auto; padding: 16px 16px 60px; }
+  .ov-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+  .ov-head h2 { font-family: 'Fraunces', serif; font-size: 22px; margin: 0; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button { flex: 1; }
+  .tabs .on { background: var(--b-accent); color: #fff; border-color: var(--b-accent); }
+  .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .book-btn { border: 1px solid var(--b-line); background: var(--b-card); color: var(--b-fg); border-radius: 12px; padding: 14px 12px; text-align: left; font-family: 'Fraunces', serif; font-size: 16px; cursor: pointer; }
+  .chap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; }
+  .chap-btn { border: 1px solid var(--b-line); background: var(--b-card); color: var(--b-fg); border-radius: 10px; padding: 14px 0; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .empty { color: var(--b-soft); font-size: 14px; padding: 8px 2px; }
+  .res { border-bottom: 1px solid var(--b-line); padding: 12px 2px; cursor: pointer; }
+  .res .ref { font-weight: 700; font-size: 13.5px; color: var(--b-accent); margin-bottom: 4px; }
+  .res .txt { font-family: 'Fraunces', serif; font-size: 17px; line-height: 1.5; }
+  .res .note { margin-top: 6px; font-size: 13px; color: var(--b-soft); font-style: italic; }
+  .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--b-line); border-radius: 12px; font-size: 16px; background: var(--b-card); color: var(--b-fg); font-family: inherit; margin-bottom: 12px; }
+  .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--b-line); }
+  .pref-row:last-child { border-bottom: none; }
+  .pref-row .seg { display: flex; gap: 6px; }
+  .pref-row .seg button.on { background: var(--b-accent); color: #fff; border-color: var(--b-accent); }
+  mark.q { background: #ffe9a8; color: #241e16; border-radius: 2px; }
+  footer { padding-bottom: 80px; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<div class="toolbar"><div class="toolbar-in">
+  <button class="tb-btn tb-title" id="btn-picker">Choisir un livre ▾</button>
+  <button class="tb-btn tb-icon" id="btn-search" aria-label="Rechercher">🔍</button>
+  <button class="tb-btn tb-icon" id="btn-marks" aria-label="Mes favoris">⭐</button>
+  <button class="tb-btn tb-icon" id="btn-prefs" aria-label="Affichage">Aa</button>
+</div></div>
+
+<main class="reader" id="reader">
+  <div class="empty" style="text-align:center;padding:40px 0;">Chargement de la Bible…</div>
+</main>
+
+<div class="sheet" id="sheet"><div class="sheet-in">
+  <div class="sheet-ref" id="sheet-ref"></div>
+  <div class="sheet-note" id="sheet-note"></div>
+  <div class="sheet-row" id="sheet-colors">
+    <button class="swatch" data-color="yellow" style="background:#ffe9a8" aria-label="Jaune"></button>
+    <button class="swatch" data-color="green" style="background:#cdeccf" aria-label="Vert"></button>
+    <button class="swatch" data-color="blue" style="background:#cfe6ff" aria-label="Bleu"></button>
+    <button class="swatch" data-color="pink" style="background:#ffd6e0" aria-label="Rose"></button>
+    <button class="swatch rm" data-color="none" aria-label="Retirer le surlignage">✕</button>
+  </div>
+  <div class="sheet-row">
+    <button class="act" id="a-fav">⭐ Favori</button>
+    <button class="act" id="a-note">💬 Note</button>
+    <button class="act" id="a-copy">📋 Copier</button>
+    <button class="act" id="a-share">↗️ Partager</button>
+    <button class="act" id="a-close">Fermer</button>
+  </div>
+</div></div>
+
+<div class="nav-bar"><div class="nav-in">
+  <button class="tb-btn" id="btn-prev" disabled>‹ Précédent</button>
+  <button class="tb-btn" id="btn-next" disabled>Suivant ›</button>
+</div></div>
+
+<!-- Choix du livre et du chapitre -->
+<div class="overlay" id="ov-picker"><div class="ov-in">
+  <div class="ov-head"><h2 id="picker-title">Livres</h2><button class="tb-btn" data-close="ov-picker">Fermer</button></div>
+  <div id="picker-body"></div>
+</div></div>
+
+<!-- Recherche -->
+<div class="overlay" id="ov-search"><div class="ov-in">
+  <div class="ov-head"><h2>Rechercher</h2><button class="tb-btn" data-close="ov-search">Fermer</button></div>
+  <input type="search" class="search-input" id="search-input" placeholder="Un mot ou une expression (3 lettres minimum)">
+  <div id="search-results"><div class="empty">Tapez un mot pour le chercher dans toute la Bible mise en ligne.</div></div>
+</div></div>
+
+<!-- Favoris et notes -->
+<div class="overlay" id="ov-marks"><div class="ov-in">
+  <div class="ov-head"><h2>Mes favoris et notes</h2><button class="tb-btn" data-close="ov-marks">Fermer</button></div>
+  <div class="tabs">
+    <button class="tb-btn on" data-tab="favorite">⭐ Favoris</button>
+    <button class="tb-btn" data-tab="note">💬 Notes</button>
+    <button class="tb-btn" data-tab="highlight">🖍 Surlignés</button>
+  </div>
+  <div id="marks-body"></div>
+</div></div>
+
+<!-- Affichage -->
+<div class="overlay" id="ov-prefs"><div class="ov-in">
+  <div class="ov-head"><h2>Affichage</h2><button class="tb-btn" data-close="ov-prefs">Fermer</button></div>
+  <div class="pref-row"><span>Taille du texte</span>
+    <span class="seg"><button class="tb-btn" id="fs-minus">A−</button><button class="tb-btn" id="fs-val" disabled>28</button><button class="tb-btn" id="fs-plus">A+</button></span></div>
+  <div class="pref-row"><span>Thème</span>
+    <span class="seg" id="seg-theme"><button class="tb-btn" data-t="light">Clair</button><button class="tb-btn" data-t="sepia">Sépia</button><button class="tb-btn" data-t="dark">Sombre</button></span></div>
+  <div class="pref-row"><span>Mise en page</span>
+    <span class="seg" id="seg-layout"><button class="tb-btn" data-l="flow">Continue</button><button class="tb-btn" data-l="line">Un verset par ligne</button></span></div>
+</div></div>
+
+<footer>Bible — version « Parole pure » · Ministère de la Nouvelle Alliance</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+if (!token) { window.location.href = '/login.html'; }
+const H = { Authorization: `Bearer ${token}` };
+const HJ = { 'Content-Type': 'application/json', ...H };
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const state = { books: [], data: null, marks: new Map(), selected: new Set(), prefs: { size: 28, theme: 'light', layout: 'flow' } };
+
+// ---------- Préférences d'affichage ----------
+try { Object.assign(state.prefs, JSON.parse(localStorage.getItem('bible_prefs') || '{}')); } catch (e) {}
+function savePrefs() { localStorage.setItem('bible_prefs', JSON.stringify(state.prefs)); }
+function applyPrefs() {
+  document.body.dataset.btheme = state.prefs.theme;
+  const bt = document.querySelector('.bible-text');
+  if (bt) { bt.style.fontSize = state.prefs.size + 'px'; bt.classList.toggle('per-line', state.prefs.layout === 'line'); }
+  $('fs-val').textContent = state.prefs.size;
+  document.querySelectorAll('#seg-theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === state.prefs.theme));
+  document.querySelectorAll('#seg-layout button').forEach((b) => b.classList.toggle('on', b.dataset.l === state.prefs.layout));
+}
+$('fs-minus').onclick = () => { state.prefs.size = Math.max(18, state.prefs.size - 2); savePrefs(); applyPrefs(); };
+$('fs-plus').onclick = () => { state.prefs.size = Math.min(44, state.prefs.size + 2); savePrefs(); applyPrefs(); };
+document.querySelectorAll('#seg-theme button').forEach((b) => b.onclick = () => { state.prefs.theme = b.dataset.t; savePrefs(); applyPrefs(); });
+document.querySelectorAll('#seg-layout button').forEach((b) => b.onclick = () => { state.prefs.layout = b.dataset.l; savePrefs(); applyPrefs(); });
+
+// ---------- Fenêtres plein écran ----------
+function openOv(id) { $(id).classList.add('on'); document.body.style.overflow = 'hidden'; }
+function closeOv(id) { $(id).classList.remove('on'); if (!document.querySelector('.overlay.on')) document.body.style.overflow = ''; }
+document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => closeOv(b.dataset.close));
+
+// ---------- Chargement ----------
+async function api(path, opts) {
+  const r = await fetch(path, { headers: H, ...(opts || {}) });
+  if (r.status === 401) { window.location.href = '/login.html'; throw new Error('401'); }
+  return r;
+}
+
+async function init() {
+  applyPrefs();
+  const r = await api('/api/bible/books');
+  state.books = r.ok ? await r.json() : [];
+  if (!state.books.length) {
+    $('reader').innerHTML = '<div class="empty" style="text-align:center;padding:50px 10px;font-size:16px;">La Bible « Parole pure » sera mise en ligne progressivement, livre par livre. Revenez bientôt.</div>';
+    $('btn-picker').disabled = true;
+    return;
+  }
+  const p = new URLSearchParams(location.search);
+  let target = null;
+  if (p.get('livre') && p.get('chapitre')) target = { book: Number(p.get('livre')), chapter: Number(p.get('chapitre')), verse: Number(p.get('verset')) || null };
+  if (!target) { try { const l = JSON.parse(localStorage.getItem('bible_last') || 'null'); if (l) target = { book: l.book, chapter: l.chapter, verse: null }; } catch (e) {} }
+  const ok = target && state.books.some((b) => b.id === target.book && b.chapters.includes(target.chapter));
+  if (!ok) { const b = state.books[0]; target = { book: b.id, chapter: b.chapters[0], verse: null }; }
+  loadChapter(target.book, target.chapter, target.verse);
+}
+
+async function loadChapter(bookId, chapter, verseNumber) {
+  closeSheet();
+  state.selected.clear();
+  const [cr, mr] = await Promise.all([
+    api(`/api/bible/books/${bookId}/chapters/${chapter}`),
+    api(`/api/bible/marks?book_id=${bookId}&chapter=${chapter}`),
+  ]);
+  if (!cr.ok) { $('reader').innerHTML = '<div class="empty">Chapitre introuvable.</div>'; return; }
+  state.data = await cr.json();
+  state.marks = new Map();
+  (mr.ok ? await mr.json() : []).forEach((m) => {
+    if (!state.marks.has(m.verse_id)) state.marks.set(m.verse_id, {});
+    state.marks.get(m.verse_id)[m.type] = m;
+  });
+  localStorage.setItem('bible_last', JSON.stringify({ book: Number(bookId), chapter: Number(chapter) }));
+  render();
+  window.scrollTo({ top: 0 });
+  if (verseNumber) {
+    const v = state.data.verses.find((x) => x.verse === verseNumber);
+    const el = v && document.querySelector(`.v[data-id="${v.id}"]`);
+    if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); }
+  }
+}
+
+// ---------- Affichage du chapitre ----------
+function verseClasses(v) {
+  const m = state.marks.get(v.id) || {};
+  let cls = 'v';
+  if (m.highlight) cls += ' hl-' + m.highlight.color;
+  if (state.selected.has(v.id)) cls += ' sel';
+  return cls;
+}
+function render() {
+  const d = state.data;
+  $('btn-picker').textContent = `${d.book.name} ${d.chapter} ▾`;
+  document.title = `${d.book.name} ${d.chapter} — Bible Parole pure`;
+  let html = '';
+  let open = false;
+  d.verses.forEach((v) => {
+    if (v.heading) { if (open) { html += '</p>'; open = false; } html += `<h3>${esc(v.heading)}</h3>`; }
+    if (!open) { html += '<p>'; open = true; }
+    const m = state.marks.get(v.id) || {};
+    const icons = (m.favorite ? '⭐' : '') + (m.note ? '💬' : '');
+    html += `<span class="${verseClasses(v)}" data-id="${v.id}"><sup>${v.verse}</sup>${esc(v.text)}${icons ? `<span class="ic">${icons}</span>` : ''} </span>`;
+  });
+  if (open) html += '</p>';
+  $('reader').innerHTML = `
+    <div class="chap-title">${esc(d.book.name)} ${d.chapter}</div>
+    <div class="chap-sub">Bible · Parole pure</div>
+    <div class="bible-text">${html}</div>`;
+  applyPrefs();
+  $('btn-prev').disabled = !d.prev; $('btn-next').disabled = !d.next;
+  $('btn-prev').textContent = d.prev ? '‹ ' + d.prev.label : '‹ Précédent';
+  $('btn-next').textContent = d.next ? d.next.label + ' ›' : 'Suivant ›';
+  document.querySelectorAll('.bible-text .v').forEach((el) => el.addEventListener('click', () => toggleSelect(Number(el.dataset.id))));
+}
+$('btn-prev').onclick = () => { const p = state.data && state.data.prev; if (p) loadChapter(p.book_id, p.chapter); };
+$('btn-next').onclick = () => { const n = state.data && state.data.next; if (n) loadChapter(n.book_id, n.chapter); };
+
+// ---------- Sélection de versets et actions ----------
+function toggleSelect(id) {
+  if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+  const el = document.querySelector(`.v[data-id="${id}"]`);
+  if (el) el.classList.toggle('sel', state.selected.has(id));
+  updateSheet();
+}
+function selectedVerses() { return state.data.verses.filter((v) => state.selected.has(v.id)); }
+function refLabel(vs) {
+  const nums = vs.map((v) => v.verse).sort((a, b) => a - b);
+  const parts = []; let start = nums[0], prev = nums[0];
+  for (let i = 1; i <= nums.length; i++) {
+    if (nums[i] === prev + 1) { prev = nums[i]; continue; }
+    parts.push(start === prev ? `${start}` : `${start}-${prev}`);
+    start = nums[i]; prev = nums[i];
+  }
+  return `${state.data.book.name} ${state.data.chapter}:${parts.join(',')}`;
+}
+function closeSheet() { $('sheet').classList.remove('on'); }
+function updateSheet() {
+  const vs = selectedVerses();
+  if (!vs.length) { closeSheet(); return; }
+  $('sheet').classList.add('on');
+  $('sheet-ref').textContent = refLabel(vs);
+  const single = vs.length === 1 ? (state.marks.get(vs[0].id) || {}) : null;
+  $('sheet-note').textContent = single && single.note ? '💬 ' + single.note.note : '';
+  $('sheet-note').style.display = single && single.note ? 'block' : 'none';
+  const allFav = vs.every((v) => (state.marks.get(v.id) || {}).favorite);
+  $('a-fav').textContent = allFav ? '⭐ Retirer des favoris' : '⭐ Favori';
+}
+function clearSelection() { state.selected.clear(); document.querySelectorAll('.v.sel').forEach((e) => e.classList.remove('sel')); closeSheet(); }
+$('a-close').onclick = clearSelection;
+
+function setMark(verseId, mark) {
+  if (!state.marks.has(verseId)) state.marks.set(verseId, {});
+  state.marks.get(verseId)[mark.type] = mark;
+}
+function refreshVerse(v) {
+  const el = document.querySelector(`.v[data-id="${v.id}"]`);
+  if (!el) return;
+  const m = state.marks.get(v.id) || {};
+  el.className = verseClasses(v);
+  const icons = (m.favorite ? '⭐' : '') + (m.note ? '💬' : '');
+  const old = el.querySelector('.ic'); if (old) old.remove();
+  if (icons) { const s = document.createElement('span'); s.className = 'ic'; s.textContent = icons; el.insertBefore(s, el.lastChild && el.lastChild.nodeType === 3 && /^\s$/.test(el.lastChild.textContent) ? el.lastChild : null); }
+}
+
+document.querySelectorAll('#sheet-colors .swatch').forEach((b) => b.onclick = async () => {
+  const vs = selectedVerses(); if (!vs.length) return;
+  const color = b.dataset.color;
+  for (const v of vs) {
+    const m = state.marks.get(v.id) || {};
+    if (color === 'none') {
+      if (m.highlight) { await api(`/api/bible/marks/${m.highlight.id}`, { method: 'DELETE' }); delete m.highlight; }
+    } else {
+      const r = await api('/api/bible/marks', { method: 'POST', headers: HJ, body: JSON.stringify({ verse_id: v.id, type: 'highlight', color }) });
+      if (r.ok) setMark(v.id, await r.json());
+    }
+    refreshVerse(v);
+  }
+  clearSelection();
+});
+
+$('a-fav').onclick = async () => {
+  const vs = selectedVerses(); if (!vs.length) return;
+  const allFav = vs.every((v) => (state.marks.get(v.id) || {}).favorite);
+  for (const v of vs) {
+    const m = state.marks.get(v.id) || {};
+    if (allFav) {
+      if (m.favorite) { await api(`/api/bible/marks/${m.favorite.id}`, { method: 'DELETE' }); delete m.favorite; }
+    } else if (!m.favorite) {
+      const r = await api('/api/bible/marks', { method: 'POST', headers: HJ, body: JSON.stringify({ verse_id: v.id, type: 'favorite' }) });
+      if (r.ok) setMark(v.id, await r.json());
+    }
+    refreshVerse(v);
+  }
+  clearSelection();
+};
+
+$('a-note').onclick = async () => {
+  const vs = selectedVerses();
+  if (vs.length !== 1) return alert('Sélectionnez un seul verset pour ajouter une note.');
+  const v = vs[0];
+  const m = state.marks.get(v.id) || {};
+  const text = prompt(`Votre note sur ${refLabel(vs)} :`, m.note ? m.note.note : '');
+  if (text === null) return;
+  const r = await api('/api/bible/marks', { method: 'POST', headers: HJ, body: JSON.stringify({ verse_id: v.id, type: 'note', note: text }) });
+  if (r.ok) {
+    const data = await r.json();
+    if (data.removed) { delete m.note; } else { setMark(v.id, data); }
+    refreshVerse(v);
+  }
+  clearSelection();
+};
+
+function quoteText(vs) {
+  const sorted = vs.slice().sort((a, b) => a.verse - b.verse);
+  return `« ${sorted.map((v) => v.text).join(' ')} »\n— ${refLabel(sorted)} (Bible Parole pure)`;
+}
+$('a-copy').onclick = () => {
+  const vs = selectedVerses(); if (!vs.length) return;
+  navigator.clipboard.writeText(quoteText(vs)).then(() => { alert('Verset copié !'); clearSelection(); });
+};
+$('a-share').onclick = () => {
+  const vs = selectedVerses(); if (!vs.length) return;
+  const first = vs.slice().sort((a, b) => a.verse - b.verse)[0];
+  const url = `${location.origin}/bible.html?livre=${state.data.book.id}&chapitre=${state.data.chapter}&verset=${first.verse}`;
+  const text = quoteText(vs) + '\n' + url;
+  if (navigator.share) navigator.share({ text }).catch(() => {});
+  else navigator.clipboard.writeText(text).then(() => alert('Verset copié !'));
+};
+
+// ---------- Choix du livre et du chapitre ----------
+let pickerTestament = 'ancien';
+function showBooks() {
+  $('picker-title').textContent = 'Livres';
+  const has = (t) => state.books.some((b) => b.testament === t);
+  if (!has(pickerTestament)) pickerTestament = has('ancien') ? 'ancien' : 'nouveau';
+  const list = state.books.filter((b) => b.testament === pickerTestament);
+  $('picker-body').innerHTML = `
+    <div class="tabs">
+      <button class="tb-btn ${pickerTestament === 'ancien' ? 'on' : ''}" data-t="ancien">Ancien Testament</button>
+      <button class="tb-btn ${pickerTestament === 'nouveau' ? 'on' : ''}" data-t="nouveau">Nouveau Testament</button>
+    </div>
+    ${list.length ? `<div class="book-grid">${list.map((b) => `<button class="book-btn" data-id="${b.id}">${esc(b.name)}</button>`).join('')}</div>`
+      : '<div class="empty">Les livres de cette partie seront mis en ligne progressivement.</div>'}`;
+  $('picker-body').querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { pickerTestament = b.dataset.t; showBooks(); });
+  $('picker-body').querySelectorAll('.book-btn').forEach((b) => b.onclick = () => showChapters(Number(b.dataset.id)));
+}
+function showChapters(bookId) {
+  const book = state.books.find((b) => b.id === bookId);
+  $('picker-title').textContent = book.name;
+  $('picker-body').innerHTML = `
+    <button class="tb-btn" id="back-books" style="margin-bottom:14px;">‹ Tous les livres</button>
+    <div class="chap-grid">${book.chapters.map((c) => `<button class="chap-btn" data-c="${c}">${c}</button>`).join('')}</div>`;
+  $('back-books').onclick = showBooks;
+  $('picker-body').querySelectorAll('.chap-btn').forEach((b) => b.onclick = () => { closeOv('ov-picker'); loadChapter(bookId, Number(b.dataset.c)); });
+}
+$('btn-picker').onclick = () => {
+  if (state.data) { pickerTestament = (state.books.find((b) => b.id === state.data.book.id) || {}).testament || 'ancien'; }
+  showBooks(); openOv('ov-picker');
+};
+
+// ---------- Recherche ----------
+let searchTimer = null;
+$('btn-search').onclick = () => { openOv('ov-search'); setTimeout(() => $('search-input').focus(), 60); };
+$('search-input').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const q = $('search-input').value.trim();
+    if (q.length < 3) { $('search-results').innerHTML = '<div class="empty">Tapez au moins 3 lettres.</div>'; return; }
+    const r = await api('/api/bible/search?q=' + encodeURIComponent(q));
+    const rows = r.ok ? await r.json() : [];
+    if (!rows.length) { $('search-results').innerHTML = '<div class="empty">Aucun verset trouvé.</div>'; return; }
+    const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+    $('search-results').innerHTML = rows.map((x, i) => `
+      <div class="res" data-i="${i}"><div class="ref">${esc(x.book_name)} ${x.chapter}:${x.verse}</div>
+      <div class="txt">${esc(x.text).replace(re, '<mark class="q">$1</mark>')}</div></div>`).join('');
+    $('search-results').querySelectorAll('.res').forEach((el) => el.onclick = () => {
+      const x = rows[Number(el.dataset.i)];
+      closeOv('ov-search'); loadChapter(x.book_id, x.chapter, x.verse);
+    });
+  }, 350);
+});
+
+// ---------- Favoris, notes, surlignages ----------
+let marksTab = 'favorite';
+async function showMarks() {
+  openOv('ov-marks');
+  $('marks-body').innerHTML = '<div class="empty">Chargement…</div>';
+  const r = await api('/api/bible/marks/list');
+  const all = r.ok ? await r.json() : [];
+  document.querySelectorAll('#ov-marks .tabs button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.tab === marksTab);
+    b.onclick = () => { marksTab = b.dataset.tab; renderMarks(all); };
+  });
+  renderMarks(all);
+}
+function renderMarks(all) {
+  document.querySelectorAll('#ov-marks .tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === marksTab));
+  const rows = all.filter((m) => m.type === marksTab);
+  if (!rows.length) { $('marks-body').innerHTML = '<div class="empty">Rien ici pour le moment. Touchez un verset dans le texte pour l\'ajouter.</div>'; return; }
+  $('marks-body').innerHTML = rows.map((m, i) => `
+    <div class="res" data-i="${i}"><div class="ref">${esc(m.book_name)} ${m.chapter}:${m.verse}</div>
+    <div class="txt">${esc(m.text)}</div>${m.note ? `<div class="note">💬 ${esc(m.note)}</div>` : ''}</div>`).join('');
+  $('marks-body').querySelectorAll('.res').forEach((el) => el.onclick = () => {
+    const m = rows[Number(el.dataset.i)];
+    closeOv('ov-marks'); loadChapter(m.book_id, m.chapter, m.verse);
+  });
+}
+$('btn-marks').onclick = showMarks;
+$('btn-prefs').onclick = () => openOv('ov-prefs');
+
+init();
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>

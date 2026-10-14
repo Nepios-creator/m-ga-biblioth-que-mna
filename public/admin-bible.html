@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration — Bible Parole pure</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; margin-bottom: 30px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14.5px; font-family: inherit; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .row2, .row3 { grid-template-columns: 1fr; } }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .msg.warn { background: #fff4dc; color: #8a5a00; }
+  .hidden { display: none; }
+  .book-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); gap: 10px; flex-wrap: wrap; }
+  .book-row:last-child { border-bottom: none; }
+  .book-row .info strong { display: block; }
+  .book-row .info span { font-size: 12.5px; color: var(--ink-soft); }
+  .mini { border: none; padding: 7px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .mini.del { background: #fdeaea; color: #a33; }
+  .mini.pub { background: #e8f6ec; color: #2a7a44; }
+  .mini.off { background: #f0ebe0; color: #7a6f5d; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+  .chip { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; }
+  .sample { background: var(--paper); border-radius: 10px; padding: 12px 14px; font-size: 14.5px; line-height: 1.6; margin-bottom: 10px; }
+  .sample b { color: var(--gold-deep); }
+  .progress { height: 10px; background: var(--paper); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+  .progress > div { height: 100%; background: var(--gold); }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/admin.html">Panneau admin</a><a href="/bible.html">Voir la Bible</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel"><h2>Accès refusé</h2><p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p></div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:16px;">← Panneau admin</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Bible — version « Parole pure »</h1>
+    <p style="color:var(--ink-soft);margin-bottom:24px;">Mettez la Bible en ligne livre par livre. Le texte est conservé tel quel ; il n'est jamais modifié.</p>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
+        <h2 style="margin:0;">Avancement</h2><span id="progress-label" style="font-size:14px;color:var(--ink-soft);"></span>
+      </div>
+      <div class="progress"><div id="progress-bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:6px;">Publier un livre</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;">Choisissez le livre, puis son texte (fichier Word <b>.docx</b>, fichier <b>.txt</b>, ou texte collé). Vous pourrez vérifier l'aperçu avant de publier. Pour corriger un livre déjà en ligne, republiez-le : il est mis à jour sans effacer les favoris des lecteurs.</p>
+      <div id="msg-box"></div>
+
+      <div class="field"><label>Livre</label>
+        <select id="f-canon"></select>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Nom affiché</label><input type="text" id="f-name"></div>
+        <div class="field"><label>Abréviation</label><input type="text" id="f-abbr"></div>
+        <div class="field"><label>Testament</label>
+          <select id="f-testament"><option value="ancien">Ancien Testament</option><option value="nouveau">Nouveau Testament</option></select>
+        </div>
+      </div>
+      <div class="field" style="max-width:260px;"><label>Ordre dans la Bible</label><input type="number" id="f-order"></div>
+
+      <div class="field"><label>Fichier du livre (.docx ou .txt)</label><input type="file" id="f-file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></div>
+      <div class="field"><label>… ou coller le texte ici</label><textarea id="f-text" rows="6" placeholder="Chapitre 1&#10;1 Au commencement…&#10;2 …"></textarea></div>
+
+      <details style="margin-bottom:16px;font-size:13.5px;color:var(--ink-soft);">
+        <summary style="cursor:pointer;font-weight:600;">Comment préparer le texte ?</summary>
+        <ul style="margin:10px 0 0 18px;line-height:1.7;">
+          <li>Une ligne « Chapitre 1 » (ou « Psaume 23 ») avant chaque chapitre.</li>
+          <li>Les versets numérotés : « 1 Au commencement… », un verset par ligne, ou plusieurs dans un paragraphe.</li>
+          <li>Numéros en exposant dans Word : reconnus automatiquement.</li>
+          <li>Un intertitre (sans numéro) placé avant un verset est conservé au-dessus de ce verset.</li>
+        </ul>
+      </details>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost" id="btn-preview">1. Voir l'aperçu</button>
+        <button type="button" class="btn btn-primary" id="btn-publish" disabled>2. Publier ce livre</button>
+      </div>
+      <div id="preview-box" style="margin-top:20px;"></div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Livres en ligne</h2>
+      <div id="books-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const user = (() => { try { return JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) { return null; } })();
+const H = { Authorization: `Bearer ${token}` };
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const CANON = [
+  ['Genèse','Gn','ancien'],['Exode','Ex','ancien'],['Lévitique','Lv','ancien'],['Nombres','Nb','ancien'],['Deutéronome','Dt','ancien'],
+  ['Josué','Jos','ancien'],['Juges','Jg','ancien'],['Ruth','Rt','ancien'],['1 Samuel','1S','ancien'],['2 Samuel','2S','ancien'],
+  ['1 Rois','1R','ancien'],['2 Rois','2R','ancien'],['1 Chroniques','1Ch','ancien'],['2 Chroniques','2Ch','ancien'],['Esdras','Esd','ancien'],
+  ['Néhémie','Né','ancien'],['Esther','Est','ancien'],['Job','Jb','ancien'],['Psaumes','Ps','ancien'],['Proverbes','Pr','ancien'],
+  ['Ecclésiaste','Ec','ancien'],['Cantique des Cantiques','Ct','ancien'],['Ésaïe','Es','ancien'],['Jérémie','Jr','ancien'],['Lamentations','Lm','ancien'],
+  ['Ézéchiel','Ez','ancien'],['Daniel','Dn','ancien'],['Osée','Os','ancien'],['Joël','Jl','ancien'],['Amos','Am','ancien'],['Abdias','Ab','ancien'],
+  ['Jonas','Jon','ancien'],['Michée','Mi','ancien'],['Nahum','Na','ancien'],['Habacuc','Ha','ancien'],['Sophonie','So','ancien'],['Aggée','Ag','ancien'],
+  ['Zacharie','Za','ancien'],['Malachie','Ml','ancien'],
+  ['Matthieu','Mt','nouveau'],['Marc','Mc','nouveau'],['Luc','Lc','nouveau'],['Jean','Jn','nouveau'],['Actes','Ac','nouveau'],['Romains','Rm','nouveau'],
+  ['1 Corinthiens','1Co','nouveau'],['2 Corinthiens','2Co','nouveau'],['Galates','Ga','nouveau'],['Éphésiens','Ep','nouveau'],['Philippiens','Ph','nouveau'],
+  ['Colossiens','Col','nouveau'],['1 Thessaloniciens','1Th','nouveau'],['2 Thessaloniciens','2Th','nouveau'],['1 Timothée','1Tm','nouveau'],['2 Timothée','2Tm','nouveau'],
+  ['Tite','Tt','nouveau'],['Philémon','Phm','nouveau'],['Hébreux','He','nouveau'],['Jacques','Jc','nouveau'],['1 Pierre','1P','nouveau'],['2 Pierre','2P','nouveau'],
+  ['1 Jean','1Jn','nouveau'],['2 Jean','2Jn','nouveau'],['3 Jean','3Jn','nouveau'],['Jude','Jd','nouveau'],['Apocalypse','Ap','nouveau'],
+];
+
+if (!token || !user || user.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  initForm();
+  loadBooks();
+}
+
+function showMsg(text, type) { $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`; window.scrollTo({ top: $('msg-box').offsetTop - 80, behavior: 'smooth' }); }
+
+function initForm() {
+  $('f-canon').innerHTML = '<option value="">— Autre livre (saisie libre) —</option>' +
+    CANON.map((b, i) => `<option value="${i}">${i + 1}. ${b[0]}</option>`).join('');
+  $('f-canon').addEventListener('change', () => {
+    const i = $('f-canon').value;
+    if (i === '') return;
+    const b = CANON[Number(i)];
+    $('f-name').value = b[0]; $('f-abbr').value = b[1]; $('f-testament').value = b[2]; $('f-order').value = (Number(i) + 1) * 10;
+    resetPreview();
+  });
+  ['f-file', 'f-text'].forEach((id) => $(id).addEventListener('input', resetPreview));
+  $('f-file').addEventListener('change', resetPreview);
+}
+
+function resetPreview() { $('preview-box').innerHTML = ''; $('btn-publish').disabled = true; }
+
+function buildForm(includeMeta) {
+  const fd = new FormData();
+  const file = $('f-file').files[0];
+  if (file) fd.append('file', file);
+  else fd.append('text', $('f-text').value);
+  if (includeMeta) {
+    fd.append('name', $('f-name').value.trim());
+    fd.append('abbreviation', $('f-abbr').value.trim());
+    fd.append('testament', $('f-testament').value);
+    fd.append('book_order', $('f-order').value);
+  }
+  return fd;
+}
+
+$('btn-preview').addEventListener('click', async () => {
+  $('msg-box').innerHTML = '';
+  if (!$('f-file').files[0] && !$('f-text').value.trim()) return showMsg('Choisissez un fichier ou collez le texte du livre.', 'error');
+  $('preview-box').innerHTML = '<div class="msg success">Analyse du texte en cours…</div>';
+  try {
+    const r = await fetch('/api/bible/admin/preview', { method: 'POST', headers: H, body: buildForm(false) });
+    const d = await r.json();
+    if (!r.ok) { $('preview-box').innerHTML = `<div class="msg error">${esc(d.message || 'Erreur')}</div>`; return; }
+    renderPreview(d);
+  } catch (e) { $('preview-box').innerHTML = '<div class="msg error">Erreur réseau — réessayez.</div>'; }
+});
+
+function sample(label, s) {
+  if (!s) return '';
+  return `<div class="sample"><b>${label} — chapitre ${s.chapter}</b><br>${s.verses.map((v) =>
+    `${v.heading ? `<i>[${esc(v.heading)}]</i><br>` : ''}<b>${v.verse}</b> ${esc(v.text)}`).join('<br>')}</div>`;
+}
+
+function renderPreview(d) {
+  const blocking = d.duplicates > 0 || !d.totalVerses;
+  $('preview-box').innerHTML = `
+    <div class="msg ${blocking ? 'error' : 'success'}"><b>${d.chapters.length} chapitre(s)</b> et <b>${d.totalVerses} verset(s)</b> détectés.</div>
+    ${d.warnings.length ? `<div class="msg warn"><b>À vérifier :</b><ul style="margin:6px 0 0 18px;">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+    <div class="chips">${d.chapters.map((c) => `<span class="chip">Ch. ${c.chapter} : ${c.count}</span>`).join('')}</div>
+    ${sample('Début', d.sampleStart)}${sample('Fin', d.sampleEnd)}
+    <p style="font-size:13px;color:var(--ink-soft);">Vérifiez que les premiers et derniers versets sont corrects, puis publiez.</p>`;
+  $('btn-publish').disabled = blocking;
+}
+
+$('btn-publish').addEventListener('click', async () => {
+  if (!$('f-name').value.trim()) return showMsg('Indiquez le nom du livre (ou choisissez-le dans la liste).', 'error');
+  $('btn-publish').disabled = true;
+  showMsg('Publication en cours…', 'success');
+  try {
+    const r = await fetch('/api/bible/admin/books', { method: 'POST', headers: H, body: buildForm(true) });
+    const d = await r.json();
+    if (!r.ok) { showMsg(esc(d.message || 'Erreur'), 'error'); $('btn-publish').disabled = false; return; }
+    showMsg(esc(d.message), 'success');
+    $('f-file').value = ''; $('f-text').value = ''; $('f-canon').value = '';
+    $('preview-box').innerHTML = '';
+    loadBooks();
+  } catch (e) { showMsg('Erreur réseau — réessayez.', 'error'); $('btn-publish').disabled = false; }
+});
+
+async function loadBooks() {
+  const r = await fetch('/api/bible/admin/books', { headers: H });
+  if (!r.ok) { $('books-list').innerHTML = '<p>Erreur de chargement.</p>'; return; }
+  const books = await r.json();
+  const done = books.filter((b) => b.verses > 0).length;
+  $('progress-label').textContent = `${done} livre(s) sur 66`;
+  $('progress-bar').style.width = Math.round((done / 66) * 100) + '%';
+  if (!books.length) { $('books-list').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre en ligne pour le moment.</p>'; return; }
+  $('books-list').innerHTML = books.map((b) => `
+    <div class="book-row">
+      <div class="info"><strong>${esc(b.name)}</strong><span>${b.testament === 'nouveau' ? 'Nouveau' : 'Ancien'} Testament · ${b.chapters} chapitre(s) · ${b.verses} verset(s) · ordre ${b.book_order}</span></div>
+      <div style="display:flex;gap:8px;">
+        <button class="mini ${b.published ? 'pub' : 'off'}" data-act="toggle" data-id="${b.id}" data-pub="${b.published}">${b.published ? '👁 Publié' : '🚫 Masqué'}</button>
+        <button class="mini del" data-act="del" data-id="${b.id}">Supprimer</button>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('#books-list button').forEach((btn) => btn.addEventListener('click', async () => {
+    if (btn.dataset.act === 'toggle') {
+      await fetch(`/api/bible/admin/books/${btn.dataset.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...H }, body: JSON.stringify({ published: btn.dataset.pub !== 'true' }) });
+    } else {
+      if (!confirm('Supprimer ce livre et tous ses versets ? Les favoris des lecteurs sur ce livre seront perdus.')) return;
+      await fetch(`/api/bible/admin/books/${btn.dataset.id}`, { method: 'DELETE', headers: H });
+    }
+    loadBooks();
+  }));
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
