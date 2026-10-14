@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 24px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; margin-bottom: 22px; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .hidden { display: none; }
+
+  /* Lecteur intégré — vrai texte, grand et lisible (identique à l'espace d'étude) */
+  .ebook-text { font-size: 26px; line-height: 1.8; color: #241e16; font-family: 'Fraunces', Georgia, serif; overflow-wrap: anywhere; }
+  .ebook-text p { margin: 0 0 1.3em; }
+  .ebook-text h2 { font-size: 1.5em; font-weight: 700; margin: 1em 0 0.6em; color: #16130f; line-height: 1.3; }
+  .ebook-text h2:first-child { margin-top: 0; }
+  .ebook-text h3 { font-size: 1.12em; font-weight: 700; font-style: italic; margin: 1.1em 0 0.5em; color: #3a2f1f; }
+  .ebook-text mark.hl { background: #ffe9a8; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ebook-text mark.note { background: #cfe6ff; color: inherit; border-radius: 2px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .ebook-text ::selection { background: rgba(201,162,75,0.5); }
+  @media (min-width: 720px) { .ebook-text { font-size: 28px; } }
+  .sel-bar { position: sticky; top: 8px; z-index: 5; background: #fffdf8; border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .sel-bar .sel-text { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; font-style: italic; min-height: 18px; }
+  .sel-bar .sel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sel-bar .sel-actions .btn { padding: 7px 12px; font-size: 12.5px; }
+  .anno-item { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .anno-item:last-child { border-bottom: none; }
+  .anno-item .q { font-style: italic; color: var(--ink); }
+  .anno-item .n { margin-top: 4px; color: var(--ink-soft); }
+  .anno-item .a-actions { margin-top: 6px; display: flex; gap: 12px; }
+  .anno-item .a-actions button { background: none; border: none; color: var(--blue-deep); font-size: 12px; cursor: pointer; padding: 0; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <a href="/catalogue.html" class="btn btn-ghost" style="margin-bottom:18px;">← Retour au catalogue</a>
+  <div class="panel" id="read-panel">
+    <div style="padding:30px;text-align:center;color:var(--ink-soft);">Chargement du livre…</div>
+  </div>
+</div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const authHeaders = { Authorization: `Bearer ${token}` };
+const bookId = new URLSearchParams(location.search).get('book');
+
+let readerState = null;
+
+function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+if (!token) {
+  window.location.href = '/login.html';
+} else if (!bookId) {
+  $('read-panel').innerHTML = '<p>Livre introuvable.</p>';
+} else {
+  openBookReader();
+}
+
+async function openBookReader() {
+  readerState = { bookId, title: '', paragraphs: [], annotations: [], selection: '', selectionPara: null };
+  try {
+    const [bookRes, posRes, annoRes] = await Promise.all([
+      fetch(`/api/reader/books/${bookId}`, { headers: authHeaders }),
+      fetch(`/api/reader/books/${bookId}/position`, { headers: authHeaders }),
+      fetch(`/api/reader/books/${bookId}/annotations`, { headers: authHeaders }),
+    ]);
+
+    if (bookRes.status === 401) { window.location.href = '/login.html'; return; }
+
+    const data = await bookRes.json();
+
+    // Livre disponible uniquement en PDF : on l'ouvre comme avant
+    if (bookRes.status === 409 && data.fallback === 'pdf') {
+      const r = await fetch(`/api/books/${bookId}/read-link`, { headers: authHeaders });
+      const links = await r.json();
+      if (r.ok && links.readUrl) { window.location.replace(links.readUrl); return; }
+    }
+
+    if (!bookRes.ok) {
+      $('read-panel').innerHTML = `<div class="msg error">${escHtml(data.message || 'Erreur de chargement du livre')}</div>`;
+      return;
+    }
+
+    const pos = posRes.ok ? await posRes.json() : null;
+    readerState.annotations = annoRes.ok ? await annoRes.json() : [];
+    readerState.title = data.book.title;
+    readerState.paragraphs = data.paragraphs;
+    document.title = `${data.book.title} — Ministère de la Nouvelle Alliance`;
+
+    $('read-panel').innerHTML = `
+      <h2 style="margin-bottom:4px;">${escHtml(data.book.title)}</h2>
+      <p style="color:var(--ink-soft);margin-bottom:14px;">${escHtml(data.book.author || '')}</p>
+      <div id="resume-box"></div>
+      <div class="sel-bar" id="sel-bar">
+        <div class="sel-text" id="sel-text">Touchez et maintenez un mot, puis étirez pour sélectionner une phrase ou un paragraphe à surligner, commenter ou partager.</div>
+        <div class="sel-actions">
+          <button class="btn btn-ghost" id="btn-highlight">🖍 Surligner</button>
+          <button class="btn btn-ghost" id="btn-comment">💬 Commenter</button>
+          <button class="btn btn-ghost" id="btn-share">↗️ Partager</button>
+          <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (ici)</button>
+        </div>
+      </div>
+      <div class="ebook-text" id="ebook-text"></div>
+      <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
+      <div id="anno-list" style="margin-bottom:20px;"></div>
+      <a href="/catalogue.html" class="btn btn-primary">← Retour au catalogue</a>
+    `;
+
+    renderParagraphs();
+    renderAnnotations();
+    wireReaderControls();
+
+    const savedIndex = pos && pos.page_number ? pos.page_number : null;
+    if (savedIndex && savedIndex > 1 && savedIndex <= readerState.paragraphs.length) {
+      $('resume-box').innerHTML = `
+        <div class="msg success" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span>Vous vous étiez arrêté en cours de lecture.</span>
+          <span style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px;" id="resume-yes">Reprendre</button>
+            <button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;" id="resume-no">Depuis le début</button>
+          </span>
+        </div>`;
+      $('resume-yes').addEventListener('click', () => { $('resume-box').innerHTML = ''; goToPara(savedIndex); });
+      $('resume-no').addEventListener('click', () => { $('resume-box').innerHTML = ''; });
+    }
+  } catch (err) {
+    $('read-panel').innerHTML = '<div class="msg error">Erreur de chargement du livre</div>';
+  }
+}
+
+function renderParagraphs() {
+  const st = readerState;
+  $('ebook-text').innerHTML = st.paragraphs.map((p, i) => {
+    if (p.startsWith('# ')) return `<h2 id="para-${i}" data-i="${i}">${escHtml(p.slice(2))}</h2>`;
+    if (p.startsWith('## ')) return `<h3 id="para-${i}" data-i="${i}">${escHtml(p.slice(3))}</h3>`;
+    return `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`;
+  }).join('');
+  applyHighlights();
+}
+
+// Colore directement les passages surlignés / commentés dans le texte, sans jamais cacher les mots
+function applyHighlights() {
+  const st = readerState;
+  st.paragraphs.forEach((raw, i) => {
+    const el = document.getElementById('para-' + i);
+    if (!el) return;
+    const text = raw.startsWith('## ') ? raw.slice(3) : raw.startsWith('# ') ? raw.slice(2) : raw;
+    const relevant = st.annotations.filter(a => a.quote_text && a.type !== 'favorite' && text.includes(a.quote_text));
+    if (!relevant.length) { el.innerHTML = escHtml(text); return; }
+    const marks = new Array(text.length).fill(null);
+    relevant.forEach(a => {
+      const idx = text.indexOf(a.quote_text);
+      if (idx === -1) return;
+      for (let k = idx; k < idx + a.quote_text.length; k++) {
+        if (a.type === 'note' || !marks[k]) marks[k] = a.type === 'note' ? 'note' : 'hl';
+      }
+    });
+    let html = '', k = 0;
+    while (k < text.length) {
+      let j = k;
+      while (j < text.length && marks[j] === marks[k]) j++;
+      const chunk = escHtml(text.slice(k, j));
+      html += marks[k] ? `<mark class="${marks[k]}">${chunk}</mark>` : chunk;
+      k = j;
+    }
+    el.innerHTML = html;
+  });
+}
+
+function currentParaIndex(node) {
+  const el = node && node.nodeType === 3 ? node.parentElement : node;
+  const closest = el && el.closest ? el.closest('[data-i]') : null;
+  return closest ? Number(closest.dataset.i) : null;
+}
+
+function wireReaderControls() {
+  const st = readerState;
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    const container = document.getElementById('ebook-text');
+    if (text && container && container.contains(sel.anchorNode)) {
+      st.selection = text.replace(/\s+/g, ' ');
+      st.selectionPara = currentParaIndex(sel.anchorNode);
+      $('sel-text').textContent = '« ' + (st.selection.length > 220 ? st.selection.slice(0, 220) + '…' : st.selection) + ' »';
+    }
+  });
+
+  async function saveAnnotation(type, note) {
+    const r = await fetch(`/api/reader/books/${st.bookId}/annotations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ page_number: st.selectionPara != null ? st.selectionPara + 1 : null, quote_text: st.selection || null, note: note || null, type }),
+    });
+    if (r.ok) {
+      st.annotations.push(await r.json());
+      renderAnnotations();
+      applyHighlights();
+      window.getSelection().removeAllRanges();
+    } else {
+      const err = await r.json(); alert(err.message || 'Erreur');
+    }
+  }
+
+  $('btn-highlight').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage dans le texte.');
+    saveAnnotation('highlight');
+  });
+  $('btn-comment').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage à commenter.');
+    const note = prompt('Votre commentaire :');
+    if (note && note.trim()) saveAnnotation('note', note.trim());
+  });
+  $('btn-favorite').addEventListener('click', () => saveAnnotation('favorite'));
+  $('btn-share').addEventListener('click', () => {
+    if (!st.selection) return alert('Sélectionnez d\'abord un passage à partager.');
+    shareQuote(st.selection);
+  });
+
+  // Enregistre la position de lecture pendant le défilement (la reprise, elle, reste un choix)
+  let scrollTimer = null;
+  window.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const paras = document.querySelectorAll('#ebook-text p');
+      let visible = null;
+      paras.forEach(p => {
+        const r = p.getBoundingClientRect();
+        if (r.top < window.innerHeight * 0.5 && r.bottom > 0) visible = p;
+      });
+      if (visible) {
+        fetch(`/api/reader/books/${st.bookId}/position`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
+          body: JSON.stringify({ page_number: Number(visible.dataset.i) + 1 }),
+        });
+      }
+    }, 1200);
+  });
+}
+
+function shareQuote(text) {
+  const full = `« ${text} »\n— Ministère de la Nouvelle Alliance (${location.origin})`;
+  if (navigator.share) navigator.share({ text: full }).catch(() => {});
+  else navigator.clipboard.writeText(full).then(() => alert('Extrait copié !'));
+}
+
+function goToPara(n) {
+  const el = document.getElementById('para-' + (n - 1));
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderAnnotations() {
+  const st = readerState;
+  const icons = { highlight: '🖍', note: '💬', favorite: '⭐' };
+  if (!st.annotations.length) {
+    $('anno-list').innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Aucune annotation pour le moment.</p>';
+    return;
+  }
+  $('anno-list').innerHTML = st.annotations.map(a => `
+    <div class="anno-item">
+      <div>${icons[a.type]} <span style="font-size:12px;color:var(--ink-soft);">paragraphe ${a.page_number || '—'}</span></div>
+      ${a.quote_text ? `<div class="q">« ${escHtml(a.quote_text)} »</div>` : ''}
+      ${a.note ? `<div class="n">${escHtml(a.note)}</div>` : ''}
+      <div class="a-actions">
+        <button onclick="goToPara(${a.page_number || 1})">Aller au paragraphe</button>
+        ${a.quote_text ? `<button onclick='shareQuote(${JSON.stringify(a.quote_text)})'>Partager</button>` : ''}
+        <button onclick="deleteAnnotation(${a.id})">Supprimer</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteAnnotation(id) {
+  if (!confirm('Supprimer cette annotation ?')) return;
+  await fetch(`/api/reader/annotations/${id}`, { method: 'DELETE', headers: authHeaders });
+  readerState.annotations = readerState.annotations.filter(a => a.id !== id);
+  renderAnnotations();
+  applyHighlights();
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
