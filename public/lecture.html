@@ -51,7 +51,10 @@
 </header>
 
 <div class="wrap">
-  <a href="/catalogue.html" class="btn btn-ghost" style="margin-bottom:18px;">← Retour au catalogue</a>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+    <a href="/catalogue.html" class="btn btn-ghost">← Retour au catalogue</a>
+    <button class="btn btn-ghost" id="btn-fullscreen" style="display:none;">⛶ Plein écran</button>
+  </div>
   <div class="panel" id="read-panel">
     <div style="padding:30px;text-align:center;color:var(--ink-soft);">Chargement du livre…</div>
   </div>
@@ -299,6 +302,23 @@ async function deleteAnnotation(id) {
   renderAnnotations();
   applyHighlights();
 }
+
+// Mode plein écran : lecture immersive, sans distraction
+(function () {
+  const btn = document.getElementById('btn-fullscreen');
+  const el = document.documentElement;
+  const request = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!btn || !request) return; // non disponible (ex. iPhone) : le bouton reste caché
+  btn.style.display = 'inline-block';
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  btn.addEventListener('click', () => {
+    if (isFs()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else request.call(el);
+  });
+  const refresh = () => { btn.textContent = isFs() ? '✕ Quitter le plein écran' : '⛶ Plein écran'; };
+  document.addEventListener('fullscreenchange', refresh);
+  document.addEventListener('webkitfullscreenchange', refresh);
+})();
 </script>
 
 <script src="/js/pwa.js"></script>
