@@ -208,7 +208,7 @@ async function autoGenerateMissingQuotes() {
   try {
     const books = (await pool.query(
       `SELECT id, title, pdf_data, docx_data FROM books
-       WHERE quotes_version < $1 AND (pdf_data IS NOT NULL OR docx_data IS NOT NULL)
+       WHERE (quotes_version < $1 OR quotes_generated_at IS NULL) AND (pdf_data IS NOT NULL OR docx_data IS NOT NULL)
        ORDER BY quote_order ASC, id ASC`,
       [QUOTES_VERSION]
     )).rows;
