@@ -10,6 +10,7 @@ const studyRoutes = require('./routes/study');
 const messagesRoutes = require('./routes/messages');
 const assistantRoutes = require('./routes/assistant');
 const readerRoutes = require('./routes/reader');
+const bibleRoutes = require('./routes/bible');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
 const { fillMissingPartContent, autoSplitStudyBooks } = require('./lib/fill-part-content');
 const { autoGenerateQuizzes } = require('./lib/generate-quizzes');
@@ -132,6 +133,7 @@ app.use('/api/study', studyRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/reader', readerRoutes);
+app.use('/api/bible', bibleRoutes);
 app.use('/api/quotes', quotesRoutes);
 
 app.listen(PORT, () => {
