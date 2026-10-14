@@ -4,9 +4,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Page d'accueil : active les cadres interactifs et l'ajustement de la taille des citations
-if (location.pathname === '/' || location.pathname === '/index.html') {
-  const homeScript = document.createElement('script');
-  homeScript.src = '/js/home.js';
-  document.body.appendChild(homeScript);
-}
+// Ajouts communs (menu, raccourcis admin) sur toutes les pages
+(function () {
+  const extras = document.createElement('script');
+  extras.src = '/js/site-extras.js';
+  document.body.appendChild(extras);
+
+  // Page d'accueil : cadres interactifs, section Bible et ajustement des citations
+  if (location.pathname === '/' || location.pathname === '/index.html') {
+    const home = document.createElement('script');
+    home.src = '/js/home.js';
+    document.body.appendChild(home);
+  }
+})();

@@ -32,6 +32,22 @@
     fitQuote();
   }
 
+  // --- Section « Bible — Parole pure » ajoutée sur l'accueil, avant « À propos » ---
+  (function addBibleSection() {
+    const anchor = document.getElementById('a-propos');
+    if (!anchor || document.getElementById('bible-section')) return;
+    const sec = document.createElement('section');
+    sec.id = 'bible-section';
+    sec.className = 'section';
+    sec.innerHTML = `
+      <div class="container" style="text-align:center;">
+        <h2 style="font-family:'Fraunces',serif;margin-bottom:10px;">La Bible — version « Parole pure »</h2>
+        <p style="max-width:560px;margin:0 auto 22px;color:var(--ink-soft);">Notre propre version de la Bible, présentée pour une lecture paisible : grand texte, surlignage, notes, favoris et partage de versets.</p>
+        <a href="/bible.html" class="btn btn-primary">Ouvrir la Bible</a>
+      </div>`;
+    anchor.parentNode.insertBefore(sec, anchor);
+  })();
+
   // --- Les quatre cadres ---
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const canFullscreen = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
