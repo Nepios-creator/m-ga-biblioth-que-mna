@@ -76,7 +76,8 @@ async function getBookLinks(id) {
   const r = await fetch(`/api/books/${id}/read-link`, { headers: { Authorization: `Bearer ${localStorage.getItem('mna_token')}` } });
   return r.json();
 }
-async function openRead(id) { const links = await getBookLinks(id); window.open(links.readUrl, '_blank'); }
+// La lecture s'ouvre dans le lecteur intégré (surlignage, commentaires, partage, favoris), comme dans l'espace d'étude
+function openRead(id) { window.location.href = '/lecture.html?book=' + id; }
 async function openDownload(id) { const links = await getBookLinks(id); window.open(links.downloadUrl, '_blank'); }
 </script>
 
