@@ -13,6 +13,20 @@
   .msg.success { background: #e8f6ec; color: #2a7a44; }
   .hidden { display: none; }
 
+  /* Navigation par parties (menu déroulant + précédent / suivant) */
+  .part-nav { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: #f7f1e3; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .part-nav-row { display: flex; gap: 8px; align-items: center; }
+  .part-nav select { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14.5px; background: #fff; font-family: inherit; }
+  .part-nav .btn { padding: 9px 14px; }
+  .part-nav .btn:disabled { opacity: 0.4; cursor: default; }
+  .part-count { flex: 1; text-align: center; font-size: 12.5px; color: var(--ink-soft); }
+  .part-nav-bottom { display: flex; gap: 8px; align-items: center; margin: 8px 0 18px; }
+  .part-nav-bottom .btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* Lecture biblique : passages cités dans la partie, placés en début de partie */
+  .bible-reading { font-size: 0.72em; line-height: 1.7; color: #7a5a10; margin: 0 0 1.4em; }
+  .bible-reading strong { color: #3a2f1f; }
+
   /* Lecteur intégré — vrai texte, grand et lisible (identique à l'espace d'étude) */
   .ebook-text { font-size: 26px; line-height: 1.8; color: #241e16; font-family: 'Fraunces', Georgia, serif; overflow-wrap: anywhere; }
   .ebook-text p { margin: 0 0 1.3em; }
@@ -72,6 +86,142 @@ let readerState = null;
 
 function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+// ---------- Passages bibliques (références citées dans le texte d'une partie) ----------
+
+const BIBLE_BOOKS = [
+  ['Genèse', ['Genèse', 'Genese', 'Gen', 'Gn']],
+  ['Exode', ['Exode', 'Exo', 'Ex']],
+  ['Lévitique', ['Lévitique', 'Levitique', 'Lév', 'Lev', 'Lv']],
+  ['Nombres', ['Nombres', 'Nomb', 'Nb']],
+  ['Deutéronome', ['Deutéronome', 'Deuteronome', 'Deut', 'Dt']],
+  ['Josué', ['Josué', 'Josue', 'Jos']],
+  ['Juges', ['Juges', 'Jug', 'Jg']],
+  ['Ruth', ['Ruth']],
+  ['1 Samuel', ['1 Samuel', '1 Sam']],
+  ['2 Samuel', ['2 Samuel', '2 Sam']],
+  ['1 Rois', ['1 Rois']],
+  ['2 Rois', ['2 Rois']],
+  ['1 Chroniques', ['1 Chroniques', '1 Chron']],
+  ['2 Chroniques', ['2 Chroniques', '2 Chron']],
+  ['Esdras', ['Esdras', 'Esd']],
+  ['Néhémie', ['Néhémie', 'Nehemie', 'Néh', 'Neh']],
+  ['Esther', ['Esther', 'Esth']],
+  ['Job', ['Job']],
+  ['Psaumes', ['Psaumes', 'Psaume', 'Ps']],
+  ['Proverbes', ['Proverbes', 'Prov', 'Pr']],
+  ['Ecclésiaste', ['Ecclésiaste', 'Ecclesiaste', 'Eccl', 'Ecc']],
+  ['Cantique des Cantiques', ['Cantique des Cantiques', 'Cant']],
+  ['Ésaïe', ['Ésaïe', 'Esaïe', 'Ésaie', 'Esaie', 'Isaïe', 'Isaie', 'Es', 'Is']],
+  ['Jérémie', ['Jérémie', 'Jeremie', 'Jér', 'Jer']],
+  ['Lamentations', ['Lamentations', 'Lam']],
+  ['Ézéchiel', ['Ézéchiel', 'Ezéchiel', 'Ezechiel', 'Éz', 'Ez']],
+  ['Daniel', ['Daniel', 'Dan']],
+  ['Osée', ['Osée', 'Osee', 'Os']],
+  ['Joël', ['Joël', 'Joel']],
+  ['Amos', ['Amos']],
+  ['Abdias', ['Abdias', 'Abd']],
+  ['Jonas', ['Jonas', 'Jon']],
+  ['Michée', ['Michée', 'Michee', 'Mich', 'Mic']],
+  ['Nahum', ['Nahum', 'Nah']],
+  ['Habakuk', ['Habakuk', 'Habacuc', 'Hab']],
+  ['Sophonie', ['Sophonie', 'Soph']],
+  ['Aggée', ['Aggée', 'Aggee', 'Agg']],
+  ['Zacharie', ['Zacharie', 'Zach', 'Zac']],
+  ['Malachie', ['Malachie', 'Mal']],
+  ['Matthieu', ['Matthieu', 'Matt', 'Mt']],
+  ['Marc', ['Marc', 'Mc']],
+  ['Luc', ['Luc', 'Lc']],
+  ['Jean', ['Jean', 'Jn']],
+  ['Actes', ['Actes', 'Act']],
+  ['Romains', ['Romains', 'Rom', 'Rm']],
+  ['1 Corinthiens', ['1 Corinthiens', '1 Cor']],
+  ['2 Corinthiens', ['2 Corinthiens', '2 Cor']],
+  ['Galates', ['Galates', 'Gal']],
+  ['Éphésiens', ['Éphésiens', 'Ephésiens', 'Ephesiens', 'Éph', 'Eph']],
+  ['Philippiens', ['Philippiens', 'Phil', 'Php']],
+  ['Colossiens', ['Colossiens', 'Col']],
+  ['1 Thessaloniciens', ['1 Thessaloniciens', '1 Thess']],
+  ['2 Thessaloniciens', ['2 Thessaloniciens', '2 Thess']],
+  ['1 Timothée', ['1 Timothée', '1 Timothee', '1 Tim']],
+  ['2 Timothée', ['2 Timothée', '2 Timothee', '2 Tim']],
+  ['Tite', ['Tite', 'Tit']],
+  ['Philémon', ['Philémon', 'Philemon', 'Philém', 'Philem']],
+  ['Hébreux', ['Hébreux', 'Hebreux', 'Héb', 'Heb']],
+  ['Jacques', ['Jacques', 'Jac']],
+  ['1 Pierre', ['1 Pierre', '1 Pi']],
+  ['2 Pierre', ['2 Pierre', '2 Pi']],
+  ['1 Jean', ['1 Jean', '1 Jn']],
+  ['2 Jean', ['2 Jean', '2 Jn']],
+  ['3 Jean', ['3 Jean', '3 Jn']],
+  ['Jude', ['Jude']],
+  ['Apocalypse', ['Apocalypse', 'Apoc', 'Ap']],
+];
+
+const BIBLE_CANON = {};
+const BIBLE_RE = (() => {
+  const forms = [];
+  BIBLE_BOOKS.forEach(([name, list]) => list.forEach(f => {
+    forms.push(f);
+    BIBLE_CANON[f.toLowerCase().replace(/[\s.]/g, '')] = name;
+  }));
+  forms.sort((a, b) => b.length - a.length);
+  const toRe = (f) => f.replace(/^([123]) /, '$1\\s?').replace(/ /g, '\\s+');
+  const books = forms.map(toRe).join('|');
+  const NUM = '\\d{1,3}';
+  const first = `${NUM}\\s*[.:]\\s*${NUM}(?:\\s*[-–]\\s*${NUM})?`;
+  // suite d'une référence : ", 9-12" ou "; 7.17" (jamais le numéro d'un livre comme "; 1 Corinthiens")
+  const cont = `\\s*[,;]\\s*${NUM}(?:\\s*[.:]\\s*${NUM})?(?:\\s*[-–]\\s*${NUM})?(?!\\d|\\s*[A-Za-zÀ-ÿ\\d])`;
+  return new RegExp(`(^|[^A-Za-zÀ-ÿ0-9])(${books})\\.?\\s*(${first}(?:${cont})*)`, 'gi');
+})();
+
+function cleanChain(c) {
+  return c.replace(/\s+/g, ' ').replace(/\s*:\s*/g, '.').replace(/\s*\.\s*/g, '.').replace(/\s*[-–]\s*/g, '-').replace(/\s*([,;])\s*/g, '$1 ').trim();
+}
+
+// Retourne "Genèse 1.1-2, 9-12; Exode 3.8; ..." pour une liste de paragraphes (ou '' s'il n'y en a pas)
+function extractBibleRefs(paragraphs) {
+  const text = paragraphs.map(p => p.replace(/^#{1,2}\s+/, '')).join('\u0001');
+  const byBook = new Map();
+  for (const m of text.matchAll(BIBLE_RE)) {
+    const name = BIBLE_CANON[m[2].toLowerCase().replace(/[\s.]/g, '')];
+    if (!name) continue;
+    const chain = cleanChain(m[3]);
+    if (!byBook.has(name)) byBook.set(name, []);
+    const arr = byBook.get(name);
+    if (!arr.includes(chain)) arr.push(chain);
+  }
+  return [...byBook.entries()].map(([name, chains]) => `${name} ${chains.join('; ')}`).join('; ');
+}
+
+// ---------- Découpage du livre en parties ----------
+
+function computeParts(paras) {
+  const n = paras.length;
+  const isMain = (p) => /^#{1,2}\s+(PARTIE|CHAPITRE|MESSAGE|LEÇON|LECON|SECTION)\b/i.test(p);
+  const idx = [];
+  paras.forEach((p, i) => { if (isMain(p)) idx.push(i); });
+  if (!idx.length) paras.forEach((p, i) => { if (p.startsWith('# ')) idx.push(i); });
+  if (!idx.length) return [{ start: 0, end: n, label: 'Livre complet' }];
+
+  const parts = [];
+  for (let k = 0; k < idx.length; k++) {
+    const start = idx[k];
+    let labelIdx = start;
+    // Un titre « PARTIE » directement suivi d'un titre de chapitre ne forme pas une partie à lui seul
+    if (/^#{1,2}\s+PARTIE\b/i.test(paras[start]) && k + 1 < idx.length && idx[k + 1] === start + 1) {
+      labelIdx = idx[k + 1];
+      k++;
+    }
+    parts.push({ start, labelIdx });
+  }
+  if (parts[0].start > 0) parts.unshift({ start: 0, labelIdx: -1 });
+  parts.forEach((p, k) => {
+    p.end = k + 1 < parts.length ? parts[k + 1].start : n;
+    p.label = p.labelIdx >= 0 ? paras[p.labelIdx].replace(/^#{1,2}\s+/, '') : 'Début';
+  });
+  return parts;
+}
+
 if (!token) {
   window.location.href = '/login.html';
 } else if (!bookId) {
@@ -81,7 +231,7 @@ if (!token) {
 }
 
 async function openBookReader() {
-  readerState = { bookId, title: '', paragraphs: [], annotations: [], selection: '', selectionPara: null };
+  readerState = { bookId, title: '', paragraphs: [], annotations: [], selection: '', selectionPara: null, parts: [], partIdx: 0 };
   try {
     const [bookRes, posRes, annoRes] = await Promise.all([
       fetch(`/api/reader/books/${bookId}`, { headers: authHeaders }),
@@ -109,12 +259,14 @@ async function openBookReader() {
     readerState.annotations = annoRes.ok ? await annoRes.json() : [];
     readerState.title = data.book.title;
     readerState.paragraphs = data.paragraphs;
+    readerState.parts = computeParts(data.paragraphs);
     document.title = `${data.book.title} — Ministère de la Nouvelle Alliance`;
 
     $('read-panel').innerHTML = `
       <h2 style="margin-bottom:4px;">${escHtml(data.book.title)}</h2>
       <p style="color:var(--ink-soft);margin-bottom:14px;">${escHtml(data.book.author || '')}</p>
       <div id="resume-box"></div>
+      <div id="part-nav-wrap"></div>
       <div class="sel-bar" id="sel-bar">
         <div class="sel-text" id="sel-text">Touchez et maintenez un mot, puis étirez pour sélectionner une phrase ou un paragraphe à surligner, commenter ou partager.</div>
         <div class="sel-actions">
@@ -125,12 +277,14 @@ async function openBookReader() {
         </div>
       </div>
       <div class="ebook-text" id="ebook-text"></div>
+      <div id="part-nav-bottom"></div>
       <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
       <div id="anno-list" style="margin-bottom:20px;"></div>
       <a href="/catalogue.html" class="btn btn-primary">← Retour au catalogue</a>
     `;
 
     renderParagraphs();
+    renderPartNav();
     renderAnnotations();
     wireReaderControls();
 
@@ -152,14 +306,70 @@ async function openBookReader() {
   }
 }
 
+// Affiche uniquement la partie en cours, avec ses passages bibliques en début de partie
 function renderParagraphs() {
   const st = readerState;
-  $('ebook-text').innerHTML = st.paragraphs.map((p, i) => {
-    if (p.startsWith('# ')) return `<h2 id="para-${i}" data-i="${i}">${escHtml(p.slice(2))}</h2>`;
-    if (p.startsWith('## ')) return `<h3 id="para-${i}" data-i="${i}">${escHtml(p.slice(3))}</h3>`;
-    return `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`;
-  }).join('');
+  const part = st.parts[st.partIdx] || { start: 0, end: st.paragraphs.length };
+  const refs = extractBibleRefs(st.paragraphs.slice(part.start, part.end));
+  const bibleBlock = refs ? `<div class="bible-reading"><strong>Lecture biblique :</strong> ${escHtml(refs)}</div>` : '';
+
+  // Les passages sont placés juste après le(s) titre(s) qui ouvrent la partie
+  let after = part.start, lead = 0;
+  while (after < part.end && lead < 2 && /^#{1,2} /.test(st.paragraphs[after])) { after++; lead++; }
+
+  let html = '';
+  for (let i = part.start; i < part.end; i++) {
+    const p = st.paragraphs[i];
+    if (i === after) html += bibleBlock;
+    if (refs && /^Lecture biblique\s*:/i.test(p)) continue; // déjà repris dans le bloc ci-dessus
+    if (p.startsWith('# ')) html += `<h2 id="para-${i}" data-i="${i}">${escHtml(p.slice(2))}</h2>`;
+    else if (p.startsWith('## ')) html += `<h3 id="para-${i}" data-i="${i}">${escHtml(p.slice(3))}</h3>`;
+    else html += `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`;
+  }
+  if (after >= part.end) html += bibleBlock;
+  $('ebook-text').innerHTML = html;
   applyHighlights();
+}
+
+function renderPartNav() {
+  const st = readerState;
+  const wrap = $('part-nav-wrap'), bottom = $('part-nav-bottom');
+  if (!wrap || !bottom) return;
+  if (!st.parts || st.parts.length < 2) { wrap.innerHTML = ''; bottom.innerHTML = ''; return; }
+  const i = st.partIdx, last = st.parts.length - 1;
+  wrap.innerHTML = `
+    <div class="part-nav">
+      <div class="part-nav-row">
+        <select id="part-select" aria-label="Choisir une partie">
+          ${st.parts.map((p, k) => `<option value="${k}" ${k === i ? 'selected' : ''}>${escHtml(p.label)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="part-nav-row">
+        <button class="btn btn-ghost" data-part-step="-1" ${i === 0 ? 'disabled' : ''}>‹ Précédent</button>
+        <span class="part-count">Partie ${i + 1} sur ${st.parts.length}</span>
+        <button class="btn btn-ghost" data-part-step="1" ${i === last ? 'disabled' : ''}>Suivant ›</button>
+      </div>
+    </div>`;
+  bottom.innerHTML = `
+    <div class="part-nav-bottom">
+      <button class="btn btn-ghost" data-part-step="-1" ${i === 0 ? 'disabled' : ''}>‹ Précédent</button>
+      <span class="part-count">Partie ${i + 1} sur ${st.parts.length}</span>
+      <button class="btn btn-ghost" data-part-step="1" ${i === last ? 'disabled' : ''}>Suivant ›</button>
+    </div>`;
+  $('part-select').addEventListener('change', (e) => gotoPart(Number(e.target.value)));
+  document.querySelectorAll('[data-part-step]').forEach(b => {
+    b.addEventListener('click', () => gotoPart(readerState.partIdx + Number(b.dataset.partStep)));
+  });
+}
+
+function gotoPart(k, keepScroll) {
+  const st = readerState;
+  if (!st || k < 0 || k >= st.parts.length) return;
+  st.partIdx = k;
+  st.selection = '';
+  renderParagraphs();
+  renderPartNav();
+  if (!keepScroll && $('part-nav-wrap')) $('part-nav-wrap').scrollIntoView({ block: 'start' });
 }
 
 // Colore directement les passages surlignés / commentés dans le texte, sans jamais cacher les mots
@@ -269,8 +479,18 @@ function shareQuote(text) {
   else navigator.clipboard.writeText(full).then(() => alert('Extrait copié !'));
 }
 
+// Va à un paragraphe ; si besoin, ouvre d'abord la partie qui le contient
 function goToPara(n) {
-  const el = document.getElementById('para-' + (n - 1));
+  const idx = n - 1;
+  const st = readerState;
+  let el = document.getElementById('para-' + idx);
+  if (!el && st && st.parts) {
+    const k = st.parts.findIndex(p => idx >= p.start && idx < p.end);
+    if (k !== -1) {
+      gotoPart(k, true);
+      el = document.getElementById('para-' + idx);
+    }
+  }
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

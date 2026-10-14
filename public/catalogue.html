@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catalogue — Grande Bibliothèque numérique MNA</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .filter-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-row input { flex: 1; min-width: 180px; padding: 11px 14px; border: 1px solid var(--line, #e6dfd0); border-radius: 10px; font: inherit; font-size: 15px; background: #fff; }
+  .letters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+  .letter { min-width: 44px; height: 44px; padding: 0 12px; border: 1px solid var(--line, #e6dfd0); border-radius: 10px; background: #fff; font: inherit; font-weight: 700; font-size: 15px; color: var(--ink, #16130f); cursor: pointer; }
+  .letter.active { background: var(--ink, #16130f); color: #fff; border-color: var(--ink, #16130f); }
+  .letter:disabled { opacity: 0.35; cursor: default; }
+  .section-title { font-family: 'Fraunces', Georgia, serif; font-size: 22px; margin: 8px 0 14px; }
+  .free-list { background: #fff; border: 1px solid var(--line, #e6dfd0); border-radius: var(--radius, 14px); margin-bottom: 34px; }
+  .free-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line, #e6dfd0); }
+  .free-row:last-child { border-bottom: none; }
+  .free-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 6px; background: #f2e4b8; color: var(--gold-deep, #8a6a14); white-space: nowrap; }
+  .free-title { flex: 1; font-weight: 600; font-size: 16.5px; color: var(--blue-deep, #1d4a7a); cursor: pointer; line-height: 1.4; }
+  .free-dl { background: none; border: 1px solid var(--line, #e6dfd0); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: var(--ink-soft, #6b6254); }
+</style>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#16130f">
@@ -28,8 +43,25 @@
 </section>
 
 <div class="container">
-  <div class="grid" id="books-grid">
-    <div class="card"><p>Chargement du catalogue…</p></div>
+  <div id="loading" class="card"><p>Chargement du catalogue…</p></div>
+
+  <div id="catalogue" style="display:none;">
+    <div class="filter-row">
+      <input type="text" id="title-filter" placeholder="Filtrer par titre…" autocomplete="off">
+    </div>
+    <div class="letters" id="letters"></div>
+
+    <div id="free-section">
+      <h2 class="section-title" id="free-title">Livres à lire gratuitement</h2>
+      <div class="free-list" id="free-list"></div>
+    </div>
+
+    <div id="sale-section">
+      <h2 class="section-title" id="sale-title">Livres en vente</h2>
+      <div class="grid" id="books-grid"></div>
+    </div>
+
+    <div id="no-result" class="card" style="display:none;"><p>Aucun livre ne correspond à cette recherche.</p></div>
   </div>
 </div>
 
@@ -38,39 +70,95 @@
 <script>
 if (!localStorage.getItem('mna_token')) { window.location.href = '/login.html'; }
 
+const $ = (id) => document.getElementById(id);
+function escHtml(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// Texte sans accents ni majuscules, pour trier et filtrer
+function norm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+// Clé de tri : on ignore l'article du début (Le, La, Les, L', Un, Une, Des) et les guillemets
+function sortKey(title) {
+  return norm(title).replace(/^[^a-z0-9]+/, '').replace(/^(?:(?:le|la|les|un|une|des)\s+|l['’]\s*)/, '').replace(/^[^a-z0-9]+/, '');
+}
+function letterOf(key) { const c = key.charAt(0); return /[a-z]/.test(c) ? c.toUpperCase() : '#'; }
+
+let ALL = [];
+let currentLetter = 'TOUS';
+let currentQuery = '';
+
 fetch('/api/books', { headers: { Authorization: `Bearer ${localStorage.getItem('mna_token')}` } })
   .then(r => r.json())
   .then(books => {
-    const grid = document.getElementById('books-grid');
-    if (!books.length) {
-      grid.innerHTML = '<div class="card"><p>Aucun livre publié pour le moment.</p></div>';
+    if (!Array.isArray(books) || !books.length) {
+      $('loading').innerHTML = '<p>Aucun livre publié pour le moment.</p>';
       return;
     }
-    grid.innerHTML = books.map(b => `
-      <div class="book-card">
-        <div class="cover" style="padding:0;"><img src="/api/books/${b.id}/cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" style="width:100%;height:100%;object-fit:cover;"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">📘</span></div>
-        <div class="body">
-          <h3>${b.title}</h3>
-          <div class="meta">${b.author || ''}</div>
-          <p>${b.description || ''}</p>
-          ${b.access_type === 'a_vendre' ? `
-            <div style="font-weight:700;color:var(--gold-deep);margin-bottom:10px;">${b.price ? Number(b.price).toFixed(2) + ' $' : 'Prix sur demande'}</div>
-            <div class="actions">
-              <a href="https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre : ' + b.title)}" target="_blank" class="btn btn-primary">Acheter via WhatsApp</a>
-            </div>
-          ` : `
-            <div class="actions">
-              <button onclick="openRead(${b.id})" class="btn btn-primary">Lire</button>
-              ${b.access_type === 'telechargeable' ? `<button onclick="openDownload(${b.id})" class="btn btn-ghost">Télécharger</button>` : ''}
-            </div>
-          `}
-        </div>
-      </div>
-    `).join('');
+    ALL = books.map(b => { const key = sortKey(b.title); return Object.assign({}, b, { _key: key, _letter: letterOf(key) }); });
+    ALL.sort((a, b) => a._key.localeCompare(b._key, 'fr'));
+    $('loading').style.display = 'none';
+    $('catalogue').style.display = 'block';
+    buildLetters();
+    render();
+    $('title-filter').addEventListener('input', (e) => { currentQuery = norm(e.target.value); render(); });
   })
   .catch(() => {
-    document.getElementById('books-grid').innerHTML = '<div class="card"><p>Impossible de charger le catalogue pour le moment.</p></div>';
+    $('loading').innerHTML = '<p>Impossible de charger le catalogue pour le moment.</p>';
   });
+
+function buildLetters() {
+  const present = new Set(ALL.map(b => b._letter));
+  const labels = ['TOUS', '#'].concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+  $('letters').innerHTML = labels.map(l => {
+    const disabled = l !== 'TOUS' && !present.has(l);
+    return `<button class="letter${l === currentLetter ? ' active' : ''}" data-l="${l}" ${disabled ? 'disabled' : ''}>${l}</button>`;
+  }).join('');
+  document.querySelectorAll('#letters .letter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentLetter = btn.dataset.l;
+      document.querySelectorAll('#letters .letter').forEach(x => x.classList.toggle('active', x === btn));
+      render();
+    });
+  });
+}
+
+function render() {
+  const visible = ALL.filter(b =>
+    (currentLetter === 'TOUS' || b._letter === currentLetter) &&
+    (!currentQuery || norm(b.title).includes(currentQuery))
+  );
+  const free = visible.filter(b => b.access_type !== 'a_vendre');
+  const sale = visible.filter(b => b.access_type === 'a_vendre');
+
+  // Livres gratuits : simple titre, sans couverture
+  $('free-section').style.display = free.length ? 'block' : 'none';
+  $('free-title').textContent = `Livres à lire gratuitement (${free.length})`;
+  $('free-list').innerHTML = free.map(b => `
+    <div class="free-row">
+      <span class="free-badge">GRATUIT</span>
+      <span class="free-title" onclick="openRead(${b.id})">${escHtml(b.title)}</span>
+      ${b.access_type === 'telechargeable' ? `<button class="free-dl" onclick="openDownload(${b.id})" title="Télécharger">⬇ PDF</button>` : ''}
+    </div>
+  `).join('');
+
+  // Livres en vente : seuls à avoir leur couverture
+  $('sale-section').style.display = sale.length ? 'block' : 'none';
+  $('sale-title').textContent = `Livres en vente (${sale.length})`;
+  $('books-grid').innerHTML = sale.map(b => `
+    <div class="book-card">
+      <div class="cover" style="padding:0;"><img src="/api/books/${b.id}/cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" style="width:100%;height:100%;object-fit:cover;"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">📘</span></div>
+      <div class="body">
+        <h3>${escHtml(b.title)}</h3>
+        <div class="meta">${escHtml(b.author || '')}</div>
+        <p>${escHtml(b.description || '')}</p>
+        <div style="font-weight:700;color:var(--gold-deep);margin-bottom:10px;">${b.price ? Number(b.price).toFixed(2) + ' $' : 'Prix sur demande'}</div>
+        <div class="actions">
+          <a href="https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre : ' + b.title)}" target="_blank" class="btn btn-primary">Acheter via WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  $('no-result').style.display = visible.length ? 'none' : 'block';
+}
 
 async function getBookLinks(id) {
   const r = await fetch(`/api/books/${id}/read-link`, { headers: { Authorization: `Bearer ${localStorage.getItem('mna_token')}` } });
