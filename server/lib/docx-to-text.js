@@ -39,12 +39,28 @@ function extractItems(xml) {
 const isPartie = (t) => /^PARTIE\s+[IVX]+$/.test(t);
 const isChapitre = (t) => /^CHAPITRE\s+\d+(\s+BIS)?$/i.test(t);
 
+// Taille de police du corps du livre : celle qui porte le plus de texte (0 = taille par défaut du document)
+function bodySizeOf(items) {
+  const weight = new Map();
+  for (const it of items) weight.set(it.size, (weight.get(it.size) || 0) + it.text.length);
+  let best = 0;
+  let bestWeight = -1;
+  for (const [size, w] of weight) {
+    if (w > bestWeight) { best = size; bestWeight = w; }
+  }
+  return best;
+}
+
 // Même convention que l'espace d'étude : "# " = grand titre, "## " = sous-titre, sinon paragraphe
 function buildParagraphs(items) {
   const out = [];
   const n = items.length;
   const hasPartie = items.some((it) => isPartie(it.text));
   const chapterPrefix = hasPartie ? '## ' : '# ';
+  const bodySize = bodySizeOf(items);
+  // Un sous-titre est nettement plus grand que le texte du livre (et court). Si tout le livre est écrit en
+  // grande police, ses paragraphes restent de simples paragraphes au lieu de s'afficher tous en titres gras.
+  const isSubtitleSize = (size) => (bodySize === 0 ? size >= 26 : size >= bodySize + 4);
   let i = 0;
   while (i < n) {
     const it = items[i];
@@ -76,7 +92,7 @@ function buildParagraphs(items) {
       continue;
     }
 
-    if (it.size >= 26 && it.jc !== 'center') {
+    if (isSubtitleSize(it.size) && it.jc !== 'center' && t.length <= 160) {
       out.push('## ' + t);
       i++;
       continue;
