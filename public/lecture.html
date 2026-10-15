@@ -13,19 +13,25 @@
   .msg.success { background: #e8f6ec; color: #2a7a44; }
   .hidden { display: none; }
 
+  /* Table des matières (une page au début du livre) */
+  .toc-title { font-family: 'Fraunces', Georgia, serif; font-size: 22px; margin: 6px 0 14px; }
+  .toc-list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .toc-group { background: #f7f1e3; padding: 12px 16px; font-weight: 700; font-size: 14px; color: #3a2f1f; border-bottom: 1px solid var(--line); }
+  .toc-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 15px 16px; background: #fff; border: none; border-bottom: 1px solid var(--line); font: inherit; font-size: 16px; color: var(--blue-deep); cursor: pointer; line-height: 1.4; }
+  .toc-item.indent { padding-left: 28px; }
+  .toc-item:last-child { border-bottom: none; }
+  .toc-item:hover { background: #fbf7ee; }
+  .toc-arrow { color: var(--ink-soft); font-size: 20px; }
+
   /* Navigation par parties (menu déroulant + précédent / suivant) */
   .part-nav { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: #f7f1e3; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
   .part-nav-row { display: flex; gap: 8px; align-items: center; }
   .part-nav select { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14.5px; background: #fff; font-family: inherit; }
   .part-nav .btn { padding: 9px 14px; }
-  .part-nav .btn:disabled { opacity: 0.4; cursor: default; }
+  .part-nav .btn:disabled, .part-nav-bottom .btn:disabled { opacity: 0.4; cursor: default; }
   .part-count { flex: 1; text-align: center; font-size: 12.5px; color: var(--ink-soft); }
-  .part-nav-bottom { display: flex; gap: 8px; align-items: center; margin: 8px 0 18px; }
-  .part-nav-bottom .btn:disabled { opacity: 0.4; cursor: default; }
-
-  /* Lecture biblique : passages cités dans la partie, placés en début de partie */
-  .bible-reading { font-size: 0.72em; line-height: 1.7; color: #7a5a10; margin: 0 0 1.4em; }
-  .bible-reading strong { color: #3a2f1f; }
+  .part-nav-bottom { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin: 8px 0 18px; }
+  .part-nav-bottom .btn { padding: 9px 14px; }
 
   /* Lecteur intégré — vrai texte, grand et lisible (identique à l'espace d'étude) */
   .ebook-text { font-size: 26px; line-height: 1.8; color: #241e16; font-family: 'Fraunces', Georgia, serif; overflow-wrap: anywhere; }
@@ -76,6 +82,7 @@
 
 <footer>Ministère de la Nouvelle Alliance — © 2026</footer>
 
+<script src="/js/reader-common.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const token = localStorage.getItem('mna_token');
@@ -86,138 +93,99 @@ let readerState = null;
 
 function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-// ---------- Passages bibliques (références citées dans le texte d'une partie) ----------
+// ---------- Préparation du livre : table des matières, parties ----------
 
-const BIBLE_BOOKS = [
-  ['Genèse', ['Genèse', 'Genese', 'Gen', 'Gn']],
-  ['Exode', ['Exode', 'Exo', 'Ex']],
-  ['Lévitique', ['Lévitique', 'Levitique', 'Lév', 'Lev', 'Lv']],
-  ['Nombres', ['Nombres', 'Nomb', 'Nb']],
-  ['Deutéronome', ['Deutéronome', 'Deuteronome', 'Deut', 'Dt']],
-  ['Josué', ['Josué', 'Josue', 'Jos']],
-  ['Juges', ['Juges', 'Jug', 'Jg']],
-  ['Ruth', ['Ruth']],
-  ['1 Samuel', ['1 Samuel', '1 Sam']],
-  ['2 Samuel', ['2 Samuel', '2 Sam']],
-  ['1 Rois', ['1 Rois']],
-  ['2 Rois', ['2 Rois']],
-  ['1 Chroniques', ['1 Chroniques', '1 Chron']],
-  ['2 Chroniques', ['2 Chroniques', '2 Chron']],
-  ['Esdras', ['Esdras', 'Esd']],
-  ['Néhémie', ['Néhémie', 'Nehemie', 'Néh', 'Neh']],
-  ['Esther', ['Esther', 'Esth']],
-  ['Job', ['Job']],
-  ['Psaumes', ['Psaumes', 'Psaume', 'Ps']],
-  ['Proverbes', ['Proverbes', 'Prov', 'Pr']],
-  ['Ecclésiaste', ['Ecclésiaste', 'Ecclesiaste', 'Eccl', 'Ecc']],
-  ['Cantique des Cantiques', ['Cantique des Cantiques', 'Cant']],
-  ['Ésaïe', ['Ésaïe', 'Esaïe', 'Ésaie', 'Esaie', 'Isaïe', 'Isaie', 'Es', 'Is']],
-  ['Jérémie', ['Jérémie', 'Jeremie', 'Jér', 'Jer']],
-  ['Lamentations', ['Lamentations', 'Lam']],
-  ['Ézéchiel', ['Ézéchiel', 'Ezéchiel', 'Ezechiel', 'Éz', 'Ez']],
-  ['Daniel', ['Daniel', 'Dan']],
-  ['Osée', ['Osée', 'Osee', 'Os']],
-  ['Joël', ['Joël', 'Joel']],
-  ['Amos', ['Amos']],
-  ['Abdias', ['Abdias', 'Abd']],
-  ['Jonas', ['Jonas', 'Jon']],
-  ['Michée', ['Michée', 'Michee', 'Mich', 'Mic']],
-  ['Nahum', ['Nahum', 'Nah']],
-  ['Habakuk', ['Habakuk', 'Habacuc', 'Hab']],
-  ['Sophonie', ['Sophonie', 'Soph']],
-  ['Aggée', ['Aggée', 'Aggee', 'Agg']],
-  ['Zacharie', ['Zacharie', 'Zach', 'Zac']],
-  ['Malachie', ['Malachie', 'Mal']],
-  ['Matthieu', ['Matthieu', 'Matt', 'Mt']],
-  ['Marc', ['Marc', 'Mc']],
-  ['Luc', ['Luc', 'Lc']],
-  ['Jean', ['Jean', 'Jn']],
-  ['Actes', ['Actes', 'Act']],
-  ['Romains', ['Romains', 'Rom', 'Rm']],
-  ['1 Corinthiens', ['1 Corinthiens', '1 Cor']],
-  ['2 Corinthiens', ['2 Corinthiens', '2 Cor']],
-  ['Galates', ['Galates', 'Gal']],
-  ['Éphésiens', ['Éphésiens', 'Ephésiens', 'Ephesiens', 'Éph', 'Eph']],
-  ['Philippiens', ['Philippiens', 'Phil', 'Php']],
-  ['Colossiens', ['Colossiens', 'Col']],
-  ['1 Thessaloniciens', ['1 Thessaloniciens', '1 Thess']],
-  ['2 Thessaloniciens', ['2 Thessaloniciens', '2 Thess']],
-  ['1 Timothée', ['1 Timothée', '1 Timothee', '1 Tim']],
-  ['2 Timothée', ['2 Timothée', '2 Timothee', '2 Tim']],
-  ['Tite', ['Tite', 'Tit']],
-  ['Philémon', ['Philémon', 'Philemon', 'Philém', 'Philem']],
-  ['Hébreux', ['Hébreux', 'Hebreux', 'Héb', 'Heb']],
-  ['Jacques', ['Jacques', 'Jac']],
-  ['1 Pierre', ['1 Pierre', '1 Pi']],
-  ['2 Pierre', ['2 Pierre', '2 Pi']],
-  ['1 Jean', ['1 Jean', '1 Jn']],
-  ['2 Jean', ['2 Jean', '2 Jn']],
-  ['3 Jean', ['3 Jean', '3 Jn']],
-  ['Jude', ['Jude']],
-  ['Apocalypse', ['Apocalypse', 'Apoc', 'Ap']],
-];
+const MAIN_RE = /^#{1,2}\s+(PARTIE|CHAPITRE|MESSAGE|LEÇON|LECON|SECTION)\b/i;
+const stripHash = (p) => p.replace(/^#{1,3}\s+/, '');
 
-const BIBLE_CANON = {};
-const BIBLE_RE = (() => {
-  const forms = [];
-  BIBLE_BOOKS.forEach(([name, list]) => list.forEach(f => {
-    forms.push(f);
-    BIBLE_CANON[f.toLowerCase().replace(/[\s.]/g, '')] = name;
-  }));
-  forms.sort((a, b) => b.length - a.length);
-  const toRe = (f) => f.replace(/^([123]) /, '$1\\s?').replace(/ /g, '\\s+');
-  const books = forms.map(toRe).join('|');
-  const NUM = '\\d{1,3}';
-  const first = `${NUM}\\s*[.:]\\s*${NUM}(?:\\s*[-–]\\s*${NUM})?`;
-  // suite d'une référence : ", 9-12" ou "; 7.17" (jamais le numéro d'un livre comme "; 1 Corinthiens")
-  const cont = `\\s*[,;]\\s*${NUM}(?:\\s*[.:]\\s*${NUM})?(?:\\s*[-–]\\s*${NUM})?(?!\\d|\\s*[A-Za-zÀ-ÿ\\d])`;
-  return new RegExp(`(^|[^A-Za-zÀ-ÿ0-9])(${books})\\.?\\s*(${first}(?:${cont})*)`, 'gi');
-})();
-
-function cleanChain(c) {
-  return c.replace(/\s+/g, ' ').replace(/\s*:\s*/g, '.').replace(/\s*\.\s*/g, '.').replace(/\s*[-–]\s*/g, '-').replace(/\s*([,;])\s*/g, '$1 ').trim();
-}
-
-// Retourne "Genèse 1.1-2, 9-12; Exode 3.8; ..." pour une liste de paragraphes (ou '' s'il n'y en a pas)
-function extractBibleRefs(paragraphs) {
-  const text = paragraphs.map(p => p.replace(/^#{1,2}\s+/, '')).join('\u0001');
-  const byBook = new Map();
-  for (const m of text.matchAll(BIBLE_RE)) {
-    const name = BIBLE_CANON[m[2].toLowerCase().replace(/[\s.]/g, '')];
-    if (!name) continue;
-    const chain = cleanChain(m[3]);
-    if (!byBook.has(name)) byBook.set(name, []);
-    const arr = byBook.get(name);
-    if (!arr.includes(chain)) arr.push(chain);
-  }
-  return [...byBook.entries()].map(([name, chains]) => `${name} ${chains.join('; ')}`).join('; ');
-}
-
-// ---------- Découpage du livre en parties ----------
-
-function computeParts(paras) {
+// Masque la table des matières déjà présente dans le Word (elle est remplacée par la table cliquable)
+function findOwnToc(paras) {
+  const hidden = new Set();
   const n = paras.length;
-  const isMain = (p) => /^#{1,2}\s+(PARTIE|CHAPITRE|MESSAGE|LEÇON|LECON|SECTION)\b/i.test(p);
-  const idx = [];
-  paras.forEach((p, i) => { if (isMain(p)) idx.push(i); });
-  if (!idx.length) paras.forEach((p, i) => { if (p.startsWith('# ')) idx.push(i); });
-  if (!idx.length) return [{ start: 0, end: n, label: 'Livre complet' }];
+  let t = -1;
+  for (let i = 0; i < Math.min(60, n); i++) {
+    if (/^(?:#{1,3}\s+)?(?:table\s+des\s+mati[èe]res|sommaire)\s*$/i.test(paras[i].trim())) { t = i; break; }
+  }
+  if (t < 0) return hidden;
+
+  const key = (p) => stripHash(p).split(' — ')[0].trim().toUpperCase();
+  const mains = [];
+  for (let i = t + 1; i < n; i++) if (MAIN_RE.test(paras[i])) mains.push(i);
+  let limit;
+  if (mains.length) {
+    const q = mains.findIndex((m, k) => k > 0 && key(paras[m]) === key(paras[mains[0]]));
+    limit = q > 0 ? mains[q] : mains[0]; // si les titres se répètent, la 2e série est le vrai début du livre
+  } else {
+    limit = Math.min(n, t + 80);
+  }
+  hidden.add(t);
+  for (let j = t + 1; j < limit; j++) {
+    const p = paras[j];
+    if (p.length > 140 || /[.!?»”]$/.test(p.trim())) break; // un vrai paragraphe : on s'arrête
+    hidden.add(j);
+  }
+  return hidden;
+}
+
+// Découpe le livre en parties à partir de ses titres. Retourne { parts, paras }
+function computeParts(paras, hidden) {
+  const n = paras.length;
+  const collect = (test) => {
+    const a = [];
+    for (let i = 0; i < n; i++) if (!hidden.has(i) && test(paras[i])) a.push(i);
+    return a;
+  };
+
+  // 1) titres PARTIE / CHAPITRE / MESSAGE…  2) grands titres  3) sous-titres  4) lignes numérotées
+  let idx = collect((p) => MAIN_RE.test(p));
+  if (idx.length < 2) idx = collect((p) => p.startsWith('# '));
+  if (idx.length < 2) idx = collect((p) => p.startsWith('## '));
+  if (idx.length < 2) {
+    const isNum = (p) => p.length <= 110 && p.charAt(0) !== '#' && /^(?:\d{1,2}|[IVXLC]{1,6})[.)]\s+\S/.test(p) && !/[.!?;,:]$/.test(p.trim());
+    const nums = collect(isNum);
+    if (nums.length >= 3) {
+      nums.forEach((i) => { paras[i] = '## ' + paras[i]; });
+      idx = nums;
+    }
+  }
+
+  // 5) aucun titre : sections régulières, nommées d'après le début du texte
+  if (idx.length < 2) {
+    const vis = [];
+    for (let i = 0; i < n; i++) if (!hidden.has(i)) vis.push(i);
+    if (vis.length < 40) return [{ start: 0, end: n, label: 'Livre complet' }];
+    const size = 30, parts = [];
+    for (let k = 0; k < vis.length; k += size) {
+      const first = vis[k];
+      const words = stripHash(paras[first]).split(/\s+/).slice(0, 7).join(' ');
+      parts.push({ start: k === 0 ? 0 : first, end: k + size < vis.length ? vis[k + size] : n, label: `Section ${parts.length + 1} — ${words}…` });
+    }
+    return parts;
+  }
 
   const parts = [];
   for (let k = 0; k < idx.length; k++) {
     const start = idx[k];
-    let labelIdx = start;
-    // Un titre « PARTIE » directement suivi d'un titre de chapitre ne forme pas une partie à lui seul
+    let labelIdx = start, group = null;
+    // Un titre « PARTIE » directement suivi d'un titre de chapitre : la partie devient un intitulé de groupe
     if (/^#{1,2}\s+PARTIE\b/i.test(paras[start]) && k + 1 < idx.length && idx[k + 1] === start + 1) {
+      group = stripHash(paras[start]);
       labelIdx = idx[k + 1];
       k++;
     }
-    parts.push({ start, labelIdx });
+    parts.push({ start, labelIdx, group });
   }
-  if (parts[0].start > 0) parts.unshift({ start: 0, labelIdx: -1 });
+
+  // Ce qui précède le premier titre : fusionné s'il est court, sinon « Avant-propos »
+  if (parts[0].start > 0) {
+    let chars = 0;
+    for (let i = 0; i < parts[0].start; i++) if (!hidden.has(i)) chars += paras[i].length;
+    if (chars < 500) parts[0].start = 0;
+    else parts.unshift({ start: 0, labelIdx: -1, group: null });
+  }
   parts.forEach((p, k) => {
     p.end = k + 1 < parts.length ? parts[k + 1].start : n;
-    p.label = p.labelIdx >= 0 ? paras[p.labelIdx].replace(/^#{1,2}\s+/, '') : 'Début';
+    p.label = p.labelIdx >= 0 ? stripHash(paras[p.labelIdx]) : 'Avant-propos';
   });
   return parts;
 }
@@ -231,7 +199,7 @@ if (!token) {
 }
 
 async function openBookReader() {
-  readerState = { bookId, title: '', paragraphs: [], annotations: [], selection: '', selectionPara: null, parts: [], partIdx: 0 };
+  readerState = { bookId, title: '', paragraphs: [], annotations: [], selection: '', selectionPara: null, parts: [], partIdx: 0, hidden: new Set() };
   try {
     const [bookRes, posRes, annoRes] = await Promise.all([
       fetch(`/api/reader/books/${bookId}`, { headers: authHeaders }),
@@ -258,28 +226,36 @@ async function openBookReader() {
     const pos = posRes.ok ? await posRes.json() : null;
     readerState.annotations = annoRes.ok ? await annoRes.json() : [];
     readerState.title = data.book.title;
-    readerState.paragraphs = data.paragraphs;
-    readerState.parts = computeParts(data.paragraphs);
+    // Les paragraphes gardent leur numéro d'origine (les annotations enregistrées y sont rattachées)
+    readerState.paragraphs = data.paragraphs.slice();
+    readerState.hidden = findOwnToc(readerState.paragraphs);
+    readerState.parts = computeParts(readerState.paragraphs, readerState.hidden);
     document.title = `${data.book.title} — Ministère de la Nouvelle Alliance`;
 
     $('read-panel').innerHTML = `
       <h2 style="margin-bottom:4px;">${escHtml(data.book.title)}</h2>
       <p style="color:var(--ink-soft);margin-bottom:14px;">${escHtml(data.book.author || '')}</p>
       <div id="resume-box"></div>
-      <div id="part-nav-wrap"></div>
-      <div class="sel-bar" id="sel-bar">
-        <div class="sel-text" id="sel-text">Touchez et maintenez un mot, puis étirez pour sélectionner une phrase ou un paragraphe à surligner, commenter ou partager.</div>
-        <div class="sel-actions">
-          <button class="btn btn-ghost" id="btn-highlight">🖍 Surligner</button>
-          <button class="btn btn-ghost" id="btn-comment">💬 Commenter</button>
-          <button class="btn btn-ghost" id="btn-share">↗️ Partager</button>
-          <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (ici)</button>
+
+      <div id="toc-view" class="hidden"></div>
+
+      <div id="reader-view" class="hidden">
+        <div id="part-nav-wrap"></div>
+        <div class="sel-bar" id="sel-bar">
+          <div class="sel-text" id="sel-text">Touchez et maintenez un mot, puis étirez pour sélectionner une phrase ou un paragraphe à surligner, commenter ou partager.</div>
+          <div class="sel-actions">
+            <button class="btn btn-ghost" id="btn-highlight">🖍 Surligner</button>
+            <button class="btn btn-ghost" id="btn-comment">💬 Commenter</button>
+            <button class="btn btn-ghost" id="btn-share">↗️ Partager</button>
+            <button class="btn btn-ghost" id="btn-favorite">⭐ Favori (ici)</button>
+          </div>
         </div>
+        <div class="ebook-text" id="ebook-text"></div>
+        <div id="part-nav-bottom"></div>
+        <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
+        <div id="anno-list" style="margin-bottom:20px;"></div>
       </div>
-      <div class="ebook-text" id="ebook-text"></div>
-      <div id="part-nav-bottom"></div>
-      <h3 style="font-size:15px;margin:18px 0 8px;">Mes annotations</h3>
-      <div id="anno-list" style="margin-bottom:20px;"></div>
+
       <a href="/catalogue.html" class="btn btn-primary">← Retour au catalogue</a>
     `;
 
@@ -287,6 +263,9 @@ async function openBookReader() {
     renderPartNav();
     renderAnnotations();
     wireReaderControls();
+
+    // Un livre découpé s'ouvre sur sa table des matières ; sinon directement sur le texte
+    if (readerState.parts.length >= 2) showToc(); else showReader();
 
     const savedIndex = pos && pos.page_number ? pos.page_number : null;
     if (savedIndex && savedIndex > 1 && savedIndex <= readerState.paragraphs.length) {
@@ -306,28 +285,52 @@ async function openBookReader() {
   }
 }
 
-// Affiche uniquement la partie en cours, avec ses passages bibliques en début de partie
+// ---------- Table des matières ----------
+
+function renderToc() {
+  const st = readerState;
+  let html = '<h3 class="toc-title">Table des matières</h3><div class="toc-list">';
+  let inGroup = false, lastGroup = null;
+  st.parts.forEach((p, k) => {
+    if (p.group && p.group !== lastGroup) {
+      html += `<div class="toc-group">${escHtml(p.group)}</div>`;
+      lastGroup = p.group;
+      inGroup = true;
+    }
+    html += `<button class="toc-item${inGroup ? ' indent' : ''}" data-part="${k}"><span>${escHtml(p.label)}</span><span class="toc-arrow">›</span></button>`;
+  });
+  html += '</div>';
+  $('toc-view').innerHTML = html;
+  document.querySelectorAll('.toc-item').forEach((b) => {
+    b.addEventListener('click', () => openPart(Number(b.dataset.part)));
+  });
+}
+
+function showToc() {
+  renderToc();
+  $('reader-view').classList.add('hidden');
+  $('toc-view').classList.remove('hidden');
+  window.scrollTo({ top: 0 });
+}
+
+function showReader() {
+  $('toc-view').classList.add('hidden');
+  $('reader-view').classList.remove('hidden');
+}
+
+function openPart(k) {
+  $('resume-box').innerHTML = '';
+  showReader();
+  gotoPart(k);
+}
+
+// ---------- Affichage d'une partie ----------
+
+// Affiche uniquement la partie en cours, avec ses passages bibliques en début de partie (code commun à tous les lecteurs)
 function renderParagraphs() {
   const st = readerState;
   const part = st.parts[st.partIdx] || { start: 0, end: st.paragraphs.length };
-  const refs = extractBibleRefs(st.paragraphs.slice(part.start, part.end));
-  const bibleBlock = refs ? `<div class="bible-reading"><strong>Lecture biblique :</strong> ${escHtml(refs)}</div>` : '';
-
-  // Les passages sont placés juste après le(s) titre(s) qui ouvrent la partie
-  let after = part.start, lead = 0;
-  while (after < part.end && lead < 2 && /^#{1,2} /.test(st.paragraphs[after])) { after++; lead++; }
-
-  let html = '';
-  for (let i = part.start; i < part.end; i++) {
-    const p = st.paragraphs[i];
-    if (i === after) html += bibleBlock;
-    if (refs && /^Lecture biblique\s*:/i.test(p)) continue; // déjà repris dans le bloc ci-dessus
-    if (p.startsWith('# ')) html += `<h2 id="para-${i}" data-i="${i}">${escHtml(p.slice(2))}</h2>`;
-    else if (p.startsWith('## ')) html += `<h3 id="para-${i}" data-i="${i}">${escHtml(p.slice(3))}</h3>`;
-    else html += `<p id="para-${i}" data-i="${i}">${escHtml(p)}</p>`;
-  }
-  if (after >= part.end) html += bibleBlock;
-  $('ebook-text').innerHTML = html;
+  $('ebook-text').innerHTML = MNAReader.renderHtml(st.paragraphs, part.start, part.end, st.hidden);
   applyHighlights();
 }
 
@@ -339,6 +342,9 @@ function renderPartNav() {
   const i = st.partIdx, last = st.parts.length - 1;
   wrap.innerHTML = `
     <div class="part-nav">
+      <div class="part-nav-row">
+        <button class="btn btn-ghost" id="btn-toc" style="width:100%;">☰ Table des matières</button>
+      </div>
       <div class="part-nav-row">
         <select id="part-select" aria-label="Choisir une partie">
           ${st.parts.map((p, k) => `<option value="${k}" ${k === i ? 'selected' : ''}>${escHtml(p.label)}</option>`).join('')}
@@ -353,11 +359,13 @@ function renderPartNav() {
   bottom.innerHTML = `
     <div class="part-nav-bottom">
       <button class="btn btn-ghost" data-part-step="-1" ${i === 0 ? 'disabled' : ''}>‹ Précédent</button>
-      <span class="part-count">Partie ${i + 1} sur ${st.parts.length}</span>
+      <button class="btn btn-ghost" id="btn-toc-bottom">☰ Table des matières</button>
       <button class="btn btn-ghost" data-part-step="1" ${i === last ? 'disabled' : ''}>Suivant ›</button>
     </div>`;
   $('part-select').addEventListener('change', (e) => gotoPart(Number(e.target.value)));
-  document.querySelectorAll('[data-part-step]').forEach(b => {
+  $('btn-toc').addEventListener('click', showToc);
+  $('btn-toc-bottom').addEventListener('click', showToc);
+  document.querySelectorAll('[data-part-step]').forEach((b) => {
     b.addEventListener('click', () => gotoPart(readerState.partIdx + Number(b.dataset.partStep)));
   });
 }
@@ -378,7 +386,7 @@ function applyHighlights() {
   st.paragraphs.forEach((raw, i) => {
     const el = document.getElementById('para-' + i);
     if (!el) return;
-    const text = raw.startsWith('## ') ? raw.slice(3) : raw.startsWith('# ') ? raw.slice(2) : raw;
+    const text = stripHash(raw);
     const relevant = st.annotations.filter(a => a.quote_text && a.type !== 'favorite' && text.includes(a.quote_text));
     if (!relevant.length) { el.innerHTML = escHtml(text); return; }
     const marks = new Array(text.length).fill(null);
@@ -457,6 +465,7 @@ function wireReaderControls() {
   window.addEventListener('scroll', () => {
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => {
+      if ($('reader-view').classList.contains('hidden')) return;
       const paras = document.querySelectorAll('#ebook-text p');
       let visible = null;
       paras.forEach(p => {
@@ -479,10 +488,11 @@ function shareQuote(text) {
   else navigator.clipboard.writeText(full).then(() => alert('Extrait copié !'));
 }
 
-// Va à un paragraphe ; si besoin, ouvre d'abord la partie qui le contient
+// Va à un paragraphe ; si besoin, quitte la table des matières et ouvre la partie qui le contient
 function goToPara(n) {
   const idx = n - 1;
   const st = readerState;
+  showReader();
   let el = document.getElementById('para-' + idx);
   if (!el && st && st.parts) {
     const k = st.parts.findIndex(p => idx >= p.start && idx < p.end);
