@@ -15,5 +15,10 @@ if ('serviceWorker' in navigator) {
     const home = document.createElement('script');
     home.src = '/js/home.js';
     document.body.appendChild(home);
+
+    // Bouton « Écrire au ministère » (message envoyé comme depuis l'espace d'étude)
+    const contact = document.createElement('script');
+    contact.src = '/js/home-contact.js';
+    document.body.appendChild(contact);
   }
 })();
