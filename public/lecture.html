@@ -183,9 +183,23 @@ function computeParts(paras, hidden) {
     if (chars < 500) parts[0].start = 0;
     else parts.unshift({ start: 0, labelIdx: -1, group: null });
   }
+  // « CHAPITRE 3 » seul : on y ajoute le titre principal du chapitre (la ligne courte qui suit), pour la table des matières
+  const labelOf = (idx) => {
+    let label = stripHash(paras[idx]);
+    if (/^(PARTIE|CHAPITRE|MESSAGE|LEÇON|LECON|SECTION)\s+\S+$/i.test(label)) {
+      for (let j = idx + 1; j < Math.min(n, idx + 4); j++) {
+        if (hidden.has(j)) continue;
+        const nx = paras[j];
+        if (/^#{1,3} /.test(nx) || nx.length > 140 || /[.!?;:,»”]$/.test(nx.trim())) break;
+        label += ' — ' + nx;
+        break;
+      }
+    }
+    return label;
+  };
   parts.forEach((p, k) => {
     p.end = k + 1 < parts.length ? parts[k + 1].start : n;
-    p.label = p.labelIdx >= 0 ? stripHash(paras[p.labelIdx]) : 'Avant-propos';
+    p.label = p.labelIdx >= 0 ? labelOf(p.labelIdx) : 'Avant-propos';
   });
   return parts;
 }

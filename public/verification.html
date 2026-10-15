@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Vérification des brevets — Administration</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 24px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 22px; }
+  .hidden { display: none; }
+  .verdict { border-radius: 12px; padding: 18px; margin-bottom: 8px; }
+  .verdict.ok { background: #e8f6ec; color: #1f5a35; }
+  .verdict.ko { background: #fdeaea; color: #a33; }
+  .verdict h2 { font-size: 20px; margin-bottom: 10px; }
+  .verdict dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14.5px; }
+  .verdict dt { font-weight: 700; }
+  .search-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .search-row input { flex: 1; min-width: 200px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 15px; text-transform: uppercase; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+  .tab.active { background: var(--ink, #16130f); color: #fff; border-color: var(--ink, #16130f); }
+  .row { padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+  .row:last-child { border-bottom: none; }
+  .row .name { font-weight: 700; font-size: 15.5px; }
+  .row .meta { color: var(--ink-soft); font-size: 13px; margin-top: 3px; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #e8f6ec; color: #2a7a44; margin-left: 6px; }
+  .count { color: var(--ink-soft); font-size: 14px; margin-bottom: 10px; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Vérification des brevets</h1>
+  <p style="color:var(--ink-soft);margin-bottom:24px;">Page réservée à l'administration du site.</p>
+
+  <div id="denied" class="panel hidden"></div>
+
+  <div id="admin-area" class="hidden">
+    <div class="panel">
+      <h2 style="font-size:18px;margin-bottom:12px;">Vérifier un brevet</h2>
+      <div class="search-row">
+        <input type="text" id="code-input" placeholder="Code du brevet (ex. MNA-AB12CD34EF)" autocomplete="off">
+        <button class="btn btn-primary" id="code-btn">Vérifier</button>
+      </div>
+      <div id="verdict" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:18px;margin-bottom:12px;">Participants à l'espace d'étude</h2>
+      <div class="tabs">
+        <button class="tab active" data-tab="participants">Participants</button>
+        <button class="tab" data-tab="certificates">Brevets délivrés</button>
+      </div>
+      <div id="list-loading" style="color:var(--ink-soft);">Chargement…</div>
+      <div id="list-count" class="count"></div>
+      <div id="list"></div>
+    </div>
+  </div>
+</div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const headers = { Authorization: `Bearer ${token}` };
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+let DATA = { participants: [], certificates: [] };
+let currentTab = 'participants';
+
+function deny(message, withLogin) {
+  $('denied').classList.remove('hidden');
+  $('denied').innerHTML = `<p style="margin-bottom:${withLogin ? 14 : 0}px;">${esc(message)}</p>` +
+    (withLogin ? '<a class="btn btn-primary" href="/login.html">Se connecter</a>' : '');
+}
+
+async function verify(code) {
+  code = (code || '').trim();
+  if (!code) return;
+  $('verdict').innerHTML = '<p style="color:var(--ink-soft);">Vérification…</p>';
+  try {
+    const r = await fetch(`/api/study/admin/certificates/${encodeURIComponent(code)}`, { headers });
+    const data = await r.json();
+    if (r.ok && data.valid) {
+      const c = data.certificate;
+      $('verdict').innerHTML = `
+        <div class="verdict ok">
+          <h2>✅ Brevet authentique</h2>
+          <dl>
+            <dt>Nom</dt><dd>${esc(c.full_name || c.email)}</dd>
+            <dt>E-mail</dt><dd>${esc(c.email)}</dd>
+            <dt>Livre étudié</dt><dd>${esc(c.book_title)}</dd>
+            <dt>Résultat</dt><dd>${c.final_score != null ? esc(c.final_score) + ' %' : '—'}</dd>
+            <dt>Délivré le</dt><dd>${fmtDate(c.completed_at)}</dd>
+            <dt>Code</dt><dd>${esc(c.code)}</dd>
+          </dl>
+        </div>`;
+    } else {
+      $('verdict').innerHTML = `<div class="verdict ko"><h2>❌ Brevet non reconnu</h2><p>${esc(data.message || 'Aucun brevet ne correspond à ce code.')}</p></div>`;
+    }
+  } catch (e) {
+    $('verdict').innerHTML = '<div class="verdict ko"><p>Impossible de vérifier pour le moment.</p></div>';
+  }
+}
+
+function renderList() {
+  const box = $('list');
+  if (currentTab === 'participants') {
+    const rows = DATA.participants;
+    $('list-count').textContent = `${rows.length} participant(s) à l'espace d'étude`;
+    box.innerHTML = rows.length ? rows.map((p) => `
+      <div class="row">
+        <div class="name">${esc(p.full_name || p.email)}${p.certificates ? `<span class="pill">${p.certificates} brevet(s)</span>` : ''}</div>
+        <div class="meta">${esc(p.email)} · ${p.parts_read} partie(s) lue(s) · ${p.attempts} test(s) passé(s) (${p.passed_attempts} réussi(s))</div>
+      </div>`).join('') : '<p style="color:var(--ink-soft);">Aucun participant pour le moment.</p>';
+  } else {
+    const rows = DATA.certificates;
+    $('list-count').textContent = `${rows.length} brevet(s) délivré(s)`;
+    box.innerHTML = rows.length ? rows.map((c) => `
+      <div class="row">
+        <div class="name">${esc(c.full_name || c.email)} — ${esc(c.book_title)}</div>
+        <div class="meta">${c.final_score != null ? esc(c.final_score) + ' % · ' : ''}${fmtDate(c.completed_at)} · <a href="?code=${encodeURIComponent(c.code)}" style="color:var(--blue-deep);">${esc(c.code)}</a></div>
+      </div>`).join('') : '<p style="color:var(--ink-soft);">Aucun brevet délivré pour le moment.</p>';
+  }
+}
+
+async function init() {
+  if (!token) return deny('Cette page est réservée à l\'administration. Connectez-vous avec un compte administrateur.', true);
+  try {
+    const r = await fetch('/api/study/admin/participants', { headers });
+    if (r.status === 401) return deny('Session expirée. Reconnectez-vous avec un compte administrateur.', true);
+    if (r.status === 403) return deny('Accès refusé : cette page est réservée à l\'administration du site.', false);
+    DATA = await r.json();
+    $('admin-area').classList.remove('hidden');
+    $('list-loading').classList.add('hidden');
+    renderList();
+
+    document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+      currentTab = t.dataset.tab;
+      document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+      renderList();
+    }));
+    $('code-btn').addEventListener('click', () => verify($('code-input').value));
+    $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') verify($('code-input').value); });
+
+    // Arrivée par le code QR du brevet : vérification immédiate
+    const code = new URLSearchParams(location.search).get('code');
+    if (code) { $('code-input').value = code; verify(code); }
+  } catch (e) {
+    deny('Impossible de charger la page pour le moment.', false);
+  }
+}
+init();
+</script>
+</body>
+</html>

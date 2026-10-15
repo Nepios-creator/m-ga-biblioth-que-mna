@@ -52,6 +52,18 @@
   .anno-item .n { margin-top: 4px; color: var(--ink-soft); }
   .anno-item .a-actions { margin-top: 6px; display: flex; gap: 12px; }
   .anno-item .a-actions button { background: none; border: none; color: var(--blue-deep); font-size: 12px; cursor: pointer; padding: 0; }
+
+  /* Livres étudiés, tests réussis, correction des tests */
+  .study-book.finished { border-left: 4px solid #2a7a44; padding-left: 14px; }
+  .studied-mark { color: #2a7a44; font-weight: 700; font-size: 13px; margin-top: 6px; }
+  .done-banner { background: #e8f6ec; color: #2a7a44; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: 14px; font-weight: 600; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .review-title { font-size: 16px; margin: 22px 0 10px; }
+  .review-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: #fffdf8; }
+  .review-item .rq { font-weight: 600; margin-bottom: 8px; }
+  .review-item .ra { font-size: 14px; padding: 7px 10px; border-radius: 8px; margin-bottom: 6px; }
+  .review-item .ra.bad { background: #fdeaea; color: #a33; }
+  .review-item .ra.good { background: #e8f6ec; color: #2a7a44; }
 </style>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -138,15 +150,16 @@ async function loadBooks() {
   if (!r.ok) { $('books-panel').innerHTML = `<p>${books.message || 'Erreur'}</p>`; return; }
   if (!books.length) { $('books-panel').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre dans l\'espace d\'étude pour le moment.</p>'; return; }
   $('books-panel').innerHTML = books.map(b => `
-    <div class="study-book ${b.unlocked ? '' : 'locked'}">
+    <div class="study-book ${b.unlocked ? '' : 'locked'} ${b.certificate_issued ? 'finished' : ''}">
       <div>
         <h3>${b.title}</h3>
         <div class="meta">${b.author || ''} · ${b.total_parts} partie(s)</div>
+        ${b.certificate_issued ? `<div class="studied-mark">✅ Livre étudié${b.final_score != null ? ' — ' + b.final_score + ' %' : ''}</div>` : ''}
       </div>
       <div style="text-align:right;">
         ${b.certificate_issued ? '<span class="badge done">Brevet obtenu</span><br>' : ''}
         ${b.unlocked
-          ? `<button class="btn btn-primary" style="margin-top:6px;" onclick="openBook(${b.id})">${b.certificate_issued ? 'Revoir' : 'Continuer'}</button>`
+          ? `<button class="btn ${b.certificate_issued ? 'btn-ghost' : 'btn-primary'}" style="margin-top:6px;" onclick="openBook(${b.id})">${b.certificate_issued ? 'Reprendre l\'étude' : 'Continuer'}</button>`
           : '<span class="badge locked">Verrouillé</span>'}
       </div>
     </div>
@@ -163,6 +176,7 @@ async function openBook(id) {
   $('book-panel').innerHTML = `
     <h2 style="margin-bottom:4px;">${book.title}</h2>
     <p style="color:var(--ink-soft);margin-bottom:20px;">${book.description || ''}</p>
+    ${progress.certificate_issued ? `<div class="done-banner">✅ Vous avez déjà étudié ce livre${progress.final_score != null ? ' — résultat : ' + progress.final_score + ' %' : ''}. Vous pouvez le relire à tout moment.</div>` : ''}
     ${parts.map(p => `
       <div class="part-row ${p.unlocked ? '' : 'locked'}">
         <div><strong>Partie ${p.part_index}</strong> — ${p.title}<br>
@@ -171,13 +185,19 @@ async function openBook(id) {
         ${p.unlocked ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="openPartReader(${p.id}, '${p.title.replace(/'/g, "\\'")}', ${p.part_index})">📖 Lire</button>
-            ${p.has_read ? `<button class="btn btn-primary" onclick="openPartQuiz(${p.id}, '${p.title.replace(/'/g, "\\'")}')">Test</button>` : ''}
+            ${p.has_read ? (p.quiz_passed
+              ? `<button class="btn btn-ghost" disabled>✓ Test réussi</button>`
+              : `<button class="btn btn-primary" onclick="openPartQuiz(${p.id}, '${p.title.replace(/'/g, "\\'")}')">Test</button>`) : ''}
           </div>` : '<span class="badge locked">🔒</span>'}
       </div>
     `).join('')}
     ${all_parts_done && !progress.grand_test_passed ? `
       <div style="margin-top:20px;text-align:center;">
         <button class="btn btn-primary" onclick="openGrandQuiz(${book.id}, '${book.title.replace(/'/g, "\\'")}')">Passer le grand test final</button>
+      </div>` : ''}
+    ${progress.grand_test_passed ? `
+      <div style="margin-top:20px;text-align:center;">
+        <button class="btn btn-ghost" disabled>✓ Grand test réussi</button>
       </div>` : ''}
     ${progress.certificate_issued ? `
       <div style="margin-top:20px;text-align:center;">
@@ -430,7 +450,7 @@ async function openPartQuiz(partId, title) {
   const r = await fetch(`/api/study/parts/${partId}/quiz`, { headers: authHeaders });
   const data = await r.json();
   if (!r.ok) { alert(data.message); return; }
-  currentQuizContext = { type: 'part', id: partId, sessionId: data.session_id };
+  currentQuizContext = { type: 'part', id: partId, sessionId: data.session_id, title };
   renderQuiz(title, data.questions);
 }
 
@@ -438,7 +458,7 @@ async function openGrandQuiz(bookId, title) {
   const r = await fetch(`/api/study/books/${bookId}/grand-quiz`, { headers: authHeaders });
   const data = await r.json();
   if (!r.ok) { alert(data.message); return; }
-  currentQuizContext = { type: 'grand', id: bookId, sessionId: data.session_id };
+  currentQuizContext = { type: 'grand', id: bookId, sessionId: data.session_id, title };
   renderQuiz('Grand test — ' + title, data.questions);
 }
 
@@ -480,14 +500,39 @@ function renderQuiz(title, questions) {
         <button class="btn btn-ghost" onclick="showView('list'); loadBooks();">Retour à la liste des livres</button>`;
       return;
     }
+    const submitBtn = document.querySelector('#quiz-form button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    const wrong = result.wrong || [];
+    const choiceText = (w, i) => (i >= 0 && w.choices && w.choices[i] !== undefined) ? w.choices[i] : null;
+    const review = wrong.length ? `
+      <h3 class="review-title">Correction — ${wrong.length} réponse(s) à revoir</h3>
+      ${wrong.map(w => `
+        <div class="review-item">
+          <div class="rq">${w.question_text}</div>
+          <div class="ra bad">Votre réponse : ${choiceText(w, w.your_answer) || 'aucune réponse donnée'}</div>
+          <div class="ra good">Bonne réponse : ${choiceText(w, w.correct_answer) || ''}</div>
+        </div>`).join('')}` : '';
     $('quiz-result').innerHTML = `
-      <div class="msg ${result.passed ? 'success' : 'error'}">
+      <div class="msg ${result.passed ? 'success' : 'error'}" style="margin-top:18px;">
         ${result.passed ? '✅ Réussi !' : '❌ Non réussi.'} Score : ${result.score}% (${result.correct}/${result.total})
-        ${result.passed ? '' : ' — Relisez la partie puis retentez le test.'}
+        ${result.passed ? ' — ce test est maintenant validé et n\'est plus accessible.' : ' — Relisez la partie, consultez la correction ci-dessous, puis retentez le test.'}
       </div>
-      <button class="btn btn-ghost" onclick="showView('list'); loadBooks();">Retour à la liste des livres</button>
+      ${review}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+        ${result.passed ? '' : '<button class="btn btn-primary" onclick="retryQuiz()">Réessayer le test</button>'}
+        <button class="btn btn-ghost" onclick="openBook(currentBookId)">Retour au livre</button>
+        <button class="btn btn-ghost" onclick="showView('list'); loadBooks();">Liste des livres</button>
+      </div>
     `;
+    $('quiz-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+}
+
+function retryQuiz() {
+  const c = currentQuizContext;
+  if (!c) return;
+  if (c.type === 'part') openPartQuiz(c.id, c.title);
+  else openGrandQuiz(c.id, c.title);
 }
 
 $('back-to-list').addEventListener('click', () => { showView('list'); loadBooks(); });
