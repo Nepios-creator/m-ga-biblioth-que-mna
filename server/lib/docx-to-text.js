@@ -9,7 +9,10 @@ function decodeXmlEntities(s) {
     .replace(/&amp;/g, '&');
 }
 
-// Découpe le document.xml en paragraphes avec texte, alignement et taille de police max
+// Un passage est en gras si <w:b/> est présent (et pas <w:b w:val="0"/>)
+const hasBold = (rPr) => /<w:b(?:\s*\/>|\s+w:val="(?:1|true|on)"\s*\/?>)/.test(rPr || '');
+
+// Découpe le document.xml en paragraphes : texte, alignement, taille de police, gras et style de titre Word
 function extractItems(xml) {
   const rawChunks = xml.split('</w:p>');
   const items = [];
@@ -31,13 +34,32 @@ function extractItems(xml) {
       const szMatch = block[1].match(/<w:sz w:val="(\d+)"/);
       if (szMatch) maxSize = Math.max(maxSize, parseInt(szMatch[1], 10));
     }
-    items.push({ text, jc, size: maxSize });
+
+    // Gras : tous les passages contenant du texte sont en gras
+    const runs = [...p.matchAll(/<w:r(?:\s[^>]*)?>([^]*?)<\/w:r>/g)].filter((m) => /<w:t[\s>]/.test(m[1]));
+    const bold = runs.length > 0 && runs.every((m) => hasBold((m[1].match(/<w:rPr>([^]*?)<\/w:rPr>/) || [])[1]));
+
+    // Style de titre Word (Titre 1, Heading 2, Title…)
+    const styleMatch = p.match(/<w:pStyle w:val="([^"]+)"/);
+    const style = styleMatch ? styleMatch[1] : '';
+    let level = 0;
+    const lv = style.match(/^(?:Heading|Titre)\s*(\d)/i);
+    if (lv) level = parseInt(lv[1], 10);
+    else if (/^(?:Title|Titre)$/i.test(style)) level = 1;
+    else if (/^(?:Subtitle|Sous-?titre)$/i.test(style)) level = 2;
+
+    items.push({ text, jc, size: maxSize, bold, level });
   }
   return items;
 }
 
-const isPartie = (t) => /^PARTIE\s+[IVX]+$/.test(t);
-const isChapitre = (t) => /^CHAPITRE\s+\d+(\s+BIS)?$/i.test(t);
+const NUMWORDS = 'UNE?|DEUX|TROIS|QUATRE|CINQ|SIX|SEPT|HUIT|NEUF|DIX|ONZE|DOUZE|TREIZE|QUATORZE|QUINZE|SEIZE|DIX-(?:SEPT|HUIT|NEUF)|VINGT(?:-[A-ZÉÈ]+)*|PREMIER|PREMIÈRE';
+// « CHAPITRE 1 », « CHAPITRE UN », « Chapitre I » — avec ou sans titre sur la même ligne (« CHAPITRE 1 — Le Christ »)
+const CHAP_RE = new RegExp('^(?:CHAPITRE|CHAP\\.)\\s+(\\d+|[IVXLC]+|' + NUMWORDS + ')(\\s+BIS)?\\s*(?:[—–:.\\-]\\s*(.+))?$', 'i');
+const PART_RE = /^PARTIE\s+([IVX]+|\d+)\s*(?:[—–:.\-]\s*(.+))?$/i;
+
+const chap = (t) => { const m = t.match(CHAP_RE); return m ? { label: ('CHAPITRE ' + m[1] + (m[2] ? ' BIS' : '')).toUpperCase(), title: (m[3] || '').trim() } : null; };
+const part = (t) => { const m = t.match(PART_RE); return m ? { label: ('PARTIE ' + m[1]).toUpperCase(), title: (m[2] || '').trim() } : null; };
 
 // Taille de police du corps du livre : celle qui porte le plus de texte (0 = taille par défaut du document)
 function bodySizeOf(items) {
@@ -51,37 +73,59 @@ function bodySizeOf(items) {
   return best;
 }
 
+const endsLikeSentence = (t) => /[.!?;:,»”]$/.test(t.trim());
+
 // Même convention que l'espace d'étude : "# " = grand titre, "## " = sous-titre, sinon paragraphe
 function buildParagraphs(items) {
   const out = [];
   const n = items.length;
-  const hasPartie = items.some((it) => isPartie(it.text));
+  const hasPartie = items.some((it) => part(it.text));
   const chapterPrefix = hasPartie ? '## ' : '# ';
   const bodySize = bodySizeOf(items);
-  // Un sous-titre est nettement plus grand que le texte du livre (et court). Si tout le livre est écrit en
-  // grande police, ses paragraphes restent de simples paragraphes au lieu de s'afficher tous en titres gras.
-  const isSubtitleSize = (size) => (bodySize === 0 ? size >= 26 : size >= bodySize + 4);
+
+  // Un sous-titre est nettement plus grand que le texte du livre. Si tout le livre est écrit en grande police,
+  // ses paragraphes restent de simples paragraphes au lieu de s'afficher tous en titres.
+  const isBigger = (size) => (bodySize === 0 ? size >= 26 : size >= bodySize + 4);
+  // Le gras ne distingue les titres que s'il n'est pas utilisé partout dans le livre
+  const boldCount = items.filter((it) => it.bold).length;
+  const boldIsDistinctive = n > 0 && boldCount / n < 0.5;
+  const isTitleish = (it) => it.text.length <= 140 && !endsLikeSentence(it.text) &&
+    (it.level > 0 || (boldIsDistinctive && it.bold) || isBigger(it.size) || it.jc === 'center');
+
   let i = 0;
   while (i < n) {
     const it = items[i];
     const t = it.text;
 
-    if (isPartie(t)) {
-      const next = i + 1 < n ? items[i + 1].text : '';
-      const hasSub = next && !isPartie(next) && !isChapitre(next) && next.length < 120;
-      out.push('# ' + t + (hasSub ? ' — ' + next : ''));
-      i += hasSub ? 2 : 1;
+    const pa = part(t);
+    if (pa) {
+      let title = pa.title;
+      let j = i + 1;
+      if (!title && j < n && items[j].text.length < 120 && !part(items[j].text) && !chap(items[j].text) && isTitleish(items[j])) { title = items[j].text; j++; }
+      out.push('# ' + pa.label + (title ? ' — ' + title : ''));
+      i = j;
       continue;
     }
 
-    if (isChapitre(t)) {
-      const titleParts = [];
+    const ch = chap(t);
+    if (ch) {
+      const titleParts = ch.title ? [ch.title] : [];
       let j = i + 1;
-      while (j < n && items[j].jc === 'center' && items[j].text.length < 90 && !isPartie(items[j].text) && !isChapitre(items[j].text)) {
-        titleParts.push(items[j].text);
-        j++;
+      if (!ch.title) {
+        // Le titre principal du chapitre suit le numéro : on le rattache au titre (jusqu'à 3 lignes)
+        while (j < n && titleParts.length < 3) {
+          const nx = items[j];
+          if (part(nx.text) || chap(nx.text) || nx.text.length > 140 || endsLikeSentence(nx.text)) break;
+          const styled = nx.level > 0 || (boldIsDistinctive && nx.bold) || isBigger(nx.size) || nx.jc === 'center';
+          if (!styled && !(titleParts.length === 0 && nx.text.length <= 90)) break; // texte courant isolé : le titre d'un chapitre sans mise en forme tient sur une ligne
+          // Après la 1re ligne, on n'en ajoute d'autres que si le titre est centré sur plusieurs lignes ;
+          // sinon la ligne suivante est un sous-titre du chapitre, pas la suite du titre principal
+          if (titleParts.length > 0 && !(nx.jc === 'center' && items[j - 1].jc === 'center')) break;
+          titleParts.push(nx.text);
+          j++;
+        }
       }
-      out.push(chapterPrefix + t + (titleParts.length ? ' — ' + titleParts.join(' ') : ''));
+      out.push(chapterPrefix + ch.label + (titleParts.length ? ' — ' + titleParts.join(' ') : ''));
       i = j;
       continue;
     }
@@ -92,8 +136,16 @@ function buildParagraphs(items) {
       continue;
     }
 
-    if (isSubtitleSize(it.size) && it.jc !== 'center' && t.length <= 160) {
-      out.push('## ' + t);
+    // Titres et sous-titres du livre : style de titre Word, gras court, ou police nettement plus grande
+    const strong = it.level > 0 || (boldIsDistinctive && it.bold) || isBigger(it.size);
+    if (strong && t.length <= 160 && !endsLikeSentence(t)) {
+      const top = it.level === 1 || (it.jc === 'center' && (it.bold || isBigger(it.size)) && !hasPartie);
+      out.push((top ? '# ' : '## ') + t);
+      i++;
+      continue;
+    }
+    if (strong && it.size && isBigger(it.size) && it.jc !== 'center' && t.length <= 160) {
+      out.push('## ' + t); // conserve l'ancien comportement pour les sous-titres en grande police qui se terminent par une ponctuation
       i++;
       continue;
     }
@@ -115,4 +167,4 @@ async function docxToParagraphs(docxBuffer) {
   return buildParagraphs(items);
 }
 
-module.exports = { docxToParagraphs };
+module.exports = { docxToParagraphs, _test: { extractItems, buildParagraphs } };
