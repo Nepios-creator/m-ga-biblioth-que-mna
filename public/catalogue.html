@@ -19,6 +19,16 @@
   .free-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 6px; background: #f2e4b8; color: var(--gold-deep, #8a6a14); white-space: nowrap; }
   .free-title { flex: 1; font-weight: 600; font-size: 16.5px; color: var(--blue-deep, #1d4a7a); cursor: pointer; line-height: 1.4; }
   .free-dl { background: none; border: 1px solid var(--line, #e6dfd0); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: var(--ink-soft, #6b6254); }
+
+  /* Livres en vente : cartes compactes (2 par ligne sur téléphone) */
+  #books-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 12px; margin-bottom: 30px; }
+  #books-grid .book-card { border-radius: 12px; }
+  #books-grid .book-card .cover { aspect-ratio: 3 / 3.6; font-size: 26px; }
+  #books-grid .book-card .body { padding: 9px 10px 12px; }
+  #books-grid .book-card h3 { font-size: 13.5px; line-height: 1.3; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #books-grid .book-card .meta { font-size: 11px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #books-grid .book-card .price { font-weight: 700; font-size: 13px; color: var(--gold-deep, #a67f2e); margin-bottom: 8px; }
+  #books-grid .book-card .actions .btn { width: 100%; text-align: center; padding: 7px 8px; font-size: 12px; }
 </style>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -148,10 +158,9 @@ function render() {
       <div class="body">
         <h3>${escHtml(b.title)}</h3>
         <div class="meta">${escHtml(b.author || '')}</div>
-        <p>${escHtml(b.description || '')}</p>
-        <div style="font-weight:700;color:var(--gold-deep);margin-bottom:10px;">${b.price ? Number(b.price).toFixed(2) + ' $' : 'Prix sur demande'}</div>
+        <div class="price">${b.price ? Number(b.price).toFixed(2) + ' $' : 'Prix sur demande'}</div>
         <div class="actions">
-          <a href="https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre : ' + b.title)}" target="_blank" class="btn btn-primary">Acheter via WhatsApp</a>
+          <a href="https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre : ' + b.title)}" target="_blank" class="btn btn-primary">Acheter</a>
         </div>
       </div>
     </div>
