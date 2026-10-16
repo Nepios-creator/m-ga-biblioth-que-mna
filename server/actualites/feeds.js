@@ -1,9 +1,9 @@
 // Sources officielles : lecture des flux RSS/Atom et proposition quotidienne d'actualités à l'administrateur.
 const pool = require('../db/pool');
 const { fetchText } = require('./fetch-page');
-const { decodeEntities, textFromHtml, truncate, parseAttrs, safeUrl } = require('./html-tools');
+const { decodeEntities, textFromHtml, truncate, parseAttrs, safeUrl, isFrench } = require('./html-tools');
 
-const PER_SOURCE = 6;          // actualités proposées par source à chaque passage
+const PER_SOURCE = 4;          // actualités proposées par source à chaque passage
 const MAX_AGE_DAYS = 10;       // on ne propose pas d'articles plus anciens
 const EXPIRE_AFTER_DAYS = 14;  // une proposition ignorée disparaît après ce délai
 
@@ -106,6 +106,7 @@ function guessCategory(text, fallback) {
   const t = String(text || '').toLowerCase();
   if (/persécut|persecut|martyr|christian(s)? (killed|attacked)|church (attack|burn)|liberté religieuse|religious freedom|blasphem/.test(t)) return 'persecution';
   if (/humanitair|humanitarian|famine|refugee|réfugi|aid |aide d'urgence|charity|solidarit|flood|inondation|earthquake|séisme/.test(t)) return 'solidarite';
+  if (/polémique|controvers|scandale|buzz|viral|tollé|indign|choc|bouleverse|révèle|accus|affaire|miracle|prophéti|méga-?église|célébrit|rappeur|chanteur|influenceur|tiktok|youtube|réseaux sociaux|incroyable|inattendu/.test(t)) return 'buzz';
   if (/mission|évangélis|evangelis|church plant|implantation d'église|crusade|croisade/.test(t)) return 'mission';
   if (/jeunes|youth|famille|family|children|enfants|marriage|mariage/.test(t)) return 'jeunesse';
   if (/conférence|conference|assemblée|assembly|synode|synod|congress|congrès|rassemblement|festival|retreat|retraite/.test(t)) return 'evenement';
@@ -117,10 +118,10 @@ function guessCategory(text, fallback) {
 let running = false;
 
 async function setMeta(key, value) {
-  await pool.query('INSERT INTO news_meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
+  await pool.query('INSERT INTO actu_meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
 }
 async function getMeta(key) {
-  const r = await pool.query('SELECT value FROM news_meta WHERE key = $1', [key]);
+  const r = await pool.query('SELECT value FROM actu_meta WHERE key = $1', [key]);
   return r.rows[0] ? r.rows[0].value : null;
 }
 
@@ -131,10 +132,10 @@ async function runDailyFetch() {
   let added = 0;
   try {
     await pool.query(
-      "UPDATE news_suggestions SET status = 'expiree' WHERE status = 'nouvelle' AND created_at < now() - ($1 || ' days')::interval",
+      "UPDATE actu_suggestions SET status = 'expiree' WHERE status = 'nouvelle' AND created_at < now() - ($1 || ' days')::interval",
       [String(EXPIRE_AFTER_DAYS)]
     );
-    const sources = (await pool.query('SELECT * FROM news_sources WHERE enabled ORDER BY id')).rows;
+    const sources = (await pool.query("SELECT * FROM actu_sources WHERE enabled AND language = 'fr' ORDER BY id")).rows;
     const oldest = Date.now() - MAX_AGE_DAYS * 86400000;
 
     for (const s of sources) {
@@ -144,20 +145,23 @@ async function runDailyFetch() {
         for (const it of items) {
           if (n >= PER_SOURCE) break;
           if (it.published_at && new Date(it.published_at).getTime() < oldest) continue;
-          const done = await pool.query('SELECT 1 FROM news_articles WHERE source_url = $1', [it.link]);
+          if (isFrench(it.title + ' ' + it.summary) === false) continue; // le site ne publie qu'en français
+          const done = await pool.query('SELECT 1 FROM actu_articles WHERE source_url = $1', [it.link]);
           if (done.rows.length) continue;
           const ins = await pool.query(
-            `INSERT INTO news_suggestions (source_id, source_name, title, summary, link, image_url, published_at, language, region, category)
+            `INSERT INTO actu_suggestions (source_id, source_name, title, summary, link, image_url, published_at, language, region, category)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (link) DO NOTHING RETURNING id`,
             [s.id, s.name, it.title, it.summary, it.link, it.image, it.published_at, s.language, s.region, guessCategory(it.title + ' ' + it.summary, s.category)]
           );
           if (ins.rows.length) { n++; added++; }
         }
-        await pool.query("UPDATE news_sources SET feed_url = $2, last_checked_at = now(), last_status = 'ok', last_error = NULL WHERE id = $1", [s.id, feedUrl]);
+        await pool.query("UPDATE actu_sources SET feed_url = $2, last_checked_at = now(), last_status = 'ok', last_error = NULL WHERE id = $1", [s.id, feedUrl]);
         results.push({ source: s.name, ok: true, added: n });
+        console.log(`[actualités] ${s.name} : ${n} proposition(s)`);
       } catch (err) {
-        await pool.query("UPDATE news_sources SET last_checked_at = now(), last_status = 'erreur', last_error = $2 WHERE id = $1", [s.id, String(err.message).slice(0, 300)]);
+        await pool.query("UPDATE actu_sources SET last_checked_at = now(), last_status = 'erreur', last_error = $2 WHERE id = $1", [s.id, String(err.message).slice(0, 300)]);
         results.push({ source: s.name, ok: false, error: err.message });
+        console.log(`[actualités] ${s.name} : ÉCHEC — ${err.message}`);
       }
     }
     await setMeta('last_fetch_date', new Date().toISOString().slice(0, 10));

@@ -1,7 +1,7 @@
 // Lit une page web d'actualité et en extrait : titre, résumé, image, texte complet, auteur, date, source.
 // Sans dépendance externe : analyse par expressions régulières, avec plusieurs méthodes de secours.
 const { fetchText } = require('./fetch-page');
-const { decodeEntities, escapeHtml, textFromHtml, truncate, parseAttrs, safeUrl, sanitizeHtml } = require('./html-tools');
+const { decodeEntities, escapeHtml, textFromHtml, truncate, parseAttrs, safeUrl, sanitizeHtml, isFrench } = require('./html-tools');
 
 const JUNK = /^(partager|share|tweet|tweeter|facebook|whatsapp|imprimer|print|lire aussi|read more|read also|related|suivez|follow us|subscribe|s['’]abonner|newsletter|publicité|advertisement|cookies?)\b/i;
 const SOCIAL = /(^|\.)(facebook|instagram|twitter|x|tiktok|linkedin|threads)\.(com|net)$/i;
@@ -126,6 +126,8 @@ async function extractFromUrl(rawUrl) {
   } else if (uncertain) {
     notes.push('Mise en page inhabituelle : relisez bien le texte avant de publier.');
   }
+  const notFrench = isFrench(title + ' ' + textFromHtml(body).slice(0, 1500)) === false;
+  if (notFrench) notes.push('Ce texte ne semble pas rédigé en français. Le site ne publie que des actualités en français : traduisez-le (bouton « Traduire en français ») ou choisissez une autre publication.');
   if (SOCIAL.test(host)) notes.push('Les réseaux sociaux limitent la lecture automatique : vérifiez le texte et ajoutez les images si besoin.');
 
   let cover = safeUrl(ldImage(ld.image) || meta['og:image'] || meta['twitter:image'] || '', finalUrl);
@@ -152,6 +154,7 @@ async function extractFromUrl(rawUrl) {
     language: /^[a-z]{2}$/.test(lang) ? lang : 'fr',
     partial,
     uncertain,
+    not_french: notFrench,
     notes,
   };
 }

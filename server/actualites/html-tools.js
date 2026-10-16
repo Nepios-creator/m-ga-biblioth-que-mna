@@ -123,4 +123,21 @@ function sanitizeHtml(html, base) {
     .trim();
 }
 
-module.exports = { decodeEntities, escapeHtml, textFromHtml, truncate, parseAttrs, safeUrl, sanitizeHtml };
+// Détection simple du français (mots courants). Retourne true / false, ou null si le texte est trop court pour décider.
+const FR_WORDS = new Set(['le', 'la', 'les', 'des', 'du', 'de', 'un', 'une', 'et', 'est', 'en', 'pour', 'dans', 'que', 'qui', 'sur', 'au', 'aux', 'avec', 'par', 'pas', 'plus', 'sont', 'ce', 'cette', 'ses', 'leur', 'leurs', 'il', 'elle', 'ils', 'nous', 'vous', 'été', 'être', 'ont', 'mais', 'ou', 'où', 'son', 'sa', 'se', 'ne', 'à', 'après', 'entre', 'lors', 'selon', 'sous', 'comme', 'très']);
+const EN_WORDS = new Set(['the', 'and', 'of', 'to', 'in', 'is', 'for', 'that', 'with', 'on', 'as', 'by', 'are', 'was', 'were', 'his', 'her', 'their', 'from', 'has', 'have', 'this', 'it', 'at', 'be', 'not', 'but', 'will', 'after', 'about']);
+const OTHER_WORDS = new Set(['el', 'los', 'las', 'y', 'por', 'con', 'para', 'una', 'del', 'su', 'sus', 'es', 'não', 'uma', 'os', 'dos', 'das', 'com', 'são', 'che', 'di', 'il', 'della', 'per', 'sono', 'nel', 'non', 'ein', 'der', 'die', 'und', 'ist', 'nicht', 'mit']);
+
+function isFrench(text) {
+  const words = String(text || '').toLowerCase().match(/[a-zàâäçéèêëîïôöûùüÿœ]+/g) || [];
+  let fr = 0, en = 0, other = 0;
+  for (const w of words) {
+    if (FR_WORDS.has(w)) fr++;
+    if (EN_WORDS.has(w)) en++;
+    if (OTHER_WORDS.has(w)) other++;
+  }
+  if (fr + en + other < 3) return null;
+  return fr >= 2 && fr > en * 1.5 && fr > other * 1.5;
+}
+
+module.exports = { decodeEntities, escapeHtml, textFromHtml, truncate, parseAttrs, safeUrl, sanitizeHtml, isFrench };

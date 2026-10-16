@@ -10,27 +10,39 @@ const CATEGORIES = [
   ['societe', 'Société et culture'],
   ['jeunesse', 'Jeunesse et famille'],
   ['temoignage', 'Témoignages'],
+  ['buzz', 'Buzz et débats'],
   ['annonce', 'Annonces du ministère'],
 ];
 
 const REGIONS = ['Afrique', 'Europe', 'Amérique du Nord', 'Amérique latine', 'Asie', 'Moyen-Orient', 'Océanie', 'Monde'];
 
-// Sources officielles proposées au départ. Si l'adresse du flux n'est pas indiquée, le site la détecte tout seul.
+// Sources proposées au départ : uniquement des sites en français, de toutes les sensibilités chrétiennes
+// (protestants, évangéliques, œcuméniques, catholiques). Si l'adresse du flux n'est pas indiquée, le site la détecte tout seul.
 // L'administrateur peut ajouter, retirer ou désactiver des sources depuis l'espace d'administration.
 const DEFAULT_SOURCES = [
+  { name: 'Réforme (protestant)', site_url: 'https://www.reforme.net', feed_url: null, language: 'fr', region: 'Europe', category: 'eglise' },
+  { name: 'Protestinfo (Suisse)', site_url: 'https://www.protestinfo.ch', feed_url: null, language: 'fr', region: 'Europe', category: 'eglise' },
+  { name: 'Fédération protestante de France', site_url: 'https://www.protestants.org', feed_url: null, language: 'fr', region: 'Europe', category: 'eglise' },
+  { name: 'Christianisme Aujourd\'hui (évangélique)', site_url: 'https://www.christianismeaujourdhui.info', feed_url: null, language: 'fr', region: 'Monde', category: 'eglise' },
+  { name: 'Top Chrétien', site_url: 'https://www.topchretien.com', feed_url: null, language: 'fr', region: 'Monde', category: 'buzz' },
+  { name: 'Journal Chrétien', site_url: 'https://www.journalchretien.net', feed_url: null, language: 'fr', region: 'Monde', category: 'eglise' },
+  { name: 'Évangéliques de France (CNEF)', site_url: 'https://www.lecnef.org', feed_url: null, language: 'fr', region: 'Europe', category: 'eglise' },
+  { name: 'Jesus.ch (Suisse)', site_url: 'https://www.jesus.ch', feed_url: null, language: 'fr', region: 'Europe', category: 'eglise' },
+  { name: 'Portes Ouvertes France', site_url: 'https://www.portesouvertes.fr', feed_url: null, language: 'fr', region: 'Monde', category: 'persecution' },
+  { name: 'Croire.com (toutes confessions)', site_url: 'https://www.croire.com', feed_url: null, language: 'fr', region: 'Monde', category: 'societe' },
+  { name: 'Aleteia (français)', site_url: 'https://fr.aleteia.org', feed_url: null, language: 'fr', region: 'Monde', category: 'buzz' },
   { name: 'Vatican News (français)', site_url: 'https://www.vaticannews.va/fr.html', feed_url: 'https://www.vaticannews.va/fr.rss.xml', language: 'fr', region: 'Monde', category: 'eglise' },
-  { name: 'Vatican News (English)', site_url: 'https://www.vaticannews.va/en.html', feed_url: 'https://www.vaticannews.va/en.rss.xml', language: 'en', region: 'Monde', category: 'eglise' },
-  { name: 'Conseil œcuménique des Églises', site_url: 'https://www.oikoumene.org', feed_url: null, language: 'en', region: 'Monde', category: 'eglise' },
-  { name: 'Anglican Communion News Service', site_url: 'https://www.anglicannews.org', feed_url: null, language: 'en', region: 'Monde', category: 'eglise' },
-  { name: 'Evangelical Focus (Europe)', site_url: 'https://evangelicalfocus.com', feed_url: null, language: 'en', region: 'Europe', category: 'eglise' },
-  { name: 'Christianity Today', site_url: 'https://www.christianitytoday.com', feed_url: null, language: 'en', region: 'Amérique du Nord', category: 'eglise' },
-  { name: 'Baptist Press', site_url: 'https://www.baptistpress.com', feed_url: null, language: 'en', region: 'Amérique du Nord', category: 'mission' },
-  { name: 'Open Doors', site_url: 'https://www.opendoors.org', feed_url: null, language: 'en', region: 'Monde', category: 'persecution' },
+];
+
+// Anciennes sources anglophones (première version du module) : retirées, le site ne publie qu'en français.
+const OLD_ENGLISH_SITES = [
+  'https://www.vaticannews.va/en.html', 'https://www.oikoumene.org', 'https://www.anglicannews.org', 'https://evangelicalfocus.com',
+  'https://www.christianitytoday.com', 'https://www.baptistpress.com', 'https://www.opendoors.org',
 ];
 
 async function ensureSchema() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS news_articles (
+    CREATE TABLE IF NOT EXISTS actu_articles (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       summary TEXT,
@@ -55,12 +67,12 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_articles_status_date_idx ON news_articles (status, created_at DESC);
-    CREATE INDEX IF NOT EXISTS news_articles_source_url_idx ON news_articles (source_url);
+    CREATE INDEX IF NOT EXISTS actu_articles_status_date_idx ON actu_articles (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS actu_articles_source_url_idx ON actu_articles (source_url);
 
-    CREATE TABLE IF NOT EXISTS news_images (
+    CREATE TABLE IF NOT EXISTS actu_images (
       id SERIAL PRIMARY KEY,
-      article_id INTEGER NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
+      article_id INTEGER NOT NULL REFERENCES actu_articles(id) ON DELETE CASCADE,
       mime TEXT NOT NULL,
       data BYTEA NOT NULL,
       caption TEXT,
@@ -68,9 +80,9 @@ async function ensureSchema() {
       position INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_images_article_idx ON news_images (article_id);
+    CREATE INDEX IF NOT EXISTS actu_images_article_idx ON actu_images (article_id);
 
-    CREATE TABLE IF NOT EXISTS news_sources (
+    CREATE TABLE IF NOT EXISTS actu_sources (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       site_url TEXT NOT NULL,
@@ -85,9 +97,9 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS news_suggestions (
+    CREATE TABLE IF NOT EXISTS actu_suggestions (
       id SERIAL PRIMARY KEY,
-      source_id INTEGER REFERENCES news_sources(id) ON DELETE SET NULL,
+      source_id INTEGER REFERENCES actu_sources(id) ON DELETE SET NULL,
       source_name TEXT,
       title TEXT NOT NULL,
       summary TEXT,
@@ -101,23 +113,44 @@ async function ensureSchema() {
       article_id INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_suggestions_status_idx ON news_suggestions (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS actu_suggestions_status_idx ON actu_suggestions (status, created_at DESC);
 
-    CREATE TABLE IF NOT EXISTS news_meta (
+    CREATE TABLE IF NOT EXISTS actu_meta (
       key TEXT PRIMARY KEY,
       value TEXT
     );
   `);
 
-  const { rows } = await pool.query('SELECT count(*)::int AS n FROM news_sources');
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM actu_sources');
   if (rows[0].n === 0) {
     for (const s of DEFAULT_SOURCES) {
       await pool.query(
-        'INSERT INTO news_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6)',
+        'INSERT INTO actu_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6)',
         [s.name, s.site_url, s.feed_url, s.language, s.region, s.category]
       );
     }
   }
+  await migrateToFrench();
 }
 
-module.exports = { ensureSchema, CATEGORIES, REGIONS };
+// Passage au « français uniquement » et aux sources de toutes confessions (une seule fois)
+async function migrateToFrench() {
+  const done = await pool.query("SELECT 1 FROM actu_meta WHERE key = 'sources_fr_v1'");
+  if (done.rows.length) return;
+  await pool.query("DELETE FROM actu_sources WHERE language <> 'fr' AND site_url = ANY($1)", [OLD_ENGLISH_SITES]);
+  await pool.query("UPDATE actu_sources SET enabled = false WHERE language <> 'fr'");
+  await pool.query("UPDATE actu_suggestions SET status = 'rejetee' WHERE status = 'nouvelle' AND language <> 'fr'");
+  for (const s of DEFAULT_SOURCES) {
+    const ex = await pool.query('SELECT 1 FROM actu_sources WHERE site_url = $1', [s.site_url]);
+    if (!ex.rows.length) {
+      await pool.query(
+        'INSERT INTO actu_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6)',
+        [s.name, s.site_url, s.feed_url, s.language, s.region, s.category]
+      );
+    }
+  }
+  await pool.query("DELETE FROM actu_meta WHERE key = 'last_fetch_date'"); // nouvelle recherche dès le prochain passage
+  await pool.query("INSERT INTO actu_meta (key, value) VALUES ('sources_fr_v1', '1') ON CONFLICT (key) DO NOTHING");
+}
+
+module.exports = { ensureSchema, migrateToFrench, CATEGORIES, REGIONS };
