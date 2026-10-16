@@ -1,4 +1,4 @@
-// Intégration de l'espace « Actualités chrétiennes » dans les pages existantes.
+// Intégration de l'espace « Actualités chrétiennes » dans les pages existantes du site.
 // Ce script est ajouté automatiquement par le serveur : aucun fichier existant n'est modifié.
 (function () {
   const path = location.pathname;
@@ -14,61 +14,40 @@
     nav.insertBefore(a, nav.querySelector('a[href="/login.html"]') || null);
   }
 
-  // --- 2. Page d'accueil : bandeau « À la une » qui donne envie de lire ---
+  // --- 2. Page d'accueil : les dernières actualités ---
   if (path === '/' || path === '/index.html') {
-    fetch('/api/actualites?limit=8')
+    fetch('/api/actualites?limit=3')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data || !data.items || !data.items.length) return;
-        const items = data.items.slice().sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0)).slice(0, 3);
         if (!document.getElementById('nw-css')) {
           const l = document.createElement('link');
           l.id = 'nw-css'; l.rel = 'stylesheet'; l.href = '/css/actualites.css';
           document.head.appendChild(l);
         }
-        const isNew = (a) => Date.now() - new Date(a.created_at).getTime() < 3 * 86400000;
         const sec = document.createElement('section');
+        sec.className = 'section nw-home';
         sec.id = 'actualites-accueil';
-        sec.className = 'nw-banner-wrap';
         sec.innerHTML = `
-          <div class="nw-banner" role="region" aria-label="Actualités chrétiennes à la une">
-            ${items.map((a, i) => `
-              <a class="nw-slide${i === 0 ? ' on' : ''}" href="/actualite.html?id=${a.id}" ${a.cover ? `style="background-image:url('${esc(String(a.cover).replace(/'/g, '%27'))}')"` : ''}>
-                <span class="nw-shade"></span>
-                <span class="nw-slide-in">
-                  <span class="nw-live"><i></i>${isNew(a) ? 'Nouveau' : 'À la une'}</span>
-                  <strong class="nw-slide-title">${esc(a.title)}</strong>
-                  ${a.summary ? `<span class="nw-slide-sum">${esc(a.summary)}</span>` : ''}
-                  <span class="nw-slide-meta">${esc(fmtDate(a.date))}${a.source_name ? ' · ' + esc(a.source_name) : ''}</span>
-                  <span class="nw-slide-btn">Lire l'actualité →</span>
-                </span>
+          <div class="container">
+            <span class="tag">Actualités chrétiennes</span>
+            <h2>L'Église dans le monde</h2>
+            <p class="lead">Les dernières nouvelles chrétiennes du monde entier, présentées simplement.</p>
+            <div class="nw-grid">${data.items.map((a) => `
+              <a class="nw-card" href="/actualite.html?id=${a.id}">
+                <div class="img" ${a.cover ? `style="background-image:url('${esc(a.cover)}')"` : ''}>${a.cover ? '' : '📰'}</div>
+                <div class="body">
+                  <div class="nw-meta"><span>${esc(fmtDate(a.date))}</span>${a.source_name ? `<span>· ${esc(a.source_name)}</span>` : ''}</div>
+                  <h3>${esc(a.title)}</h3>
+                  ${a.summary ? `<p>${esc(a.summary)}</p>` : ''}
+                </div>
               </a>`).join('')}
-            <a class="nw-all" href="/actualites.html">Toutes les actualités</a>
-            ${items.length > 1 ? `<div class="nw-dots">${items.map((a, i) => `<button type="button" aria-label="Actualité ${i + 1}" class="${i === 0 ? 'on' : ''}"></button>`).join('')}</div>` : ''}
+            </div>
+            <a class="btn btn-primary" href="/actualites.html">Voir toutes les actualités</a>
           </div>`;
-
-        const hero = document.querySelector('.hero');
-        const anchor = hero ? (hero.closest('section') || hero) : document.querySelector('header');
-        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
-        else document.body.insertBefore(sec, document.body.firstChild);
-
-        // Défilement automatique (en pause au survol / au toucher)
-        if (items.length > 1) {
-          const slides = sec.querySelectorAll('.nw-slide');
-          const dots = sec.querySelectorAll('.nw-dots button');
-          let cur = 0, timer;
-          const show = (n) => {
-            cur = (n + slides.length) % slides.length;
-            slides.forEach((s, i) => s.classList.toggle('on', i === cur));
-            dots.forEach((d, i) => d.classList.toggle('on', i === cur));
-          };
-          const start = () => { clearInterval(timer); timer = setInterval(() => show(cur + 1), 6500); };
-          dots.forEach((d, i) => d.addEventListener('click', () => { show(i); start(); }));
-          const banner = sec.querySelector('.nw-banner');
-          ['mouseenter', 'touchstart'].forEach((ev) => banner.addEventListener(ev, () => clearInterval(timer), { passive: true }));
-          ['mouseleave', 'touchend'].forEach((ev) => banner.addEventListener(ev, start, { passive: true }));
-          start();
-        }
+        const target = document.querySelector('.cta-final') || document.querySelector('footer');
+        if (target && target.parentNode) target.parentNode.insertBefore(sec, target);
+        else document.body.appendChild(sec);
       })
       .catch(() => {});
   }
