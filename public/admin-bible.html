@@ -56,7 +56,7 @@
   <div id="admin-area" class="hidden">
     <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:16px;">← Panneau admin</a>
     <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Bible — version « Parole pure »</h1>
-    <p style="color:var(--ink-soft);margin-bottom:24px;">Mettez la Bible en ligne livre par livre. Le texte est conservé tel quel ; il n'est jamais modifié.</p>
+    <p style="color:var(--ink-soft);margin-bottom:24px;">Mettez la Bible en ligne chapitre par chapitre. Le texte des versets est conservé tel quel ; il n'est jamais modifié.</p>
 
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
@@ -67,7 +67,7 @@
 
     <div class="panel">
       <h2 style="margin-bottom:6px;">Publier un livre</h2>
-      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;">Choisissez le fichier du livre (Word <b>.docx</b>, <b>.txt</b>, ou texte collé) : le site reconnaît le livre, les chapitres et les versets tout seul. Vérifiez l'aperçu, puis publiez. Pour corriger un livre déjà en ligne, republiez-le : il est mis à jour sans effacer les favoris des lecteurs.</p>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;">Choisissez le fichier d'un chapitre (Word <b>.docx</b>, <b>.txt</b>, ou texte collé) : le site reconnaît le livre, le chapitre, les versets et les <b>commentaires</b>, et place chaque commentaire au bon endroit. Vérifiez l'aperçu, puis publiez. Les autres chapitres du livre ne sont jamais touchés ; republier un chapitre le met à jour sans effacer les favoris des lecteurs.</p>
       <div id="msg-box"></div>
 
       <div class="field"><label>Fichier du livre (Word .docx ou .txt)</label><input type="file" id="f-file"></div>
@@ -83,7 +83,10 @@
           <select id="f-testament"><option value="ancien">Ancien Testament</option><option value="nouveau">Nouveau Testament</option></select>
         </div>
       </div>
-      <div class="field" style="max-width:260px;"><label>Ordre dans la Bible</label><input type="number" id="f-order"></div>
+      <div class="row2">
+        <div class="field"><label>Numéro du chapitre</label><input type="number" id="f-chapter" min="1" placeholder="reconnu dans le fichier si possible"></div>
+        <div class="field"><label>Ordre du livre dans la Bible</label><input type="number" id="f-order"></div>
+      </div>
 
       <details style="margin-bottom:16px;font-size:13.5px;color:var(--ink-soft);">
         <summary style="cursor:pointer;font-weight:600;">Comment préparer le texte ?</summary>
@@ -91,6 +94,8 @@
           <li>Le site reconnaît : « Chapitre 1 », « Psaume 23 », « Genèse 1 », ou la numérotation qui repart à 1.</li>
           <li>Les versets : « 1 Au commencement… », un verset par ligne ou plusieurs dans un paragraphe ; numéros seuls sur leur ligne, en exposant, ou numérotation automatique de Word : tout est reconnu.</li>
           <li>Un intertitre (sans numéro) placé avant un verset est conservé au-dessus de ce verset.</li>
+          <li><b>Lettres de renvoi</b> (a, b, c… en exposant ou en petit dans un verset) : elles ne se mélangent plus au texte ; elles sont reliées au commentaire de même lettre (« a. … », « a) … », « 1a : … » ou note de bas de page Word).</li>
+          <li><b>Commentaires</b> reconnus : un paragraphe qui commence par « Commentaire », « Note », « Remarque »… ou par une référence (« v. 3 : », « Versets 3-5 », « 3-5 : »), un paragraphe en italique, encadré, en zone de texte ou de style « Commentaire », une rubrique « Commentaires » en fin de chapitre, et les commentaires Word. Ils sont placés <b>après le verset cité</b> dans le document, sinon après le verset qui les précède.</li>
           <li>Les anciens fichiers Word <b>.doc</b> ne sont pas lisibles : enregistrez-les en <b>.docx</b>.</li>
         </ul>
       </details>
@@ -185,7 +190,20 @@ function initForm() {
     resetPreview();
   });
   ['f-file', 'f-text'].forEach((id) => $(id).addEventListener('input', resetPreview));
-  $('f-file').addEventListener('change', () => { resetPreview(); if ($('f-file').files[0]) $('btn-preview').click(); }); // l'aperçu se lance tout seul
+  $('f-file').addEventListener('change', () => {
+    resetPreview();
+    const f = $('f-file').files[0];
+    if (f) {
+      const m = f.name.replace(/\.[a-z0-9]+$/i, '').match(/(\d{1,3})(?!.*\d)/); // « Genèse 3.docx » → 3
+      if (m && !$('f-chapter').value) $('f-chapter').value = m[1];
+      $('btn-preview').click(); // l'aperçu se lance tout seul
+    }
+  });
+  let chapTimer = null;
+  $('f-chapter').addEventListener('input', () => {
+    clearTimeout(chapTimer);
+    chapTimer = setTimeout(() => { if ($('f-file').files[0] || $('f-text').value.trim()) $('btn-preview').click(); }, 500);
+  });
 }
 
 function resetPreview() { $('preview-box').innerHTML = ''; $('btn-publish').disabled = true; }
@@ -195,6 +213,7 @@ function buildForm(includeMeta) {
   const file = $('f-file').files[0];
   if (file) fd.append('file', file);
   else fd.append('text', $('f-text').value);
+  fd.append('chapter', $('f-chapter').value.trim());
   if (includeMeta) {
     fd.append('name', $('f-name').value.trim());
     fd.append('abbreviation', $('f-abbr').value.trim());
@@ -229,6 +248,23 @@ function linesRead(d, open) {
     <div class="lines-read">${d.firstLines.map((l) => `<div>${esc(l)}</div>`).join('')}</div></details>`;
 }
 
+function commentsBlock(d) {
+  const cm = d.comments || [];
+  if (!cm.length) return '<p style="font-size:13px;color:var(--ink-soft);">Aucun commentaire détecté dans ce document.</p>';
+  const where = (c) => c.verse_end === 0 ? 'En tête du chapitre'
+    : (c.verse_start === c.verse_end ? `Après le verset ${c.verse_end}` : `Après les versets ${c.verse_start} à ${c.verse_end}`);
+  const how = { document: 'indiqué dans le document', word: 'commentaire Word', note: 'relié à sa lettre dans le verset', position: 'placé après le verset qui le précède', approx: 'verset cité introuvable : placé à la fin', debut: 'avant le premier verset' };
+  return `<h3 style="font-size:15px;margin:14px 0 8px;">💬 ${cm.length} commentaire(s) détecté(s) — voici où ils seront placés</h3>` +
+    cm.map((c) => `<div class="sample"><b>${c.letter ? `Note « ${esc(c.letter)} » — ` : ''}${where(c)}</b> <span style="font-size:12px;color:var(--ink-soft);">(${how[c.how] || c.how})</span><br>${c.title ? `<i>${esc(c.title)}</i> — ` : ''}${esc(c.text)}${c.text.length >= 220 ? '…' : ''}</div>`).join('');
+}
+
+function notesBlock(d) {
+  const ns = d.notes || [];
+  if (!ns.length) return '';
+  const ok = ns.filter((n) => n.matched).length;
+  return `<div class="msg ${ok === ns.length ? 'success' : 'warn'}">🔤 <b>${ns.length} lettre(s) de renvoi</b> repérée(s) dans les versets (${ns.map((n) => `${esc(n.letter)} → v.${n.verse}${n.matched ? '' : ' ⚠'}`).join(', ')}). ${ok === ns.length ? 'Chacune est reliée à son commentaire.' : 'Les lettres marquées ⚠ n\'ont pas de commentaire.'}</div>`;
+}
+
 function renderPreview(d) {
   // Le livre est reconnu tout seul d'après le début du fichier, tant que vous n'en avez pas choisi un vous-même
   let recognised = '';
@@ -246,12 +282,15 @@ function renderPreview(d) {
     return;
   }
 
-  const blocking = d.duplicates > 0;
+  const blocking = d.duplicates > 0 || d.chapterAssumed;
   $('preview-box').innerHTML = `${recognised}
     <div class="msg ${blocking ? 'error' : 'success'}"><b>${d.chapters.length} chapitre(s)</b> et <b>${d.totalVerses} verset(s)</b> détectés.</div>
+    ${d.chapterAssumed ? '<div class="msg error"><b>Quel chapitre est-ce ?</b> Le numéro du chapitre n\'est pas écrit dans le fichier : indiquez-le dans la case « Numéro du chapitre » ci-dessus (l\'aperçu se rafraîchit tout seul).</div>' : ''}
     ${d.warnings.length ? `<div class="msg warn"><b>À vérifier :</b><ul style="margin:6px 0 0 18px;">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div class="chips">${d.chapters.map((c) => `<span class="chip">Ch. ${c.chapter} : ${c.count}</span>`).join('')}</div>
     ${sample('Début', d.sampleStart)}${sample('Fin', d.sampleEnd)}
+    ${notesBlock(d)}
+    ${commentsBlock(d)}
     ${linesRead(d, false)}
     <p style="font-size:13px;color:var(--ink-soft);">Vérifiez que les premiers et derniers versets sont corrects, puis publiez.</p>`;
   $('btn-publish').disabled = blocking;
@@ -266,7 +305,7 @@ $('btn-publish').addEventListener('click', async () => {
     const d = await readJson(r);
     if (!r.ok) { showMsg(esc(d.message || 'Erreur'), 'error'); $('btn-publish').disabled = false; return; }
     showMsg(esc(d.message), 'success');
-    $('f-file').value = ''; $('f-text').value = ''; $('f-canon').value = ''; $('f-name').value = ''; $('f-abbr').value = ''; $('f-order').value = '';
+    $('f-file').value = ''; $('f-text').value = ''; $('f-chapter').value = ''; // le livre reste choisi : on enchaîne avec le chapitre suivant
     $('preview-box').innerHTML = '';
     loadBooks();
   } catch (e) { showMsg('Le serveur ne répond pas. Patientez quelques secondes, puis réessayez.', 'error'); $('btn-publish').disabled = false; }
