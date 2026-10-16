@@ -2,9 +2,33 @@ const express = require('express');
 const multer = require('multer');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
-const { docxToRawLines, parseBible, sniffFormat } = require('../lib/bible-parse');
+const { docxToBlocks, parseBibleDocument, parseBibleText, sniffFormat } = require('../lib/bible-parse');
 
 const router = express.Router();
+
+// Commentaires des chapitres (créés automatiquement à la première utilisation)
+let schemaReady = null;
+function ensureSchema() {
+  if (!schemaReady) {
+    schemaReady = pool.query(`
+      CREATE TABLE IF NOT EXISTS bible_comments (
+        id SERIAL PRIMARY KEY,
+        book_id INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        verse_start INTEGER NOT NULL DEFAULT 0,
+        verse_end INTEGER NOT NULL DEFAULT 0,
+        title TEXT,
+        body TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_bible_comments_chapter ON bible_comments(book_id, chapter);
+      ALTER TABLE bible_comments ADD COLUMN IF NOT EXISTS letter TEXT;
+      ALTER TABLE bible_verses ADD COLUMN IF NOT EXISTS notes JSONB;
+    `).catch((err) => { schemaReady = null; throw err; });
+  }
+  return schemaReady;
+}
+ensureSchema().catch((err) => console.error('Table des commentaires de la Bible :', err.message));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25 Mo max
 
 // Téléversement avec un vrai message d'erreur lisible (au lieu d'une page d'erreur illisible)
@@ -22,29 +46,47 @@ function uploadOne(req, res, next) {
 const admin = express.Router();
 admin.use(requireAuth, requireAdmin);
 
-// Lit le texte reçu (fichier ou texte collé). Le type du fichier est reconnu d'après son contenu,
-// pas d'après son nom : sur téléphone, le nom reçu n'a parfois pas d'extension.
-async function linesFromRequest(req) {
+// Lit le texte reçu (fichier ou texte collé) et le découpe en versets et commentaires. Le type du fichier est
+// reconnu d'après son contenu, pas d'après son nom : sur téléphone, le nom reçu n'a parfois pas d'extension.
+async function analyseRequest(req) {
+  let parsed, lines;
   if (req.file) {
     const kind = sniffFormat(req.file.buffer);
     if (kind === 'empty') throw new Error('Le fichier reçu est vide. Choisissez-le de nouveau.');
     if (kind === 'text') {
       let text = req.file.buffer.toString('utf8');
       if (text.includes('\ufffd')) text = req.file.buffer.toString('latin1'); // fichier .txt ancien (Windows-1252)
-      return text.replace(/^\ufeff/, '').split(/\r?\n/);
+      lines = text.replace(/^\ufeff/, '').split(/\r?\n/);
+      parsed = parseBibleText(lines);
+    } else {
+      const { blocks, natives, noteDefs } = await docxToBlocks(req.file.buffer); // .docx, ou message clair pour .doc / PDF / autre
+      lines = [];
+      blocks.forEach((b) => b.text.split('\n').forEach((l) => lines.push(l)));
+      parsed = parseBibleDocument(blocks, natives, noteDefs);
     }
-    return docxToRawLines(req.file.buffer); // .docx, ou message clair pour .doc / PDF / autre
+  } else {
+    const text = String((req.body && req.body.text) || '');
+    if (!text.trim()) throw new Error('Aucun texte reçu : choisissez un fichier ou collez le texte.');
+    lines = text.split(/\r?\n/);
+    parsed = parseBibleText(lines);
   }
-  const text = String((req.body && req.body.text) || '');
-  if (!text.trim()) throw new Error('Aucun texte reçu : choisissez un fichier ou collez le texte.');
-  return text.split(/\r?\n/);
+  // Un fichier = un chapitre : le numéro indiqué dans le formulaire remplace celui du fichier
+  const wanted = parseInt(req.body && req.body.chapter, 10);
+  if (wanted > 0 && parsed.chapters.length === 1) {
+    const from = parsed.chapters[0].chapter;
+    parsed.chapters[0].chapter = wanted;
+    parsed.comments.forEach((c) => { if (c.chapter === from) c.chapter = wanted; });
+    parsed.chapterAssumed = false;
+    parsed.warnings = parsed.warnings.filter((w) => !/chapitre 1 supposé/.test(w));
+  }
+  const nonEmpty = lines.map((l) => String(l).replace(/⟦#([^⟧]+)⟧/g, '[$1]').replace(/⟦(\d+)⟧/g, '$1 ').trim()).filter(Boolean);
+  return { parsed, linesRead: nonEmpty.length, firstLines: nonEmpty.slice(0, 8).map((l) => l.slice(0, 140)) };
 }
 
 // Aperçu : analyse le texte sans rien enregistrer
 admin.post('/preview', uploadOne, async (req, res) => {
   try {
-    const lines = await linesFromRequest(req);
-    const parsed = parseBible(lines);
+    const { parsed, linesRead, firstLines } = await analyseRequest(req);
     const chapters = parsed.chapters.map((c) => ({ chapter: c.chapter, count: c.verses.length }));
     const first = parsed.chapters[0];
     const lastCh = parsed.chapters[parsed.chapters.length - 1];
@@ -53,11 +95,17 @@ admin.post('/preview', uploadOne, async (req, res) => {
       duplicates: parsed.duplicates,
       warnings: parsed.warnings,
       chapters,
+      chapterAssumed: !!parsed.chapterAssumed,
       sampleStart: first ? { chapter: first.chapter, verses: first.verses.slice(0, 3) } : null,
       sampleEnd: lastCh ? { chapter: lastCh.chapter, verses: lastCh.verses.slice(-2) } : null,
+      notes: parsed.notes || [],
+      comments: parsed.comments.map((c) => ({
+        chapter: c.chapter, verse_start: c.verse_start, verse_end: c.verse_end, title: c.title || null, letter: c.letter || null, how: c.how,
+        paragraphs: c.paragraphs.length, text: c.paragraphs.join(' ').slice(0, 220),
+      })),
       // Début du fichier tel que le site le lit : sert à reconnaître le livre et à comprendre un refus
-      linesRead: lines.filter((l) => String(l).trim()).length,
-      firstLines: lines.map((l) => String(l).trim()).filter(Boolean).slice(0, 8).map((l) => l.slice(0, 140)),
+      linesRead,
+      firstLines,
     });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -75,11 +123,13 @@ admin.post('/books', uploadOne, async (req, res) => {
 
   let parsed;
   try {
-    parsed = parseBible(await linesFromRequest(req));
+    await ensureSchema();
+    parsed = (await analyseRequest(req)).parsed;
   } catch (err) {
     return res.status(400).json({ message: err.message });
   }
   if (!parsed.totalVerses) return res.status(400).json({ message: 'Aucun verset détecté : vérifiez le format du texte.' });
+  if (parsed.chapterAssumed) return res.status(400).json({ message: 'Le numéro du chapitre n\'a pas été trouvé dans le fichier : indiquez-le dans la case « Numéro du chapitre » avant de publier (sinon le chapitre 1 serait remplacé).' });
   if (parsed.duplicates > 0) return res.status(400).json({ message: 'Des numéros de versets apparaissent en double : corrigez le texte avant de publier.' });
 
   const client = await pool.connect();
@@ -104,7 +154,7 @@ admin.post('/books', uploadOne, async (req, res) => {
 
     const flat = [];
     for (const c of parsed.chapters) {
-      for (const v of c.verses) flat.push({ chapter: c.chapter, verse: v.verse, text: v.text, heading: v.heading || null });
+      for (const v of c.verses) flat.push({ chapter: c.chapter, verse: v.verse, text: v.text, heading: v.heading || null, notes: JSON.stringify(v.notes || []) });
     }
 
     // Mise à jour / ajout par lots
@@ -113,27 +163,39 @@ admin.post('/books', uploadOne, async (req, res) => {
       const slice = flat.slice(i, i + BATCH);
       const params = [];
       const values = slice.map((v, k) => {
-        params.push(bookId, v.chapter, v.verse, v.text, v.heading);
-        const b = k * 5;
-        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5})`;
+        params.push(bookId, v.chapter, v.verse, v.text, v.heading, v.notes);
+        const b = k * 6;
+        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6}::jsonb)`;
       });
       await client.query(
-        `INSERT INTO bible_verses (book_id, chapter, verse, text, heading) VALUES ${values.join(',')}
-         ON CONFLICT (book_id, chapter, verse) DO UPDATE SET text = EXCLUDED.text, heading = EXCLUDED.heading`,
+        `INSERT INTO bible_verses (book_id, chapter, verse, text, heading, notes) VALUES ${values.join(',')}
+         ON CONFLICT (book_id, chapter, verse) DO UPDATE SET text = EXCLUDED.text, heading = EXCLUDED.heading, notes = EXCLUDED.notes`,
         params
       );
     }
 
-    // Retire les versets qui ne figurent plus dans le nouveau texte
+    // Retire les versets qui ne figurent plus dans le nouveau texte — uniquement dans les chapitres envoyés
+    // (les autres chapitres du livre ne sont jamais touchés)
+    const chapterNumbers = parsed.chapters.map((c) => c.chapter);
     const keep = new Set(flat.map((v) => `${v.chapter}:${v.verse}`));
-    const old = (await client.query('SELECT id, chapter, verse FROM bible_verses WHERE book_id = $1', [bookId])).rows;
+    const old = (await client.query('SELECT id, chapter, verse FROM bible_verses WHERE book_id = $1 AND chapter = ANY($2::int[])', [bookId, chapterNumbers])).rows;
     const staleIds = old.filter((r) => !keep.has(`${r.chapter}:${r.verse}`)).map((r) => r.id);
     if (staleIds.length) await client.query('DELETE FROM bible_verses WHERE id = ANY($1::int[])', [staleIds]);
 
+    // Commentaires de ces chapitres : remplacés par ceux du nouveau fichier
+    await client.query('DELETE FROM bible_comments WHERE book_id = $1 AND chapter = ANY($2::int[])', [bookId, chapterNumbers]);
+    let position = 0;
+    for (const c of parsed.comments) {
+      await client.query(
+        'INSERT INTO bible_comments (book_id, chapter, verse_start, verse_end, title, body, position, letter) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [bookId, c.chapter, c.verse_start, c.verse_end, c.title || null, c.paragraphs.join('\n\n'), position++, c.letter || null]
+      );
+    }
+
     await client.query('COMMIT');
     res.status(201).json({
-      message: `« ${name} » publié : ${parsed.chapters.length} chapitre(s), ${parsed.totalVerses} verset(s).`,
-      id: bookId, chapters: parsed.chapters.length, verses: parsed.totalVerses, removed: staleIds.length,
+      message: `« ${name} » chapitre ${chapterNumbers.join(', ')} publié : ${parsed.totalVerses} verset(s)` + (parsed.comments.length ? ` et ${parsed.comments.length} commentaire(s).` : '.'),
+      id: bookId, chapters: parsed.chapters.length, verses: parsed.totalVerses, comments: parsed.comments.length, removed: staleIds.length,
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -173,6 +235,8 @@ admin.put('/books/:id', async (req, res) => {
 
 admin.delete('/books/:id', async (req, res) => {
   try {
+    await ensureSchema();
+    await pool.query('DELETE FROM bible_comments WHERE book_id = $1', [req.params.id]);
     await pool.query('DELETE FROM bible_books WHERE id = $1', [req.params.id]);
     res.status(204).end();
   } catch (err) {
@@ -242,12 +306,27 @@ router.get('/books/:id/chapters/:n', async (req, res) => {
       'SELECT id, name, abbreviation, testament, book_order FROM bible_books WHERE id = $1 AND published', [req.params.id]
     )).rows[0];
     if (!book || !Number.isInteger(chapter)) return res.status(404).json({ message: 'Chapitre introuvable' });
-    const verses = (await pool.query(
-      'SELECT id, verse, text, heading FROM bible_verses WHERE book_id = $1 AND chapter = $2 ORDER BY verse', [book.id, chapter]
-    )).rows;
+    let verses;
+    try {
+      await ensureSchema();
+      verses = (await pool.query(
+        'SELECT id, verse, text, heading, notes FROM bible_verses WHERE book_id = $1 AND chapter = $2 ORDER BY verse', [book.id, chapter]
+      )).rows;
+    } catch (e) {
+      verses = (await pool.query(
+        'SELECT id, verse, text, heading FROM bible_verses WHERE book_id = $1 AND chapter = $2 ORDER BY verse', [book.id, chapter]
+      )).rows;
+    }
     if (!verses.length) return res.status(404).json({ message: 'Chapitre introuvable' });
     const { prev, next } = await neighbours(book, chapter);
-    res.json({ book: { id: book.id, name: book.name, abbreviation: book.abbreviation }, chapter, verses, prev, next });
+    let comments = [];
+    try {
+      await ensureSchema();
+      comments = (await pool.query(
+        'SELECT id, verse_start, verse_end, title, body, letter FROM bible_comments WHERE book_id = $1 AND chapter = $2 ORDER BY verse_end, position', [book.id, chapter]
+      )).rows;
+    } catch (e) { comments = []; }
+    res.json({ book: { id: book.id, name: book.name, abbreviation: book.abbreviation }, chapter, verses, comments, prev, next });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
