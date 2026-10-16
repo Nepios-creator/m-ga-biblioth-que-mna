@@ -3,6 +3,7 @@ const multer = require('multer');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
 const { docxToBlocks, parseBibleDocument, parseBibleText, sniffFormat } = require('../lib/bible-parse');
+const { parseBibleDocx } = require('../lib/bible-docx');
 
 const router = express.Router();
 
@@ -24,6 +25,13 @@ function ensureSchema() {
       CREATE INDEX IF NOT EXISTS idx_bible_comments_chapter ON bible_comments(book_id, chapter);
       ALTER TABLE bible_comments ADD COLUMN IF NOT EXISTS letter TEXT;
       ALTER TABLE bible_verses ADD COLUMN IF NOT EXISTS notes JSONB;
+      CREATE TABLE IF NOT EXISTS bible_chapters (
+        book_id INTEGER NOT NULL,
+        chapter INTEGER NOT NULL,
+        subtitle TEXT,
+        PRIMARY KEY (book_id, chapter)
+      );
+      ALTER TABLE bible_books ADD COLUMN IF NOT EXISTS full_title TEXT;
     `).catch((err) => { schemaReady = null; throw err; });
   }
   return schemaReady;
@@ -59,10 +67,16 @@ async function analyseRequest(req) {
       lines = text.replace(/^\ufeff/, '').split(/\r?\n/);
       parsed = parseBibleText(lines);
     } else {
-      const { blocks, natives, noteDefs } = await docxToBlocks(req.file.buffer); // .docx, ou message clair pour .doc / PDF / autre
-      lines = [];
-      blocks.forEach((b) => b.text.split('\n').forEach((l) => lines.push(l)));
-      parsed = parseBibleDocument(blocks, natives, noteDefs);
+      // Format « Les Saintes Écritures » (numérotation automatique de Word, notes à lettres…) : lecteur dédié d'abord
+      const dedicated = kind === 'docx' ? await parseBibleDocx(req.file.buffer).catch(() => null) : null;
+      if (dedicated) {
+        parsed = dedicated.parsed; lines = dedicated.lines;
+      } else {
+        const { blocks, natives, noteDefs } = await docxToBlocks(req.file.buffer); // .docx, ou message clair pour .doc / PDF / autre
+        lines = [];
+        blocks.forEach((b) => b.text.split('\n').forEach((l) => lines.push(l)));
+        parsed = parseBibleDocument(blocks, natives, noteDefs);
+      }
     }
   } else {
     const text = String((req.body && req.body.text) || '');
@@ -76,6 +90,7 @@ async function analyseRequest(req) {
     const from = parsed.chapters[0].chapter;
     parsed.chapters[0].chapter = wanted;
     parsed.comments.forEach((c) => { if (c.chapter === from) c.chapter = wanted; });
+    if (parsed.chapterInfo && parsed.chapterInfo[from] && from !== wanted) { parsed.chapterInfo[wanted] = parsed.chapterInfo[from]; delete parsed.chapterInfo[from]; }
     parsed.chapterAssumed = false;
     parsed.warnings = parsed.warnings.filter((w) => !/chapitre 1 supposé/.test(w));
   }
@@ -99,6 +114,10 @@ admin.post('/preview', uploadOne, async (req, res) => {
       sampleStart: first ? { chapter: first.chapter, verses: first.verses.slice(0, 3) } : null,
       sampleEnd: lastCh ? { chapter: lastCh.chapter, verses: lastCh.verses.slice(-2) } : null,
       notes: parsed.notes || [],
+      bookTitle: parsed.bookTitle || null,
+      edition: parsed.edition || [],
+      chapterInfo: parsed.chapterInfo || {},
+      headings: parsed.chapters.reduce((acc, c) => acc.concat(c.verses.filter((v) => v.heading).map((v) => ({ chapter: c.chapter, verse: v.verse, heading: v.heading }))), []),
       comments: parsed.comments.map((c) => ({
         chapter: c.chapter, verse_start: c.verse_start, verse_end: c.verse_end, title: c.title || null, letter: c.letter || null, how: c.how,
         paragraphs: c.paragraphs.length, text: c.paragraphs.join(' ').slice(0, 220),
@@ -136,18 +155,20 @@ admin.post('/books', uploadOne, async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Publier = rendre le livre visible aux lecteurs (même s'il avait été masqué)
+    const fullTitle = parsed.bookTitle || null;
     const existing = (await client.query('SELECT id FROM bible_books WHERE lower(name) = lower($1)', [name])).rows[0];
     let bookId;
     if (existing) {
       bookId = existing.id;
       await client.query(
-        'UPDATE bible_books SET name=$1, abbreviation=$2, testament=$3, book_order=$4 WHERE id=$5',
-        [name, abbreviation, testament, bookOrder, bookId]
+        'UPDATE bible_books SET name=$1, abbreviation=$2, testament=$3, book_order=$4, published=true, full_title=COALESCE($5, full_title) WHERE id=$6',
+        [name, abbreviation, testament, bookOrder, fullTitle, bookId]
       );
     } else {
       const ins = await client.query(
-        'INSERT INTO bible_books (name, abbreviation, testament, book_order, published) VALUES ($1,$2,$3,$4,true) RETURNING id',
-        [name, abbreviation, testament, bookOrder]
+        'INSERT INTO bible_books (name, abbreviation, testament, book_order, published, full_title) VALUES ($1,$2,$3,$4,true,$5) RETURNING id',
+        [name, abbreviation, testament, bookOrder, fullTitle]
       );
       bookId = ins.rows[0].id;
     }
@@ -182,7 +203,15 @@ admin.post('/books', uploadOne, async (req, res) => {
     const staleIds = old.filter((r) => !keep.has(`${r.chapter}:${r.verse}`)).map((r) => r.id);
     if (staleIds.length) await client.query('DELETE FROM bible_verses WHERE id = ANY($1::int[])', [staleIds]);
 
-    // Commentaires de ces chapitres : remplacés par ceux du nouveau fichier
+    // Sous-titre de chaque chapitre envoyé (ex. « Le Logos · La Lumière · Le Témoignage »)
+    await client.query('DELETE FROM bible_chapters WHERE book_id = $1 AND chapter = ANY($2::int[])', [bookId, chapterNumbers]);
+    for (const [ch, info] of Object.entries(parsed.chapterInfo || {})) {
+      if (info && info.subtitle && chapterNumbers.includes(Number(ch))) {
+        await client.query('INSERT INTO bible_chapters (book_id, chapter, subtitle) VALUES ($1,$2,$3)', [bookId, Number(ch), info.subtitle]);
+      }
+    }
+
+    // Commentaires et notes de ces chapitres : remplacés par ceux du nouveau fichier
     await client.query('DELETE FROM bible_comments WHERE book_id = $1 AND chapter = ANY($2::int[])', [bookId, chapterNumbers]);
     let position = 0;
     for (const c of parsed.comments) {
@@ -194,7 +223,7 @@ admin.post('/books', uploadOne, async (req, res) => {
 
     await client.query('COMMIT');
     res.status(201).json({
-      message: `« ${name} » chapitre ${chapterNumbers.join(', ')} publié : ${parsed.totalVerses} verset(s)` + (parsed.comments.length ? ` et ${parsed.comments.length} commentaire(s).` : '.'),
+      message: `« ${name} » chapitre ${chapterNumbers.join(', ')} publié : ${parsed.totalVerses} verset(s)` + (parsed.comments.length ? ` et ${parsed.comments.length} note(s).` : '.'),
       id: bookId, chapters: parsed.chapters.length, verses: parsed.totalVerses, comments: parsed.comments.length, removed: staleIds.length,
     });
   } catch (err) {
@@ -237,6 +266,7 @@ admin.delete('/books/:id', async (req, res) => {
   try {
     await ensureSchema();
     await pool.query('DELETE FROM bible_comments WHERE book_id = $1', [req.params.id]);
+    await pool.query('DELETE FROM bible_chapters WHERE book_id = $1', [req.params.id]);
     await pool.query('DELETE FROM bible_books WHERE id = $1', [req.params.id]);
     res.status(204).end();
   } catch (err) {
@@ -298,17 +328,24 @@ async function neighbours(book, chapter) {
   return { prev, next };
 }
 
-// Un chapitre : versets + chapitres voisins
+// Un chapitre : versets + notes + sous-titre + chapitres voisins
 router.get('/books/:id/chapters/:n', async (req, res) => {
   try {
     const chapter = parseInt(req.params.n, 10);
-    const book = (await pool.query(
-      'SELECT id, name, abbreviation, testament, book_order FROM bible_books WHERE id = $1 AND published', [req.params.id]
-    )).rows[0];
+    await ensureSchema().catch(() => {});
+    let book;
+    try {
+      book = (await pool.query(
+        'SELECT id, name, abbreviation, testament, book_order, full_title FROM bible_books WHERE id = $1 AND published', [req.params.id]
+      )).rows[0];
+    } catch (e) {
+      book = (await pool.query(
+        'SELECT id, name, abbreviation, testament, book_order FROM bible_books WHERE id = $1 AND published', [req.params.id]
+      )).rows[0];
+    }
     if (!book || !Number.isInteger(chapter)) return res.status(404).json({ message: 'Chapitre introuvable' });
     let verses;
     try {
-      await ensureSchema();
       verses = (await pool.query(
         'SELECT id, verse, text, heading, notes FROM bible_verses WHERE book_id = $1 AND chapter = $2 ORDER BY verse', [book.id, chapter]
       )).rows;
@@ -321,12 +358,18 @@ router.get('/books/:id/chapters/:n', async (req, res) => {
     const { prev, next } = await neighbours(book, chapter);
     let comments = [];
     try {
-      await ensureSchema();
       comments = (await pool.query(
         'SELECT id, verse_start, verse_end, title, body, letter FROM bible_comments WHERE book_id = $1 AND chapter = $2 ORDER BY verse_end, position', [book.id, chapter]
       )).rows;
     } catch (e) { comments = []; }
-    res.json({ book: { id: book.id, name: book.name, abbreviation: book.abbreviation }, chapter, verses, comments, prev, next });
+    let chapterInfo = null;
+    try {
+      chapterInfo = (await pool.query('SELECT subtitle FROM bible_chapters WHERE book_id = $1 AND chapter = $2', [book.id, chapter])).rows[0] || null;
+    } catch (e) { chapterInfo = null; }
+    res.json({
+      book: { id: book.id, name: book.name, abbreviation: book.abbreviation, full_title: book.full_title || null },
+      chapter, chapter_info: chapterInfo, verses, comments, prev, next,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
