@@ -268,10 +268,14 @@ function showMsg(text, type) {
 }
 
 async function api(path, opts) {
-  const r = await fetch('/api/actualites/admin' + path, opts);
+  opts = opts || {};
+  const r = await fetch('/api/actualites/admin' + path, { ...opts, headers: { ...AUTH, ...(opts.headers || {}) } });
   let d = null;
   try { d = await r.json(); } catch (e) { /* pas de contenu */ }
-  if (!r.ok) { const err = new Error((d && d.message) || 'Erreur'); err.data = d; err.status = r.status; throw err; }
+  if (!r.ok) {
+    const msg = r.status === 401 ? 'Votre session a expiré : reconnectez-vous puis revenez sur cette page.' : ((d && d.message) || 'Erreur');
+    const err = new Error(msg); err.data = d; err.status = r.status; throw err;
+  }
   return d;
 }
 
