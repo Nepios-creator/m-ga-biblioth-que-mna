@@ -23,7 +23,7 @@ const clip = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
 const isTrue = (v) => v === true || v === 'true' || v === '1' || v === 'on';
 const parseJson = (v, fallback) => { if (typeof v !== 'string') return v == null ? fallback : v; try { return JSON.parse(v); } catch (e) { return fallback; } };
 
-const COVER_SQL = `COALESCE((SELECT '/api/actualites/images/' || i.id FROM news_images i WHERE i.article_id = a.id AND i.is_cover ORDER BY i.id DESC LIMIT 1), a.cover_url)`;
+const COVER_SQL = `COALESCE((SELECT '/api/actualites/images/' || i.id FROM actu_images i WHERE i.article_id = a.id AND i.is_cover ORDER BY i.id DESC LIMIT 1), a.cover_url)`;
 const LIST_COLS = `a.id, a.title, a.summary, a.category, a.region, a.country, a.language, a.source_name, a.featured, a.status, a.origin, a.views,
   COALESCE(a.published_at, a.created_at) AS date, a.created_at, ${COVER_SQL} AS cover`;
 
@@ -85,7 +85,7 @@ async function saveArticle({ id, fields, files = {}, remoteCover, removeImageIds
     let articleId = id;
     if (id) {
       const r = await client.query(
-        `UPDATE news_articles SET title=$1, summary=$2, body_html=$3, category=$4, region=$5, country=$6, language=$7, source_name=$8,
+        `UPDATE actu_articles SET title=$1, summary=$2, body_html=$3, category=$4, region=$5, country=$6, language=$7, source_name=$8,
            source_url=$9, author=$10, published_at=$11, contacts=$12::jsonb, tags=$13, video_url=$14, status=$15, featured=$16, updated_at=now()
          WHERE id=$17 RETURNING id`,
         [f.title, f.summary, f.body_html, f.category, f.region, f.country, f.language, f.source_name, f.source_url, f.author,
@@ -94,7 +94,7 @@ async function saveArticle({ id, fields, files = {}, remoteCover, removeImageIds
       if (!r.rows.length) throw httpError(404, 'Actualité introuvable.');
     } else {
       const r = await client.query(
-        `INSERT INTO news_articles (title, summary, body_html, category, region, country, language, source_name, source_url, author,
+        `INSERT INTO actu_articles (title, summary, body_html, category, region, country, language, source_name, source_url, author,
            published_at, contacts, tags, video_url, status, featured, origin, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16,$17,$18) RETURNING id`,
         [f.title, f.summary, f.body_html, f.category, f.region, f.country, f.language, f.source_name, f.source_url, f.author,
@@ -104,31 +104,31 @@ async function saveArticle({ id, fields, files = {}, remoteCover, removeImageIds
     }
 
     if (removeCover) {
-      await client.query('DELETE FROM news_images WHERE article_id = $1 AND is_cover', [articleId]);
-      await client.query('UPDATE news_articles SET cover_url = NULL WHERE id = $1', [articleId]);
+      await client.query('DELETE FROM actu_images WHERE article_id = $1 AND is_cover', [articleId]);
+      await client.query('UPDATE actu_articles SET cover_url = NULL WHERE id = $1', [articleId]);
     }
     if (cover) {
-      await client.query('DELETE FROM news_images WHERE article_id = $1 AND is_cover', [articleId]);
-      await client.query('INSERT INTO news_images (article_id, mime, data, is_cover) VALUES ($1,$2,$3,true)', [articleId, cover.mime, cover.buffer]);
-      await client.query('UPDATE news_articles SET cover_url = NULL WHERE id = $1', [articleId]);
+      await client.query('DELETE FROM actu_images WHERE article_id = $1 AND is_cover', [articleId]);
+      await client.query('INSERT INTO actu_images (article_id, mime, data, is_cover) VALUES ($1,$2,$3,true)', [articleId, cover.mime, cover.buffer]);
+      await client.query('UPDATE actu_articles SET cover_url = NULL WHERE id = $1', [articleId]);
     } else if (fallbackCoverUrl) {
-      await client.query('UPDATE news_articles SET cover_url = $2 WHERE id = $1', [articleId, fallbackCoverUrl]);
+      await client.query('UPDATE actu_articles SET cover_url = $2 WHERE id = $1', [articleId, fallbackCoverUrl]);
     }
 
     const ids = removeImageIds.map(Number).filter(Number.isInteger);
-    if (ids.length) await client.query('DELETE FROM news_images WHERE article_id = $1 AND NOT is_cover AND id = ANY($2::int[])', [articleId, ids]);
+    if (ids.length) await client.query('DELETE FROM actu_images WHERE article_id = $1 AND NOT is_cover AND id = ANY($2::int[])', [articleId, ids]);
     const gallery = files.images || [];
     if (gallery.length) {
-      const pos = (await client.query('SELECT COALESCE(max(position), 0)::int AS p FROM news_images WHERE article_id = $1', [articleId])).rows[0].p;
+      const pos = (await client.query('SELECT COALESCE(max(position), 0)::int AS p FROM actu_images WHERE article_id = $1', [articleId])).rows[0].p;
       for (let i = 0; i < gallery.length; i++) {
         await client.query(
-          'INSERT INTO news_images (article_id, mime, data, caption, position) VALUES ($1,$2,$3,$4,$5)',
+          'INSERT INTO actu_images (article_id, mime, data, caption, position) VALUES ($1,$2,$3,$4,$5)',
           [articleId, gallery[i].mimetype, gallery[i].buffer, clip(captions[i], 200) || null, pos + i + 1]
         );
       }
     }
     if (suggestionId) {
-      await client.query("UPDATE news_suggestions SET status = 'validee', article_id = $1 WHERE id = $2", [articleId, suggestionId]);
+      await client.query("UPDATE actu_suggestions SET status = 'validee', article_id = $1 WHERE id = $2", [articleId, suggestionId]);
     }
     await client.query('COMMIT');
     return articleId;
@@ -161,7 +161,7 @@ module.exports = function buildRouter(express) {
   admin.use(requireAuth, requireAdmin);
 
   admin.get('/status', wrap(async (req, res) => {
-    const pending = (await pool.query("SELECT count(*)::int AS n FROM news_suggestions WHERE status = 'nouvelle'")).rows[0].n;
+    const pending = (await pool.query("SELECT count(*)::int AS n FROM actu_suggestions WHERE status = 'nouvelle'")).rows[0].n;
     res.json({ last_fetch_at: await getMeta('last_fetch_at'), pending, translation: !!process.env.MISTRAL_API_KEY, categories: CATEGORIES.map(([key, label]) => ({ key, label })), regions: REGIONS });
   }));
 
@@ -172,15 +172,15 @@ module.exports = function buildRouter(express) {
     const q = String(req.query.q || '').trim();
     if (q.length >= 2) { params.push('%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%'); where.push(`(a.title ILIKE $${params.length} OR a.source_name ILIKE $${params.length})`); }
     const rows = (await pool.query(
-      `SELECT ${LIST_COLS} FROM news_articles a ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.created_at DESC LIMIT 200`, params
+      `SELECT ${LIST_COLS} FROM actu_articles a ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.created_at DESC LIMIT 200`, params
     )).rows;
     res.json(rows);
   }));
 
   admin.get('/articles/:id(\\d+)', wrap(async (req, res) => {
-    const a = (await pool.query(`SELECT a.*, ${COVER_SQL} AS cover FROM news_articles a WHERE a.id = $1`, [req.params.id])).rows[0];
+    const a = (await pool.query(`SELECT a.*, ${COVER_SQL} AS cover FROM actu_articles a WHERE a.id = $1`, [req.params.id])).rows[0];
     if (!a) throw httpError(404, 'Actualité introuvable.');
-    a.images = (await pool.query('SELECT id, caption FROM news_images WHERE article_id = $1 AND NOT is_cover ORDER BY position, id', [a.id])).rows;
+    a.images = (await pool.query('SELECT id, caption FROM actu_images WHERE article_id = $1 AND NOT is_cover ORDER BY position, id', [a.id])).rows;
     res.json(a);
   }));
 
@@ -212,13 +212,13 @@ module.exports = function buildRouter(express) {
     if (['publie', 'brouillon'].includes(req.body.status)) { params.push(req.body.status); sets.push(`status = $${params.length}`); }
     if (typeof req.body.featured === 'boolean') { params.push(req.body.featured); sets.push(`featured = $${params.length}`); }
     if (!sets.length) throw httpError(400, 'Rien à modifier.');
-    const r = await pool.query(`UPDATE news_articles SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 RETURNING id, status, featured`, params);
+    const r = await pool.query(`UPDATE actu_articles SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 RETURNING id, status, featured`, params);
     if (!r.rows.length) throw httpError(404, 'Actualité introuvable.');
     res.json(r.rows[0]);
   }));
 
   admin.delete('/articles/:id(\\d+)', wrap(async (req, res) => {
-    await pool.query('DELETE FROM news_articles WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM actu_articles WHERE id = $1', [req.params.id]);
     res.status(204).end();
   }));
 
@@ -228,7 +228,7 @@ module.exports = function buildRouter(express) {
     if (!/^https?:\/\//i.test(url)) throw httpError(400, 'Collez un lien complet, commençant par https://');
     let draft;
     try { draft = await extractFromUrl(url); } catch (e) { throw httpError(422, e.message); }
-    const dup = (await pool.query('SELECT id FROM news_articles WHERE source_url = $1 LIMIT 1', [draft.source_url])).rows[0];
+    const dup = (await pool.query('SELECT id FROM actu_articles WHERE source_url = $1 LIMIT 1', [draft.source_url])).rows[0];
     draft.category = guessCategory(draft.title + ' ' + draft.summary, 'eglise');
     draft.existing_id = dup ? dup.id : null;
 
@@ -247,7 +247,7 @@ module.exports = function buildRouter(express) {
   admin.get('/suggestions', wrap(async (req, res) => {
     const status = ['nouvelle', 'validee', 'rejetee'].includes(req.query.status) ? req.query.status : 'nouvelle';
     const rows = (await pool.query(
-      'SELECT * FROM news_suggestions WHERE status = $1 ORDER BY created_at DESC, published_at DESC NULLS LAST LIMIT 120', [status]
+      'SELECT * FROM actu_suggestions WHERE status = $1 ORDER BY created_at DESC, published_at DESC NULLS LAST LIMIT 120', [status]
     )).rows;
     res.json(rows);
   }));
@@ -275,14 +275,14 @@ module.exports = function buildRouter(express) {
 
   // Ouvre la proposition dans l'éditeur (pour la modifier avant publication)
   admin.post('/suggestions/:id(\\d+)/prepare', wrap(async (req, res) => {
-    const s = (await pool.query('SELECT * FROM news_suggestions WHERE id = $1', [req.params.id])).rows[0];
+    const s = (await pool.query('SELECT * FROM actu_suggestions WHERE id = $1', [req.params.id])).rows[0];
     if (!s) throw httpError(404, 'Proposition introuvable.');
     res.json({ draft: await suggestionDraft(s) });
   }));
 
   // Valide la proposition telle quelle et la publie
   admin.post('/suggestions/:id(\\d+)/publish', wrap(async (req, res) => {
-    const s = (await pool.query('SELECT * FROM news_suggestions WHERE id = $1', [req.params.id])).rows[0];
+    const s = (await pool.query('SELECT * FROM actu_suggestions WHERE id = $1', [req.params.id])).rows[0];
     if (!s) throw httpError(404, 'Proposition introuvable.');
     if (s.status === 'validee') throw httpError(409, 'Cette proposition a déjà été publiée.');
     const draft = await suggestionDraft(s);
@@ -294,7 +294,7 @@ module.exports = function buildRouter(express) {
   }));
 
   admin.post('/suggestions/:id(\\d+)/reject', wrap(async (req, res) => {
-    await pool.query("UPDATE news_suggestions SET status = 'rejetee' WHERE id = $1 AND status = 'nouvelle'", [req.params.id]);
+    await pool.query("UPDATE actu_suggestions SET status = 'rejetee' WHERE id = $1 AND status = 'nouvelle'", [req.params.id]);
     res.json({ ok: true });
   }));
 
@@ -306,7 +306,7 @@ module.exports = function buildRouter(express) {
 
   // ----- Sources officielles -----
   admin.get('/sources', wrap(async (req, res) => {
-    res.json((await pool.query('SELECT * FROM news_sources ORDER BY id')).rows);
+    res.json((await pool.query('SELECT * FROM actu_sources ORDER BY id')).rows);
   }));
 
   admin.post('/sources', wrap(async (req, res) => {
@@ -316,7 +316,7 @@ module.exports = function buildRouter(express) {
     if (!name || !site) throw httpError(400, 'Indiquez le nom et l\'adresse du site (https://…).');
     const feed = /^https?:\/\//i.test(b.feed_url || '') ? safeUrl(b.feed_url) : null;
     const r = await pool.query(
-      'INSERT INTO news_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      'INSERT INTO actu_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
       [name, site, feed || null, /^[a-z]{2}$/.test(b.language || '') ? b.language : 'fr', clip(b.region, 60) || 'Monde', CAT_KEYS.has(b.category) ? b.category : 'eglise']
     );
     res.status(201).json(r.rows[0]);
@@ -330,13 +330,13 @@ module.exports = function buildRouter(express) {
     if (req.body.feed_url !== undefined) set('feed_url', /^https?:\/\//i.test(req.body.feed_url) ? safeUrl(req.body.feed_url) || null : null);
     if (req.body.name) set('name', clip(req.body.name, 120));
     if (!sets.length) throw httpError(400, 'Rien à modifier.');
-    const r = await pool.query(`UPDATE news_sources SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+    const r = await pool.query(`UPDATE actu_sources SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
     if (!r.rows.length) throw httpError(404, 'Source introuvable.');
     res.json(r.rows[0]);
   }));
 
   admin.delete('/sources/:id(\\d+)', wrap(async (req, res) => {
-    await pool.query('DELETE FROM news_sources WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM actu_sources WHERE id = $1', [req.params.id]);
     res.status(204).end();
   }));
 
@@ -352,9 +352,9 @@ module.exports = function buildRouter(express) {
   //  PUBLIC (aucune connexion nécessaire)
   // =====================================================================
   router.get('/meta', wrap(async (req, res) => {
-    const cats = (await pool.query("SELECT category, count(*)::int AS n FROM news_articles WHERE status = 'publie' GROUP BY category")).rows;
-    const regions = (await pool.query("SELECT region AS name, count(*)::int AS n FROM news_articles WHERE status = 'publie' AND region IS NOT NULL GROUP BY region ORDER BY n DESC")).rows;
-    const langs = (await pool.query("SELECT language AS code, count(*)::int AS n FROM news_articles WHERE status = 'publie' GROUP BY language ORDER BY n DESC")).rows;
+    const cats = (await pool.query("SELECT category, count(*)::int AS n FROM actu_articles WHERE status = 'publie' GROUP BY category")).rows;
+    const regions = (await pool.query("SELECT region AS name, count(*)::int AS n FROM actu_articles WHERE status = 'publie' AND region IS NOT NULL GROUP BY region ORDER BY n DESC")).rows;
+    const langs = (await pool.query("SELECT language AS code, count(*)::int AS n FROM actu_articles WHERE status = 'publie' GROUP BY language ORDER BY n DESC")).rows;
     const byCat = Object.fromEntries(cats.map((c) => [c.category, c.n]));
     res.header('Cache-Control', 'no-cache');
     res.json({ categories: CATEGORIES.map(([key, label]) => ({ key, label, count: byCat[key] || 0 })), regions, languages: langs });
@@ -375,16 +375,16 @@ module.exports = function buildRouter(express) {
       where.push(`(a.title ILIKE $${n} OR a.summary ILIKE $${n} OR a.source_name ILIKE $${n} OR a.country ILIKE $${n} OR array_to_string(a.tags, ' ') ILIKE $${n})`);
     }
     const w = where.join(' AND ');
-    const total = (await pool.query(`SELECT count(*)::int AS n FROM news_articles a WHERE ${w}`, params)).rows[0].n;
+    const total = (await pool.query(`SELECT count(*)::int AS n FROM actu_articles a WHERE ${w}`, params)).rows[0].n;
     params.push(limit, (page - 1) * limit);
     const items = (await pool.query(
-      `SELECT ${LIST_COLS} FROM news_articles a WHERE ${w} ORDER BY a.created_at DESC, a.id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params
+      `SELECT ${LIST_COLS} FROM actu_articles a WHERE ${w} ORDER BY a.created_at DESC, a.id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params
     )).rows;
     res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
   }));
 
   router.get('/images/:id(\\d+)', wrap(async (req, res) => {
-    const img = (await pool.query('SELECT mime, data FROM news_images WHERE id = $1', [req.params.id])).rows[0];
+    const img = (await pool.query('SELECT mime, data FROM actu_images WHERE id = $1', [req.params.id])).rows[0];
     if (!img) return res.status(404).end();
     res.setHeader('Content-Type', img.mime);
     res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
@@ -396,17 +396,17 @@ module.exports = function buildRouter(express) {
     const a = (await pool.query(
       `SELECT a.id, a.title, a.summary, a.body_html, a.category, a.region, a.country, a.language, a.source_name, a.source_url, a.author,
               a.contacts, a.tags, a.video_url, a.featured, a.views, COALESCE(a.published_at, a.created_at) AS date, ${COVER_SQL} AS cover
-       FROM news_articles a WHERE a.id = $1 AND a.status = 'publie'`, [req.params.id]
+       FROM actu_articles a WHERE a.id = $1 AND a.status = 'publie'`, [req.params.id]
     )).rows[0];
     if (!a) throw httpError(404, 'Cette actualité n\'existe pas ou n\'est plus en ligne.');
     a.body_html = sanitizeHtml(a.body_html);
-    a.images = (await pool.query('SELECT id, caption FROM news_images WHERE article_id = $1 AND NOT is_cover ORDER BY position, id', [a.id])).rows;
+    a.images = (await pool.query('SELECT id, caption FROM actu_images WHERE article_id = $1 AND NOT is_cover ORDER BY position, id', [a.id])).rows;
     a.video_embed = a.video_url ? videoEmbed(a.video_url) : null;
     a.related = (await pool.query(
-      `SELECT ${LIST_COLS} FROM news_articles a WHERE a.status = 'publie' AND a.id <> $1 AND (a.category = $2 OR (a.region IS NOT NULL AND a.region = $3))
+      `SELECT ${LIST_COLS} FROM actu_articles a WHERE a.status = 'publie' AND a.id <> $1 AND (a.category = $2 OR (a.region IS NOT NULL AND a.region = $3))
        ORDER BY a.created_at DESC LIMIT 3`, [a.id, a.category, a.region]
     )).rows;
-    pool.query('UPDATE news_articles SET views = views + 1 WHERE id = $1', [a.id]).catch(() => {});
+    pool.query('UPDATE actu_articles SET views = views + 1 WHERE id = $1', [a.id]).catch(() => {});
     res.json(a);
   }));
 

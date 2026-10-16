@@ -30,7 +30,7 @@ const DEFAULT_SOURCES = [
 
 async function ensureSchema() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS news_articles (
+    CREATE TABLE IF NOT EXISTS actu_articles (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       summary TEXT,
@@ -55,12 +55,12 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_articles_status_date_idx ON news_articles (status, created_at DESC);
-    CREATE INDEX IF NOT EXISTS news_articles_source_url_idx ON news_articles (source_url);
+    CREATE INDEX IF NOT EXISTS actu_articles_status_date_idx ON actu_articles (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS actu_articles_source_url_idx ON actu_articles (source_url);
 
-    CREATE TABLE IF NOT EXISTS news_images (
+    CREATE TABLE IF NOT EXISTS actu_images (
       id SERIAL PRIMARY KEY,
-      article_id INTEGER NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
+      article_id INTEGER NOT NULL REFERENCES actu_articles(id) ON DELETE CASCADE,
       mime TEXT NOT NULL,
       data BYTEA NOT NULL,
       caption TEXT,
@@ -68,9 +68,9 @@ async function ensureSchema() {
       position INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_images_article_idx ON news_images (article_id);
+    CREATE INDEX IF NOT EXISTS actu_images_article_idx ON actu_images (article_id);
 
-    CREATE TABLE IF NOT EXISTS news_sources (
+    CREATE TABLE IF NOT EXISTS actu_sources (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       site_url TEXT NOT NULL,
@@ -85,9 +85,9 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS news_suggestions (
+    CREATE TABLE IF NOT EXISTS actu_suggestions (
       id SERIAL PRIMARY KEY,
-      source_id INTEGER REFERENCES news_sources(id) ON DELETE SET NULL,
+      source_id INTEGER REFERENCES actu_sources(id) ON DELETE SET NULL,
       source_name TEXT,
       title TEXT NOT NULL,
       summary TEXT,
@@ -101,19 +101,19 @@ async function ensureSchema() {
       article_id INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS news_suggestions_status_idx ON news_suggestions (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS actu_suggestions_status_idx ON actu_suggestions (status, created_at DESC);
 
-    CREATE TABLE IF NOT EXISTS news_meta (
+    CREATE TABLE IF NOT EXISTS actu_meta (
       key TEXT PRIMARY KEY,
       value TEXT
     );
   `);
 
-  const { rows } = await pool.query('SELECT count(*)::int AS n FROM news_sources');
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM actu_sources');
   if (rows[0].n === 0) {
     for (const s of DEFAULT_SOURCES) {
       await pool.query(
-        'INSERT INTO news_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6)',
+        'INSERT INTO actu_sources (name, site_url, feed_url, language, region, category) VALUES ($1,$2,$3,$4,$5,$6)',
         [s.name, s.site_url, s.feed_url, s.language, s.region, s.category]
       );
     }
