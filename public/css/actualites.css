@@ -1,0 +1,85 @@
+/* Espace « Actualités chrétiennes » — utilise les couleurs et polices du site (style.css) */
+.nw-wrap { max-width: 1100px; margin: 0 auto; padding: 30px 24px 80px; }
+.nw-back { display: inline-block; font-size: 14px; font-weight: 600; color: var(--ink-soft); margin-bottom: 18px; }
+.nw-back:hover { color: var(--gold-deep); }
+
+/* Recherche et filtres */
+.nw-search { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.nw-search input, .nw-search select { padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
+.nw-search input { flex: 1; min-width: 200px; }
+.nw-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 22px; scrollbar-width: thin; }
+.nw-chip { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.nw-chip small { opacity: 0.7; font-weight: 500; margin-left: 4px; }
+.nw-chip:hover { border-color: var(--gold); }
+.nw-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* À la une */
+.nw-hero { display: grid; grid-template-columns: 1.4fr 1fr; background: var(--bg); color: #f4ede0; border-radius: 20px; overflow: hidden; margin-bottom: 30px; }
+.nw-hero .img { background: linear-gradient(160deg, var(--gold), var(--gold-deep)) center / cover no-repeat; min-height: 260px; }
+.nw-hero .txt { padding: 30px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+.nw-hero h2 { color: #fbf3e3; font-size: 27px; line-height: 1.25; }
+.nw-hero p { color: #d8cbb0; margin: 0; font-size: 15px; }
+.nw-hero .nw-meta { color: #c9b896; }
+.nw-hero .nw-badge { background: rgba(201, 162, 75, 0.2); color: #e8cf8f; }
+.nw-kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--gold); }
+
+/* Cartes */
+.nw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; }
+.nw-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; transition: box-shadow 0.15s, transform 0.15s; }
+.nw-card:hover { box-shadow: 0 8px 24px rgba(36, 30, 22, 0.1); transform: translateY(-2px); }
+.nw-card .img { aspect-ratio: 16 / 9; background: linear-gradient(160deg, var(--gold), var(--gold-deep)) center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 34px; color: rgba(255, 255, 255, 0.85); }
+.nw-card .body { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.nw-card h3 { font-size: 17.5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.nw-card p { color: var(--ink-soft); font-size: 14px; margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.nw-meta { font-size: 12.5px; color: var(--ink-soft); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.nw-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--blue-deep); background: #e8f1fa; padding: 3px 9px; border-radius: 999px; }
+.nw-empty { background: #fff; border: 1px dashed var(--line); border-radius: var(--radius); padding: 40px 20px; text-align: center; color: var(--ink-soft); }
+.nw-more { display: block; margin: 30px auto 0; border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 12px 28px; font: inherit; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+.nw-more:hover { border-color: var(--gold); }
+
+/* Page d'une actualité */
+.nw-article { max-width: 760px; margin: 0 auto; padding: 28px 24px 80px; }
+.nw-article h1 { font-size: 34px; line-height: 1.2; margin: 12px 0 14px; }
+.nw-lead { font-size: 19px; line-height: 1.6; color: var(--ink-soft); margin: 0 0 18px; }
+.nw-byline { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; color: var(--ink-soft); padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.nw-byline a { color: var(--blue-deep); font-weight: 600; }
+.nw-cover { width: 100%; border-radius: 16px; margin: 22px 0 6px; display: block; }
+.nw-video { position: relative; aspect-ratio: 16 / 9; margin: 22px 0; border-radius: 14px; overflow: hidden; background: #000; }
+.nw-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.nw-body { font-size: 17.5px; line-height: 1.75; margin-top: 22px; overflow-wrap: anywhere; }
+.nw-body p { margin: 0 0 18px; }
+.nw-body h2, .nw-body h3, .nw-body h4 { margin: 30px 0 10px; line-height: 1.3; }
+.nw-body h2 { font-size: 26px; } .nw-body h3 { font-size: 21px; } .nw-body h4 { font-size: 18px; }
+.nw-body img { max-width: 100%; height: auto; border-radius: 10px; margin: 14px 0; display: block; }
+.nw-body blockquote { border-left: 3px solid var(--gold); margin: 20px 0; padding: 4px 18px; color: var(--ink-soft); font-style: italic; }
+.nw-body a { color: var(--blue-deep); text-decoration: underline; }
+.nw-body ul, .nw-body ol { margin: 0 0 18px; padding-left: 24px; }
+.nw-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 26px 0; }
+.nw-gallery figure { margin: 0; cursor: zoom-in; }
+.nw-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
+.nw-gallery figcaption { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+.nw-box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; margin: 26px 0; }
+.nw-box h3 { font-size: 17px; margin-bottom: 12px; }
+.nw-contact { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 15px; flex-wrap: wrap; }
+.nw-contact:last-child { border-bottom: none; }
+.nw-contact b { min-width: 110px; color: var(--ink-soft); font-weight: 600; }
+.nw-contact a { color: var(--blue-deep); font-weight: 600; word-break: break-all; }
+.nw-share { display: flex; gap: 10px; flex-wrap: wrap; margin: 26px 0; }
+.nw-share a, .nw-share button { border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ink); }
+.nw-share a:hover, .nw-share button:hover { border-color: var(--gold); }
+.nw-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.nw-tags span { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; color: var(--ink-soft); }
+.nw-lightbox { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; cursor: zoom-out; }
+.nw-lightbox.open { display: flex; }
+.nw-lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+
+/* Section sur la page d'accueil */
+.nw-home .nw-grid { margin-bottom: 26px; }
+
+@media (max-width: 760px) {
+  .nw-hero { grid-template-columns: 1fr; }
+  .nw-hero .img { min-height: 190px; }
+  .nw-hero h2 { font-size: 22px; }
+  .nw-article h1 { font-size: 27px; }
+  .nw-body { font-size: 16.5px; }
+}
