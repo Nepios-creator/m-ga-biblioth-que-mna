@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualité — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/actualites.css">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/bible.html">Bible</a>
+    <a href="/actualites.html" style="color:var(--gold-deep);">Actualités</a>
+    <a href="/login.html">Connexion</a>
+  </nav>
+</header>
+
+<div class="nw-article" id="article">
+  <a class="nw-back" href="/actualites.html">← Toutes les actualités</a>
+  <div id="content"><div class="nw-empty">Chargement de l'actualité…</div></div>
+</div>
+
+<div class="nw-lightbox" id="lightbox"><img alt=""></div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+const LANGS = { fr: 'Français', en: 'English', pt: 'Português', es: 'Español', de: 'Deutsch', it: 'Italiano', sw: 'Kiswahili', ln: 'Lingála' };
+const CAT = {
+  eglise: 'Église dans le monde', persecution: 'Liberté religieuse et persécutions', mission: 'Missions et évangélisation',
+  solidarite: 'Solidarité et humanitaire', evenement: 'Événements et rassemblements', societe: 'Société et culture',
+  jeunesse: 'Jeunesse et famille', temoignage: 'Témoignages', annonce: 'Annonces du ministère',
+};
+
+// Rend un contact cliquable selon sa nature (e-mail, téléphone, WhatsApp, site web)
+function contactValue(c) {
+  const v = String(c.value || '').trim();
+  const label = String(c.label || '').toLowerCase();
+  if (/^https?:\/\//i.test(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v.replace(/^https?:\/\/(www\.)?/i, ''))}</a>`;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return `<a href="mailto:${esc(v)}">${esc(v)}</a>`;
+  const digits = v.replace(/[^\d+]/g, '');
+  if (/^\+?\d{7,15}$/.test(digits)) {
+    if (label.includes('whatsapp')) return `<a href="https://wa.me/${digits.replace(/^\+/, '')}" target="_blank" rel="noopener">${esc(v)}</a>`;
+    return `<a href="tel:${digits}">${esc(v)}</a>`;
+  }
+  return esc(v);
+}
+
+function cardHtml(a) {
+  return `
+    <a class="nw-card" href="/actualite.html?id=${a.id}">
+      <div class="img" ${a.cover ? `style="background-image:url('${esc(a.cover)}')"` : ''}>${a.cover ? '' : '📰'}</div>
+      <div class="body">
+        <div class="nw-meta"><span>${esc(fmtDate(a.date))}</span>${a.source_name ? `<span>· ${esc(a.source_name)}</span>` : ''}</div>
+        <h3>${esc(a.title)}</h3>
+      </div>
+    </a>`;
+}
+
+function render(a) {
+  document.title = a.title + ' — Ministère de la Nouvelle Alliance';
+  const url = location.origin + '/actualite.html?id=' + a.id;
+  const place = [a.region, a.country].filter(Boolean).join(' · ');
+  const shareText = encodeURIComponent(a.title + '\n' + url);
+
+  $('content').innerHTML = `
+    <div class="nw-meta"><span class="nw-badge">${esc(CAT[a.category] || 'Actualité')}</span>${place ? `<span>🌍 ${esc(place)}</span>` : ''}${a.language && a.language !== 'fr' ? `<span>· ${esc(LANGS[a.language] || a.language.toUpperCase())}</span>` : ''}</div>
+    <h1>${esc(a.title)}</h1>
+    ${a.summary ? `<p class="nw-lead">${esc(a.summary)}</p>` : ''}
+    <div class="nw-byline">
+      <span>${esc(fmtDate(a.date))}</span>
+      ${a.author ? `<span>Par ${esc(a.author)}</span>` : ''}
+      ${a.source_name ? `<span>Source : ${a.source_url ? `<a href="${esc(a.source_url)}" target="_blank" rel="noopener nofollow">${esc(a.source_name)}</a>` : esc(a.source_name)}</span>` : ''}
+    </div>
+    ${a.cover ? `<img class="nw-cover" src="${esc(a.cover)}" alt="">` : ''}
+    ${a.video_embed ? `<div class="nw-video"><iframe src="${esc(a.video_embed)}" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}
+    <div class="nw-body">${a.body_html}</div>
+    ${a.images && a.images.length ? `<div class="nw-gallery">${a.images.map((i) =>
+      `<figure><img src="/api/actualites/images/${i.id}" alt="${esc(i.caption || '')}" loading="lazy">${i.caption ? `<figcaption>${esc(i.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : ''}
+    ${a.contacts && a.contacts.length ? `<div class="nw-box"><h3>Contacts</h3>${a.contacts.map((c) =>
+      `<div class="nw-contact"><b>${esc(c.label || 'Contact')}</b><span>${contactValue(c)}</span></div>`).join('')}</div>` : ''}
+    ${a.source_url ? `<div class="nw-box"><h3>Publication d'origine</h3><p style="margin:0;font-size:15px;color:var(--ink-soft);">Cette actualité provient de <b>${esc(a.source_name || 'sa source')}</b>. <a href="${esc(a.source_url)}" target="_blank" rel="noopener nofollow" style="color:var(--blue-deep);font-weight:600;">Lire la publication originale ↗</a></p></div>` : ''}
+    ${a.tags && a.tags.length ? `<div class="nw-tags">${a.tags.map((t) => `<span>#${esc(t)}</span>`).join('')}</div>` : ''}
+    <div class="nw-share">
+      <a href="https://wa.me/?text=${shareText}" target="_blank" rel="noopener">Partager sur WhatsApp</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" rel="noopener">Facebook</a>
+      <button type="button" id="copy">Copier le lien</button>
+    </div>
+    ${a.related && a.related.length ? `<h2 style="font-size:22px;margin:36px 0 16px;">À lire aussi</h2><div class="nw-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">${a.related.map(cardHtml).join('')}</div>` : ''}
+  `;
+
+  $('copy').addEventListener('click', async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: a.title, url });
+      else { await navigator.clipboard.writeText(url); $('copy').textContent = 'Lien copié ✓'; }
+    } catch (e) { /* partage annulé */ }
+  });
+  document.querySelectorAll('.nw-gallery img').forEach((img) => img.addEventListener('click', () => {
+    $('lightbox').querySelector('img').src = img.src;
+    $('lightbox').classList.add('open');
+  }));
+}
+
+$('lightbox').addEventListener('click', () => $('lightbox').classList.remove('open'));
+
+(async function init() {
+  const id = parseInt(new URLSearchParams(location.search).get('id'), 10);
+  if (!id) { $('content').innerHTML = '<div class="nw-empty">Actualité introuvable. <a href="/actualites.html" style="color:var(--blue-deep);font-weight:600;">Voir toutes les actualités</a></div>'; return; }
+  try {
+    const r = await fetch('/api/actualites/' + id);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Erreur');
+    render(d);
+  } catch (e) {
+    $('content').innerHTML = `<div class="nw-empty">${esc(e.message || 'Impossible de charger cette actualité.')}<br><a href="/actualites.html" style="color:var(--blue-deep);font-weight:600;">Voir toutes les actualités</a></div>`;
+  }
+})();
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>

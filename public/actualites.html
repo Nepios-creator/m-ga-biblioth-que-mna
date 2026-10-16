@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualités chrétiennes — Ministère de la Nouvelle Alliance</title>
+<meta name="description" content="Les actualités chrétiennes du monde entier : Église, missions, solidarité, événements et témoignages.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/actualites.css">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/bible.html">Bible</a>
+    <a href="/actualites.html" style="color:var(--gold-deep);">Actualités</a>
+    <a href="/login.html">Connexion</a>
+  </nav>
+</header>
+
+<section class="hero" style="padding:64px 24px 54px;">
+  <h1 style="font-size:40px;">Actualités chrétiennes</h1>
+  <p style="margin-bottom:0;">L'Église dans le monde : informations, événements, solidarité et témoignages.</p>
+</section>
+
+<div class="nw-wrap">
+  <a class="nw-back" href="/">← Retour à l'accueil</a>
+
+  <div class="nw-search">
+    <input type="search" id="q" placeholder="Rechercher une actualité, un pays, un mot…" autocomplete="off">
+    <select id="region" aria-label="Région"><option value="">Toutes les régions</option></select>
+    <select id="lang" aria-label="Langue"><option value="">Toutes les langues</option></select>
+  </div>
+  <div class="nw-chips" id="chips"></div>
+
+  <div id="hero"></div>
+  <div class="nw-grid" id="grid"></div>
+  <div id="empty" class="nw-empty" style="display:none;">Aucune actualité ne correspond à votre recherche.</div>
+  <button type="button" class="nw-more" id="more" style="display:none;">Voir plus d'actualités</button>
+</div>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+const LANGS = { fr: 'Français', en: 'English', pt: 'Português', es: 'Español', de: 'Deutsch', it: 'Italiano', sw: 'Kiswahili', ln: 'Lingála' };
+const langName = (c) => LANGS[c] || String(c).toUpperCase();
+
+let CATS = [];
+const state = { category: '', region: '', lang: '', q: '', page: 1, pages: 1 };
+let loading = false;
+
+function cardHtml(a) {
+  const cat = (CATS.find((c) => c.key === a.category) || {}).label || '';
+  return `
+    <a class="nw-card" href="/actualite.html?id=${a.id}">
+      <div class="img" ${a.cover ? `style="background-image:url('${esc(a.cover)}')"` : ''}>${a.cover ? '' : '📰'}</div>
+      <div class="body">
+        <div class="nw-meta"><span class="nw-badge">${esc(cat)}</span><span>${esc(fmtDate(a.date))}</span></div>
+        <h3>${esc(a.title)}</h3>
+        ${a.summary ? `<p>${esc(a.summary)}</p>` : ''}
+        <div class="nw-meta" style="margin-top:auto;">${a.region ? `<span>🌍 ${esc(a.region)}${a.country ? ' · ' + esc(a.country) : ''}</span>` : ''}${a.source_name ? `<span>${esc(a.source_name)}</span>` : ''}</div>
+      </div>
+    </a>`;
+}
+
+function heroHtml(a) {
+  const cat = (CATS.find((c) => c.key === a.category) || {}).label || '';
+  return `
+    <a class="nw-hero" href="/actualite.html?id=${a.id}" style="display:grid;">
+      <div class="img" ${a.cover ? `style="background-image:url('${esc(a.cover)}')"` : ''}></div>
+      <div class="txt">
+        <span class="nw-kicker">${a.featured ? 'À la une' : 'Dernière actualité'}</span>
+        <h2>${esc(a.title)}</h2>
+        ${a.summary ? `<p>${esc(a.summary)}</p>` : ''}
+        <div class="nw-meta"><span class="nw-badge">${esc(cat)}</span><span>${esc(fmtDate(a.date))}</span>${a.source_name ? `<span>· ${esc(a.source_name)}</span>` : ''}</div>
+      </div>
+    </a>`;
+}
+
+async function load(reset) {
+  if (loading) return;
+  loading = true;
+  if (reset) { state.page = 1; $('grid').innerHTML = ''; $('hero').innerHTML = ''; }
+  const p = new URLSearchParams({ page: state.page, limit: 12 });
+  if (state.category) p.set('category', state.category);
+  if (state.region) p.set('region', state.region);
+  if (state.lang) p.set('lang', state.lang);
+  if (state.q) p.set('q', state.q);
+  try {
+    const r = await fetch('/api/actualites?' + p.toString());
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Erreur');
+    let items = d.items;
+    const plain = !state.category && !state.region && !state.lang && !state.q;
+    if (reset && plain && items.length) {
+      const top = items.find((a) => a.featured) || items[0];
+      $('hero').innerHTML = heroHtml(top);
+      items = items.filter((a) => a.id !== top.id);
+    }
+    $('grid').insertAdjacentHTML('beforeend', items.map(cardHtml).join(''));
+    state.pages = d.pages;
+    $('empty').style.display = d.total === 0 ? 'block' : 'none';
+    $('more').style.display = state.page < state.pages ? 'block' : 'none';
+  } catch (e) {
+    $('empty').textContent = 'Impossible de charger les actualités pour le moment. Réessayez dans un instant.';
+    $('empty').style.display = 'block';
+  }
+  loading = false;
+}
+
+function renderChips() {
+  const total = CATS.reduce((s, c) => s + c.count, 0);
+  const chips = [{ key: '', label: 'Toutes', count: total }].concat(CATS.filter((c) => c.count > 0));
+  $('chips').innerHTML = chips.map((c) =>
+    `<button type="button" class="nw-chip${state.category === c.key ? ' active' : ''}" data-k="${c.key}">${esc(c.label)}<small>${c.count}</small></button>`).join('');
+  $('chips').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    state.category = b.dataset.k;
+    renderChips();
+    load(true);
+  }));
+}
+
+(async function init() {
+  try {
+    const m = await (await fetch('/api/actualites/meta')).json();
+    CATS = m.categories || [];
+    $('region').insertAdjacentHTML('beforeend', (m.regions || []).map((r) => `<option value="${esc(r.name)}">${esc(r.name)} (${r.n})</option>`).join(''));
+    $('lang').insertAdjacentHTML('beforeend', (m.languages || []).map((l) => `<option value="${esc(l.code)}">${esc(langName(l.code))} (${l.n})</option>`).join(''));
+  } catch (e) { /* les filtres restent vides */ }
+  renderChips();
+  load(true);
+})();
+
+let timer;
+$('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { state.q = $('q').value.trim(); load(true); }, 350); });
+$('region').addEventListener('change', () => { state.region = $('region').value; load(true); });
+$('lang').addEventListener('change', () => { state.lang = $('lang').value; load(true); });
+$('more').addEventListener('click', () => { state.page++; load(false); });
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>

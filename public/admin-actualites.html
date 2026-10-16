@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration — Actualités chrétiennes</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 980px; margin: 0 auto; padding: 36px 20px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; margin-bottom: 26px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14.5px; font-family: inherit; background: #fff; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .row2, .row3 { grid-template-columns: 1fr; } }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .msg.warn { background: #fff4dc; color: #8a5a00; }
+  .hidden { display: none; }
+  .tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 22px; padding-bottom: 4px; }
+  .tab { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+  .tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .tab .count { background: #c0392b; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; margin-left: 6px; }
+  .mini { border: none; padding: 7px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; font-family: inherit; background: #f0ebe0; color: #4d4436; }
+  .mini.ok { background: #e8f6ec; color: #2a7a44; }
+  .mini.edit { background: #e8f1fa; color: #1f5386; }
+  .mini.del { background: #fdeaea; color: #a33; }
+  .mini.off { background: #f0ebe0; color: #7a6f5d; }
+  .item { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .item:last-child { border-bottom: none; }
+  .item .thumb { flex: none; width: 96px; height: 70px; border-radius: 10px; background: linear-gradient(160deg, var(--gold), var(--gold-deep)) center / cover no-repeat; }
+  .item .info { flex: 1; min-width: 0; }
+  .item .info strong { display: block; font-size: 15.5px; line-height: 1.35; margin-bottom: 3px; }
+  .item .info .sub { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .item .info p { margin: 0 0 8px; font-size: 13.5px; color: var(--ink-soft); }
+  .item .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 560px) { .item .thumb { width: 70px; height: 54px; } }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .toolbar button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13.5px; cursor: pointer; min-width: 36px; }
+  .toolbar button:hover { border-color: var(--gold); }
+  #f-body { min-height: 260px; max-height: 520px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 16px; line-height: 1.65; background: #fff; }
+  #f-body:focus { outline: 2px solid var(--gold); }
+  #f-body img { max-width: 100%; height: auto; }
+  #f-body blockquote { border-left: 3px solid var(--gold); margin: 10px 0; padding-left: 14px; color: var(--ink-soft); }
+  .contact-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; margin-bottom: 8px; }
+  .cover-prev { max-width: 260px; border-radius: 10px; margin-top: 8px; display: block; }
+  .gal-item { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .gal-item img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; }
+  .gal-item input { flex: 1; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13.5px; }
+  .hint { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; }
+  .src-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .src-row:last-child { border-bottom: none; }
+  .src-row .st-ok { color: #2a7a44; font-size: 12.5px; }
+  .src-row .st-err { color: #a33; font-size: 12.5px; }
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav><a href="/">Accueil</a><a href="/admin.html">Panneau admin</a><a href="/actualites.html">Voir les actualités</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel"><h2>Accès refusé</h2><p>Cette page est réservée aux administrateurs. <a href="/login.html" style="color:var(--blue-deep);font-weight:600;">Se connecter</a></p></div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:16px;">← Panneau admin</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Actualités chrétiennes</h1>
+    <p style="color:var(--ink-soft);margin-bottom:22px;">Publiez les actualités qui s'affichent dans l'espace public « Actualités ».</p>
+
+    <div id="msg-box"></div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="sug">📥 Propositions du jour<span class="count hidden" id="sug-count">0</span></button>
+      <button class="tab" data-tab="lien">🔗 Publier par lien</button>
+      <button class="tab" data-tab="edit">✍️ Rédiger / modifier</button>
+      <button class="tab" data-tab="list">📚 Publiées</button>
+      <button class="tab" data-tab="src">⚙️ Sources</button>
+    </div>
+
+    <!-- PROPOSITIONS DU JOUR -->
+    <div id="tab-sug">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <h2 style="margin:0;">Propositions des sites officiels</h2>
+          <button class="btn btn-primary" id="btn-refresh" style="border:none;cursor:pointer;">🔄 Chercher maintenant</button>
+        </div>
+        <p class="hint" id="last-fetch" style="margin-bottom:12px;"></p>
+        <div class="field" style="max-width:240px;"><select id="sug-status">
+          <option value="nouvelle">À valider</option><option value="validee">Déjà publiées</option><option value="rejetee">Ignorées</option>
+        </select></div>
+        <div id="sug-list"><p class="hint">Chargement…</p></div>
+      </div>
+    </div>
+
+    <!-- PUBLIER PAR LIEN -->
+    <div id="tab-lien" class="hidden">
+      <div class="panel">
+        <h2 style="margin-bottom:6px;">Publier à partir d'un lien</h2>
+        <p class="hint" style="margin-bottom:16px;">Collez le lien d'une publication (article d'un site, page d'une église…). Le site lit le titre, le texte, l'image et la source, puis vous les montre pour vérification.</p>
+        <div class="field"><label>Lien de la publication</label><input type="url" id="import-url" placeholder="https://…"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btn-import" style="border:none;cursor:pointer;">1. Importer et vérifier</button>
+          <button class="btn btn-ghost" id="btn-import-pub" style="cursor:pointer;">Importer et publier directement</button>
+        </div>
+        <div id="import-msg" style="margin-top:16px;"></div>
+        <details style="margin-top:14px;font-size:13.5px;color:var(--ink-soft);">
+          <summary style="cursor:pointer;font-weight:600;">À savoir</summary>
+          <ul style="margin:10px 0 0 18px;line-height:1.7;">
+            <li>La source et un lien vers la publication d'origine sont toujours affichés avec l'actualité.</li>
+            <li>Les sites de presse et d'églises se lisent très bien. Les réseaux sociaux (Facebook, Instagram…) limitent la lecture automatique : le titre et l'image sont repris, le texte est à compléter.</li>
+            <li>Republier un texte en entier peut nécessiter l'accord de son auteur : privilégiez les sources qui l'autorisent, ou citez un extrait avec le lien d'origine.</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+
+    <!-- ÉDITEUR -->
+    <div id="tab-edit" class="hidden">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <h2 style="margin:0;" id="editor-title">Nouvelle actualité</h2>
+          <button class="mini" id="btn-reset" type="button">Vider le formulaire</button>
+        </div>
+        <div id="editor-notes"></div>
+
+        <div class="field"><label>Titre *</label><input type="text" id="f-title" maxlength="300"></div>
+        <div class="field"><label>Résumé (une ou deux phrases, affiché dans la liste)</label><textarea id="f-summary" rows="2" maxlength="600"></textarea></div>
+        <div class="row3">
+          <div class="field"><label>Catégorie</label><select id="f-category"></select></div>
+          <div class="field"><label>Région du monde</label><select id="f-region"></select></div>
+          <div class="field"><label>Pays</label><input type="text" id="f-country" placeholder="Ex. : RD Congo"></div>
+        </div>
+        <div class="row3">
+          <div class="field"><label>Langue du texte</label><select id="f-language">
+            <option value="fr">Français</option><option value="en">English</option><option value="pt">Português</option><option value="es">Español</option>
+            <option value="de">Deutsch</option><option value="it">Italiano</option><option value="sw">Kiswahili</option><option value="ln">Lingála</option>
+          </select></div>
+          <div class="field"><label>Date de l'actualité</label><input type="date" id="f-date"></div>
+          <div class="field"><label>Auteur</label><input type="text" id="f-author"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Source (nom du site ou de l'organisation)</label><input type="text" id="f-source-name"></div>
+          <div class="field"><label>Lien de la publication d'origine</label><input type="url" id="f-source-url" placeholder="https://…"></div>
+        </div>
+
+        <div class="field">
+          <label>Texte de l'actualité *</label>
+          <div class="toolbar" id="toolbar">
+            <button type="button" data-cmd="bold" title="Gras"><b>G</b></button>
+            <button type="button" data-cmd="italic" title="Italique"><i>I</i></button>
+            <button type="button" data-block="h2" title="Grand titre">Titre</button>
+            <button type="button" data-block="h3" title="Sous-titre">Sous-titre</button>
+            <button type="button" data-block="p" title="Paragraphe">¶</button>
+            <button type="button" data-cmd="insertUnorderedList" title="Liste">• Liste</button>
+            <button type="button" data-block="blockquote" title="Citation">❝</button>
+            <button type="button" data-act="link" title="Ajouter un lien">🔗</button>
+            <button type="button" data-cmd="removeFormat" title="Effacer la mise en forme">✕ format</button>
+          </div>
+          <div id="f-body" contenteditable="true"></div>
+          <p class="hint">Au collage, le texte est repris sans mise en forme : utilisez les boutons ci-dessus pour les titres, le gras, les listes et les liens.</p>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <label>Image de couverture</label>
+            <input type="file" id="f-cover" accept="image/png,image/jpeg,image/webp,image/gif">
+            <img id="cover-prev" class="cover-prev hidden" alt="">
+            <label id="remove-cover-wrap" class="hidden" style="font-weight:500;margin-top:6px;"><input type="checkbox" id="f-remove-cover" style="width:auto;"> Retirer l'image de couverture</label>
+          </div>
+          <div class="field">
+            <label>Autres images (jusqu'à 8, 5 Mo chacune)</label>
+            <input type="file" id="f-images" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+            <div id="gal-new" style="margin-top:8px;"></div>
+            <div id="gal-old" style="margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Contacts (téléphone, WhatsApp, e-mail, site, adresse…)</label>
+          <div id="contacts"></div>
+          <button type="button" class="mini" id="btn-add-contact">+ Ajouter un contact</button>
+          <datalist id="contact-labels"><option value="Téléphone"><option value="WhatsApp"><option value="E-mail"><option value="Site web"><option value="Adresse"><option value="Facebook"><option value="Responsable"></datalist>
+        </div>
+
+        <div class="row2">
+          <div class="field"><label>Vidéo YouTube ou Vimeo (facultatif)</label><input type="url" id="f-video" placeholder="https://youtu.be/…"></div>
+          <div class="field"><label>Mots-clés (séparés par des virgules)</label><input type="text" id="f-tags" placeholder="paix, jeunesse, Afrique"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px;margin-bottom:18px;"><input type="checkbox" id="f-featured" style="width:auto;"> Mettre à la une</label>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btn-publish" style="border:none;cursor:pointer;">✅ Publier</button>
+          <button class="btn btn-ghost" id="btn-draft" style="cursor:pointer;">Enregistrer en brouillon</button>
+          <button class="btn btn-ghost hidden" id="btn-translate" style="cursor:pointer;">🌐 Traduire en français</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PUBLIÉES -->
+    <div id="tab-list" class="hidden">
+      <div class="panel">
+        <h2 style="margin-bottom:14px;">Actualités en ligne</h2>
+        <div class="row2" style="margin-bottom:6px;">
+          <div class="field"><input type="search" id="list-q" placeholder="Rechercher un titre…"></div>
+          <div class="field"><select id="list-status"><option value="">Toutes</option><option value="publie">Publiées</option><option value="brouillon">Brouillons</option></select></div>
+        </div>
+        <div id="art-list"><p class="hint">Chargement…</p></div>
+      </div>
+    </div>
+
+    <!-- SOURCES -->
+    <div id="tab-src" class="hidden">
+      <div class="panel">
+        <h2 style="margin-bottom:6px;">Sources officielles</h2>
+        <p class="hint" style="margin-bottom:14px;">Chaque jour, le site cherche les nouveautés de ces sources et vous les propose dans « Propositions du jour ». Rien n'est publié sans votre validation.</p>
+        <div id="src-list"><p class="hint">Chargement…</p></div>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:14px;">Ajouter une source</h2>
+        <div class="row2">
+          <div class="field"><label>Nom</label><input type="text" id="s-name" placeholder="Ex. : Église du Christ au Congo"></div>
+          <div class="field"><label>Adresse du site</label><input type="url" id="s-site" placeholder="https://…"></div>
+        </div>
+        <div class="field"><label>Adresse du flux RSS (facultatif)</label><input type="url" id="s-feed" placeholder="Laissez vide : le site le détecte tout seul">
+          <p class="hint">Le flux RSS est la liste automatique des nouveautés d'un site, ajoutée en général à l'adresse /feed ou /rss.</p></div>
+        <div class="row3">
+          <div class="field"><label>Langue</label><select id="s-lang"><option value="fr">Français</option><option value="en">English</option><option value="pt">Português</option><option value="es">Español</option></select></div>
+          <div class="field"><label>Région</label><select id="s-region"></select></div>
+          <div class="field"><label>Catégorie</label><select id="s-category"></select></div>
+        </div>
+        <button class="btn btn-primary" id="btn-add-src" style="border:none;cursor:pointer;">Ajouter la source</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const user = (() => { try { return JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) { return null; } })();
+const AUTH = { Authorization: `Bearer ${token}` };
+const JSONH = { 'Content-Type': 'application/json', ...AUTH };
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+const fmtDateTime = (d) => { try { return new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+
+let CATS = [], REGIONS = [], CAN_TRANSLATE = false;
+const S = { editingId: null, suggestionId: null, origin: 'manuel', coverRemote: '', hadCover: false, removeIds: [] };
+
+if (!token || !user || user.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  init();
+}
+
+function showMsg(text, type) {
+  $('msg-box').innerHTML = text ? `<div class="msg ${type || 'success'}">${text}</div>` : '';
+  if (text) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function api(path, opts) {
+  const r = await fetch('/api/actualites/admin' + path, opts);
+  let d = null;
+  try { d = await r.json(); } catch (e) { /* pas de contenu */ }
+  if (!r.ok) { const err = new Error((d && d.message) || 'Erreur'); err.data = d; err.status = r.status; throw err; }
+  return d;
+}
+
+// ---------- Onglets ----------
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  ['sug', 'lien', 'edit', 'list', 'src'].forEach((n) => $('tab-' + n).classList.toggle('hidden', n !== name));
+  if (name === 'sug') loadSuggestions();
+  if (name === 'list') loadArticles();
+  if (name === 'src') loadSources();
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => { showMsg(''); showTab(t.dataset.tab); }));
+
+async function init() {
+  try {
+    const st = await api('/status');
+    CATS = st.categories; REGIONS = st.regions; CAN_TRANSLATE = st.translation;
+    $('last-fetch').textContent = st.last_fetch_at ? 'Dernière recherche : ' + fmtDateTime(st.last_fetch_at) + '. Une nouvelle recherche a lieu chaque jour.' : 'Aucune recherche effectuée pour le moment : cliquez sur « Chercher maintenant ».';
+    setCount(st.pending);
+  } catch (e) { showMsg(esc(e.message), 'error'); return; }
+  const catOpts = CATS.map((c) => `<option value="${c.key}">${esc(c.label)}</option>`).join('');
+  const regOpts = '<option value="">— Non précisée —</option>' + REGIONS.map((r) => `<option>${esc(r)}</option>`).join('');
+  $('f-category').innerHTML = catOpts; $('s-category').innerHTML = catOpts;
+  $('f-region').innerHTML = regOpts; $('s-region').innerHTML = REGIONS.map((r) => `<option>${esc(r)}</option>`).join('');
+  if (CAN_TRANSLATE) $('btn-translate').classList.remove('hidden');
+  resetEditor();
+  showTab('sug');
+}
+
+function setCount(n) {
+  $('sug-count').textContent = n;
+  $('sug-count').classList.toggle('hidden', !n);
+}
+
+// ---------- Propositions du jour ----------
+async function loadSuggestions() {
+  const status = $('sug-status').value;
+  try {
+    const rows = await api('/suggestions?status=' + status);
+    if (status === 'nouvelle') setCount(rows.length);
+    if (!rows.length) {
+      $('sug-list').innerHTML = `<p class="hint">${status === 'nouvelle' ? 'Aucune proposition en attente. Cliquez sur « Chercher maintenant » pour en récupérer.' : 'Rien à afficher ici.'}</p>`;
+      return;
+    }
+    $('sug-list').innerHTML = rows.map((s) => `
+      <div class="item" data-id="${s.id}">
+        <div class="thumb" ${s.image_url ? `style="background-image:url('${esc(s.image_url)}')"` : ''}></div>
+        <div class="info">
+          <strong>${esc(s.title)}</strong>
+          <div class="sub">${esc(s.source_name || '')}${s.published_at ? ' · ' + esc(fmtDate(s.published_at)) : ''} · ${esc((CATS.find((c) => c.key === s.category) || {}).label || '')}</div>
+          ${s.summary ? `<p>${esc(s.summary)}</p>` : ''}
+          <div class="actions">
+            ${status === 'nouvelle' ? `
+              <button class="mini ok" data-act="pub">✅ Publier tel quel</button>
+              <button class="mini edit" data-act="edit">✏️ Modifier puis publier</button>
+              <button class="mini del" data-act="rej">Ignorer</button>` : ''}
+            ${status === 'validee' && s.article_id ? `<a class="mini ok" href="/actualite.html?id=${s.article_id}" target="_blank">Voir l'actualité</a>` : ''}
+            <a class="mini" href="${esc(s.link)}" target="_blank" rel="noopener">Lire l'original ↗</a>
+          </div>
+        </div>
+      </div>`).join('');
+    $('sug-list').querySelectorAll('button[data-act]').forEach((b) => b.addEventListener('click', () => onSuggestion(b)));
+  } catch (e) { $('sug-list').innerHTML = `<div class="msg error">${esc(e.message)}</div>`; }
+}
+$('sug-status').addEventListener('change', loadSuggestions);
+
+async function onSuggestion(btn) {
+  const id = btn.closest('.item').dataset.id;
+  const act = btn.dataset.act;
+  btn.disabled = true;
+  try {
+    if (act === 'rej') { await api(`/suggestions/${id}/reject`, { method: 'POST', headers: JSONH }); loadSuggestions(); return; }
+    if (act === 'edit') { await openSuggestionInEditor(id); return; }
+    btn.textContent = 'Publication…';
+    const d = await api(`/suggestions/${id}/publish`, { method: 'POST', headers: JSONH });
+    showMsg(esc(d.message) + ` <a href="/actualite.html?id=${d.id}" target="_blank" style="font-weight:600;">Voir l'actualité</a>`, 'success');
+    loadSuggestions();
+  } catch (e) {
+    if (e.data && e.data.needs_edit) {
+      showMsg(esc(e.message), 'warn');
+      await openSuggestionInEditor(id);
+    } else { showMsg(esc(e.message), 'error'); btn.disabled = false; }
+  }
+}
+
+async function openSuggestionInEditor(id) {
+  const d = await api(`/suggestions/${id}/prepare`, { method: 'POST', headers: JSONH });
+  openEditor(d.draft, 'suggestion');
+}
+
+$('btn-refresh').addEventListener('click', async () => {
+  $('btn-refresh').disabled = true; $('btn-refresh').textContent = 'Recherche en cours…';
+  try {
+    const r = await api('/suggestions/refresh', { method: 'POST', headers: JSONH });
+    const bad = r.results.filter((x) => !x.ok);
+    showMsg(`${r.added} nouvelle(s) proposition(s) trouvée(s).` + (bad.length ? ` ${bad.length} source(s) n'ont pas répondu (voir l'onglet Sources).` : ''), bad.length && !r.added ? 'warn' : 'success');
+    const st = await api('/status');
+    $('last-fetch').textContent = 'Dernière recherche : ' + fmtDateTime(st.last_fetch_at) + '.';
+    $('sug-status').value = 'nouvelle';
+    loadSuggestions();
+  } catch (e) { showMsg(esc(e.message), 'error'); }
+  $('btn-refresh').disabled = false; $('btn-refresh').textContent = '🔄 Chercher maintenant';
+});
+
+// ---------- Publier par lien ----------
+async function importUrl(publish) {
+  const url = $('import-url').value.trim();
+  if (!/^https?:\/\//i.test(url)) { $('import-msg').innerHTML = '<div class="msg error">Collez un lien complet, commençant par https://</div>'; return; }
+  $('import-msg').innerHTML = '<div class="msg success">Lecture de la publication en cours…</div>';
+  $('btn-import').disabled = $('btn-import-pub').disabled = true;
+  try {
+    const d = await api('/import', { method: 'POST', headers: JSONH, body: JSON.stringify({ url, publish }) });
+    if (publish) {
+      $('import-msg').innerHTML = '';
+      showMsg(esc(d.message) + ` <a href="/actualite.html?id=${d.id}" target="_blank" style="font-weight:600;">Voir l'actualité</a>`, 'success');
+      $('import-url').value = '';
+    } else {
+      $('import-msg').innerHTML = '';
+      openEditor(d.draft, 'lien');
+    }
+  } catch (e) {
+    if (e.data && e.data.draft) {
+      $('import-msg').innerHTML = `<div class="msg warn">${esc(e.message)}</div>`;
+      openEditor(e.data.draft, 'lien');
+    } else {
+      const extra = e.data && e.data.existing_id ? ` <a href="/actualite.html?id=${e.data.existing_id}" target="_blank" style="font-weight:600;">Voir</a>` : '';
+      $('import-msg').innerHTML = `<div class="msg error">${esc(e.message)}${extra}</div>`;
+    }
+  }
+  $('btn-import').disabled = $('btn-import-pub').disabled = false;
+}
+$('btn-import').addEventListener('click', () => importUrl(false));
+$('btn-import-pub').addEventListener('click', () => importUrl(true));
+
+// ---------- Éditeur ----------
+function resetEditor() {
+  Object.assign(S, { editingId: null, suggestionId: null, origin: 'manuel', coverRemote: '', hadCover: false, removeIds: [] });
+  ['f-title', 'f-summary', 'f-country', 'f-author', 'f-source-name', 'f-source-url', 'f-video', 'f-tags', 'f-date'].forEach((id) => { $(id).value = ''; });
+  $('f-body').innerHTML = '';
+  $('f-category').selectedIndex = 0; $('f-region').selectedIndex = 0; $('f-language').value = 'fr';
+  $('f-featured').checked = false; $('f-cover').value = ''; $('f-images').value = ''; $('f-remove-cover').checked = false;
+  $('cover-prev').classList.add('hidden'); $('remove-cover-wrap').classList.add('hidden');
+  $('gal-new').innerHTML = ''; $('gal-old').innerHTML = ''; $('editor-notes').innerHTML = '';
+  $('contacts').innerHTML = ''; addContact();
+  $('editor-title').textContent = 'Nouvelle actualité';
+  $('btn-publish').textContent = '✅ Publier';
+}
+$('btn-reset').addEventListener('click', () => { if (confirm('Vider le formulaire ?')) resetEditor(); });
+
+function setCover(url) {
+  if (url) { $('cover-prev').src = url; $('cover-prev').classList.remove('hidden'); } else { $('cover-prev').classList.add('hidden'); }
+}
+
+function openEditor(d, origin) {
+  resetEditor();
+  S.origin = origin || 'manuel';
+  S.suggestionId = d.suggestion_id || null;
+  S.coverRemote = d.cover_url || '';
+  $('f-title').value = d.title || '';
+  $('f-summary').value = d.summary || '';
+  if (d.category) $('f-category').value = d.category;
+  if (d.region) $('f-region').value = d.region;
+  $('f-country').value = d.country || '';
+  $('f-language').value = d.language && [...$('f-language').options].some((o) => o.value === d.language) ? d.language : 'fr';
+  $('f-date').value = d.published_at ? String(d.published_at).slice(0, 10) : '';
+  $('f-author').value = d.author || '';
+  $('f-source-name').value = d.source_name || '';
+  $('f-source-url').value = d.source_url || '';
+  $('f-body').innerHTML = d.body_html || '';
+  setCover(S.coverRemote);
+  const notes = (d.notes || []).map((n) => `<div class="msg warn">${esc(n)}</div>`).join('');
+  const dup = d.existing_id ? `<div class="msg warn">Cette publication est déjà en ligne. <a href="/actualite.html?id=${d.existing_id}" target="_blank" style="font-weight:600;">Voir</a></div>` : '';
+  $('editor-notes').innerHTML = dup + notes + (origin === 'manuel' ? '' : '<div class="msg success">Vérifiez le texte, modifiez ce qu\'il faut, puis cliquez sur « Publier ».</div>');
+  $('editor-title').textContent = origin === 'suggestion' ? 'Proposition du jour — vérification' : 'Importation — vérification';
+  showTab('edit');
+  window.scrollTo({ top: 0 });
+}
+
+async function editArticle(id) {
+  try {
+    const a = await api('/articles/' + id);
+    openEditor({ ...a, published_at: a.published_at, cover_url: '' }, 'manuel');
+    S.editingId = id;
+    S.hadCover = !!a.cover;
+    S.origin = a.origin;
+    $('f-tags').value = (a.tags || []).join(', ');
+    $('f-video').value = a.video_url || '';
+    $('f-featured').checked = !!a.featured;
+    $('contacts').innerHTML = '';
+    (a.contacts && a.contacts.length ? a.contacts : [{}]).forEach(addContact);
+    setCover(a.cover);
+    if (a.cover) $('remove-cover-wrap').classList.remove('hidden');
+    renderOldImages(a.images || []);
+    $('editor-notes').innerHTML = `<div class="msg ${a.status === 'publie' ? 'success' : 'warn'}">${a.status === 'publie' ? 'Cette actualité est en ligne : vos modifications seront visibles après enregistrement.' : 'Brouillon : non visible du public.'}</div>`;
+    $('editor-title').textContent = 'Modifier l\'actualité';
+    $('btn-publish').textContent = a.status === 'publie' ? '✅ Enregistrer les modifications' : '✅ Publier';
+  } catch (e) { showMsg(esc(e.message), 'error'); }
+}
+
+function renderOldImages(imgs) {
+  $('gal-old').innerHTML = imgs.length ? '<p class="hint" style="margin-bottom:6px;">Images déjà en ligne :</p>' : '';
+  imgs.forEach((i) => {
+    const row = document.createElement('div');
+    row.className = 'gal-item';
+    row.innerHTML = `<img src="/api/actualites/images/${i.id}" alt=""><span style="flex:1;font-size:13px;">${esc(i.caption || '')}</span><button type="button" class="mini del">Retirer</button>`;
+    row.querySelector('button').addEventListener('click', () => { S.removeIds.push(i.id); row.remove(); });
+    $('gal-old').appendChild(row);
+  });
+}
+
+// Barre d'outils du texte
+$('toolbar').addEventListener('mousedown', (e) => e.preventDefault());
+$('toolbar').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  $('f-body').focus();
+  if (b.dataset.cmd) document.execCommand(b.dataset.cmd, false, null);
+  else if (b.dataset.block) document.execCommand('formatBlock', false, b.dataset.block);
+  else if (b.dataset.act === 'link') {
+    const url = prompt('Adresse du lien (https://…)');
+    if (url && /^https?:\/\//i.test(url)) document.execCommand('createLink', false, url);
+  }
+});
+// Collage : texte simple, un paragraphe par ligne
+$('f-body').addEventListener('paste', (e) => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  const html = text.split(/\r?\n+/).map((t) => t.trim()).filter(Boolean).map((t) => `<p>${esc(t)}</p>`).join('');
+  document.execCommand('insertHTML', false, html);
+});
+
+// Contacts
+function addContact(c) {
+  c = c && c.value !== undefined ? c : {};
+  const row = document.createElement('div');
+  row.className = 'contact-row';
+  row.innerHTML = `<input type="text" list="contact-labels" placeholder="Type (ex. : WhatsApp)" value="${esc(c.label || '')}"><input type="text" placeholder="Numéro, adresse e-mail, lien…" value="${esc(c.value || '')}"><button type="button" class="mini del">✕</button>`;
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  $('contacts').appendChild(row);
+}
+$('btn-add-contact').addEventListener('click', () => addContact());
+
+// Images ajoutées : une légende par image
+$('f-images').addEventListener('change', () => {
+  const files = [...$('f-images').files];
+  if (files.length > 8) { showMsg('Maximum 8 images : seules les 8 premières seront envoyées.', 'warn'); }
+  $('gal-new').innerHTML = files.slice(0, 8).map((f, i) =>
+    `<div class="gal-item"><img src="${URL.createObjectURL(f)}" alt=""><input type="text" data-cap="${i}" placeholder="Légende (facultatif)"></div>`).join('');
+});
+$('f-cover').addEventListener('change', () => { const f = $('f-cover').files[0]; if (f) setCover(URL.createObjectURL(f)); });
+
+function buildForm(status) {
+  const fd = new FormData();
+  const v = (id) => $(id).value.trim();
+  fd.append('title', v('f-title')); fd.append('summary', v('f-summary'));
+  fd.append('category', $('f-category').value); fd.append('region', $('f-region').value); fd.append('country', v('f-country'));
+  fd.append('language', $('f-language').value); fd.append('published_at', $('f-date').value); fd.append('author', v('f-author'));
+  fd.append('source_name', v('f-source-name')); fd.append('source_url', v('f-source-url'));
+  fd.append('body_html', $('f-body').innerHTML);
+  fd.append('video_url', v('f-video')); fd.append('tags', v('f-tags'));
+  fd.append('featured', $('f-featured').checked ? 'true' : 'false');
+  fd.append('status', status);
+  const contacts = [...$('contacts').querySelectorAll('.contact-row')].map((r) => { const i = r.querySelectorAll('input'); return { label: i[0].value.trim(), value: i[1].value.trim() }; }).filter((c) => c.value);
+  fd.append('contacts', JSON.stringify(contacts));
+  const cover = $('f-cover').files[0];
+  if (cover) fd.append('cover', cover);
+  else if (S.coverRemote && !$('f-remove-cover').checked) fd.append('cover_remote_url', S.coverRemote);
+  const files = [...$('f-images').files].slice(0, 8);
+  files.forEach((f) => fd.append('images', f));
+  fd.append('captions', JSON.stringify(files.map((f, i) => { const el = $('gal-new').querySelector(`[data-cap="${i}"]`); return el ? el.value.trim() : ''; })));
+  if (S.editingId) {
+    fd.append('remove_image_ids', JSON.stringify(S.removeIds));
+    if ($('f-remove-cover').checked) fd.append('remove_cover', 'true');
+  } else {
+    fd.append('origin', S.origin);
+    if (S.suggestionId) fd.append('suggestion_id', S.suggestionId);
+  }
+  return fd;
+}
+
+async function save(status) {
+  if (!$('f-title').value.trim()) return showMsg('Le titre est obligatoire.', 'error');
+  if (!$('f-body').textContent.trim()) return showMsg('Le texte de l\'actualité est vide.', 'error');
+  $('btn-publish').disabled = $('btn-draft').disabled = true;
+  showMsg('Enregistrement en cours…', 'success');
+  try {
+    const url = '/api/actualites/admin/articles' + (S.editingId ? '/' + S.editingId : '');
+    const r = await fetch(url, { method: S.editingId ? 'PUT' : 'POST', headers: AUTH, body: buildForm(status) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.message || 'Erreur');
+    showMsg(esc(d.message) + (status === 'publie' ? ` <a href="/actualite.html?id=${d.id}" target="_blank" style="font-weight:600;">Voir l'actualité</a>` : ''), 'success');
+    resetEditor();
+    showTab('list');
+  } catch (e) { showMsg(esc(e.message), 'error'); }
+  $('btn-publish').disabled = $('btn-draft').disabled = false;
+}
+$('btn-publish').addEventListener('click', () => save('publie'));
+$('btn-draft').addEventListener('click', () => save('brouillon'));
+
+$('btn-translate').addEventListener('click', async () => {
+  if (!$('f-body').textContent.trim()) return showMsg('Rien à traduire : le texte est vide.', 'error');
+  $('btn-translate').disabled = true; $('btn-translate').textContent = 'Traduction en cours…';
+  try {
+    const d = await api('/translate', { method: 'POST', headers: JSONH, body: JSON.stringify({ title: $('f-title').value, summary: $('f-summary').value, body_html: $('f-body').innerHTML }) });
+    $('f-title').value = d.title; $('f-summary').value = d.summary; $('f-body').innerHTML = d.body_html; $('f-language').value = 'fr';
+    showMsg('Texte traduit en français : relisez-le avant de publier.', 'success');
+  } catch (e) { showMsg(esc(e.message), 'error'); }
+  $('btn-translate').disabled = false; $('btn-translate').textContent = '🌐 Traduire en français';
+});
+
+// ---------- Actualités publiées ----------
+async function loadArticles() {
+  const p = new URLSearchParams();
+  if ($('list-status').value) p.set('status', $('list-status').value);
+  if ($('list-q').value.trim()) p.set('q', $('list-q').value.trim());
+  try {
+    const rows = await api('/articles?' + p.toString());
+    if (!rows.length) { $('art-list').innerHTML = '<p class="hint">Aucune actualité pour le moment.</p>'; return; }
+    $('art-list').innerHTML = rows.map((a) => `
+      <div class="item" data-id="${a.id}">
+        <div class="thumb" ${a.cover ? `style="background-image:url('${esc(a.cover)}')"` : ''}></div>
+        <div class="info">
+          <strong>${a.featured ? '📌 ' : ''}${esc(a.title)}</strong>
+          <div class="sub">${esc((CATS.find((c) => c.key === a.category) || {}).label || '')} · ${esc(fmtDate(a.date))} · ${a.views} lecture(s) · ${a.status === 'publie' ? 'Publiée' : 'Brouillon'}</div>
+          <div class="actions">
+            ${a.status === 'publie' ? `<a class="mini ok" href="/actualite.html?id=${a.id}" target="_blank">Voir</a>` : ''}
+            <button class="mini edit" data-act="edit">Modifier</button>
+            <button class="mini ${a.status === 'publie' ? 'off' : 'ok'}" data-act="toggle" data-st="${a.status}">${a.status === 'publie' ? 'Masquer' : 'Publier'}</button>
+            <button class="mini" data-act="feat" data-f="${a.featured}">${a.featured ? 'Retirer de la une' : 'Mettre à la une'}</button>
+            <button class="mini del" data-act="del">Supprimer</button>
+          </div>
+        </div>
+      </div>`).join('');
+    $('art-list').querySelectorAll('button[data-act]').forEach((b) => b.addEventListener('click', async () => {
+      const id = b.closest('.item').dataset.id;
+      try {
+        if (b.dataset.act === 'edit') return editArticle(id);
+        if (b.dataset.act === 'del') {
+          if (!confirm('Supprimer cette actualité définitivement ?')) return;
+          await api('/articles/' + id, { method: 'DELETE', headers: AUTH });
+        } else if (b.dataset.act === 'toggle') {
+          await api('/articles/' + id, { method: 'PATCH', headers: JSONH, body: JSON.stringify({ status: b.dataset.st === 'publie' ? 'brouillon' : 'publie' }) });
+        } else if (b.dataset.act === 'feat') {
+          await api('/articles/' + id, { method: 'PATCH', headers: JSONH, body: JSON.stringify({ featured: b.dataset.f !== 'true' }) });
+        }
+        loadArticles();
+      } catch (e) { showMsg(esc(e.message), 'error'); }
+    }));
+  } catch (e) { $('art-list').innerHTML = `<div class="msg error">${esc(e.message)}</div>`; }
+}
+let listTimer;
+$('list-q').addEventListener('input', () => { clearTimeout(listTimer); listTimer = setTimeout(loadArticles, 350); });
+$('list-status').addEventListener('change', loadArticles);
+
+// ---------- Sources ----------
+async function loadSources() {
+  try {
+    const rows = await api('/sources');
+    $('src-list').innerHTML = rows.map((s) => `
+      <div class="src-row" data-id="${s.id}">
+        <div style="min-width:0;flex:1;">
+          <strong>${esc(s.name)}</strong>
+          <div class="hint" style="word-break:break-all;">${esc(s.site_url)}</div>
+          ${s.last_status === 'ok' ? `<div class="st-ok">✓ Fonctionne${s.last_checked_at ? ' · ' + esc(fmtDateTime(s.last_checked_at)) : ''}</div>`
+            : s.last_status === 'erreur' ? `<div class="st-err">✗ ${esc(s.last_error || 'Erreur')}</div>` : '<div class="hint">Pas encore vérifiée</div>'}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="mini ${s.enabled ? 'ok' : 'off'}" data-act="toggle" data-en="${s.enabled}">${s.enabled ? 'Active' : 'Désactivée'}</button>
+          <button class="mini del" data-act="del">Retirer</button>
+        </div>
+      </div>`).join('') || '<p class="hint">Aucune source.</p>';
+    $('src-list').querySelectorAll('button[data-act]').forEach((b) => b.addEventListener('click', async () => {
+      const id = b.closest('.src-row').dataset.id;
+      try {
+        if (b.dataset.act === 'del') { if (!confirm('Retirer cette source ?')) return; await api('/sources/' + id, { method: 'DELETE', headers: AUTH }); }
+        else await api('/sources/' + id, { method: 'PUT', headers: JSONH, body: JSON.stringify({ enabled: b.dataset.en !== 'true' }) });
+        loadSources();
+      } catch (e) { showMsg(esc(e.message), 'error'); }
+    }));
+  } catch (e) { $('src-list').innerHTML = `<div class="msg error">${esc(e.message)}</div>`; }
+}
+
+$('btn-add-src').addEventListener('click', async () => {
+  try {
+    await api('/sources', { method: 'POST', headers: JSONH, body: JSON.stringify({
+      name: $('s-name').value, site_url: $('s-site').value, feed_url: $('s-feed').value,
+      language: $('s-lang').value, region: $('s-region').value, category: $('s-category').value,
+    }) });
+    ['s-name', 's-site', 's-feed'].forEach((id) => { $(id).value = ''; });
+    showMsg('Source ajoutée. Elle sera consultée à la prochaine recherche (ou cliquez sur « Chercher maintenant »).', 'success');
+    loadSources();
+  } catch (e) { showMsg(esc(e.message), 'error'); }
+});
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>
