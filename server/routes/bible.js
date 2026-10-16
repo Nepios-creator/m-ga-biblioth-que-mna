@@ -4,6 +4,7 @@ const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
 const { docxToBlocks, parseBibleDocument, parseBibleText, sniffFormat } = require('../lib/bible-parse');
 const { parseBibleDocx } = require('../lib/bible-docx');
+const { rescueGluedNotes } = require('../lib/bible-notes-rescue');
 
 const router = express.Router();
 
@@ -84,6 +85,8 @@ async function analyseRequest(req) {
     lines = text.split(/\r?\n/);
     parsed = parseBibleText(lines);
   }
+  // Notes explicatives restées collées au dernier verset (« Notes · Chapitre II a · v.1 … ») : on les détache et on les relie à leurs lettres
+  rescueGluedNotes(parsed);
   // Un fichier = un chapitre : le numéro indiqué dans le formulaire remplace celui du fichier
   const wanted = parseInt(req.body && req.body.chapter, 10);
   if (wanted > 0 && parsed.chapters.length === 1) {
