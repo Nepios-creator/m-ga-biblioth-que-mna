@@ -135,7 +135,11 @@ function renderChips() {
     const m = await (await fetch('/api/actualites/meta')).json();
     CATS = m.categories || [];
     $('region').insertAdjacentHTML('beforeend', (m.regions || []).map((r) => `<option value="${esc(r.name)}">${esc(r.name)} (${r.n})</option>`).join(''));
-    $('lang').insertAdjacentHTML('beforeend', (m.languages || []).map((l) => `<option value="${esc(l.code)}">${esc(langName(l.code))} (${l.n})</option>`).join(''));
+    if ((m.languages || []).length > 1) {
+      $('lang').insertAdjacentHTML('beforeend', m.languages.map((l) => `<option value="${esc(l.code)}">${esc(langName(l.code))} (${l.n})</option>`).join(''));
+    } else {
+      $('lang').style.display = 'none'; // toutes les actualités sont en français
+    }
   } catch (e) { /* les filtres restent vides */ }
   renderChips();
   load(true);
