@@ -25,8 +25,8 @@ module.exports = function mountActualites(app, express, publicDir) {
     try {
       const a = (await pool.query(
         `SELECT a.title, a.summary, a.cover_url,
-                (SELECT i.id FROM actu_images i WHERE i.article_id = a.id AND i.is_cover ORDER BY i.id DESC LIMIT 1) AS cover_id
-         FROM actu_articles a WHERE a.id = $1 AND a.status = 'publie'`, [id]
+                (SELECT i.id FROM news_images i WHERE i.article_id = a.id AND i.is_cover ORDER BY i.id DESC LIMIT 1) AS cover_id
+         FROM news_articles a WHERE a.id = $1 AND a.status = 'publie'`, [id]
       )).rows[0];
       if (!a) return next();
       const html = await fs.promises.readFile(path.join(publicDir, 'actualite.html'), 'utf8');

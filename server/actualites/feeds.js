@@ -117,10 +117,10 @@ function guessCategory(text, fallback) {
 let running = false;
 
 async function setMeta(key, value) {
-  await pool.query('INSERT INTO actu_meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
+  await pool.query('INSERT INTO news_meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
 }
 async function getMeta(key) {
-  const r = await pool.query('SELECT value FROM actu_meta WHERE key = $1', [key]);
+  const r = await pool.query('SELECT value FROM news_meta WHERE key = $1', [key]);
   return r.rows[0] ? r.rows[0].value : null;
 }
 
@@ -131,10 +131,10 @@ async function runDailyFetch() {
   let added = 0;
   try {
     await pool.query(
-      "UPDATE actu_suggestions SET status = 'expiree' WHERE status = 'nouvelle' AND created_at < now() - ($1 || ' days')::interval",
+      "UPDATE news_suggestions SET status = 'expiree' WHERE status = 'nouvelle' AND created_at < now() - ($1 || ' days')::interval",
       [String(EXPIRE_AFTER_DAYS)]
     );
-    const sources = (await pool.query('SELECT * FROM actu_sources WHERE enabled ORDER BY id')).rows;
+    const sources = (await pool.query('SELECT * FROM news_sources WHERE enabled ORDER BY id')).rows;
     const oldest = Date.now() - MAX_AGE_DAYS * 86400000;
 
     for (const s of sources) {
@@ -144,19 +144,19 @@ async function runDailyFetch() {
         for (const it of items) {
           if (n >= PER_SOURCE) break;
           if (it.published_at && new Date(it.published_at).getTime() < oldest) continue;
-          const done = await pool.query('SELECT 1 FROM actu_articles WHERE source_url = $1', [it.link]);
+          const done = await pool.query('SELECT 1 FROM news_articles WHERE source_url = $1', [it.link]);
           if (done.rows.length) continue;
           const ins = await pool.query(
-            `INSERT INTO actu_suggestions (source_id, source_name, title, summary, link, image_url, published_at, language, region, category)
+            `INSERT INTO news_suggestions (source_id, source_name, title, summary, link, image_url, published_at, language, region, category)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (link) DO NOTHING RETURNING id`,
             [s.id, s.name, it.title, it.summary, it.link, it.image, it.published_at, s.language, s.region, guessCategory(it.title + ' ' + it.summary, s.category)]
           );
           if (ins.rows.length) { n++; added++; }
         }
-        await pool.query("UPDATE actu_sources SET feed_url = $2, last_checked_at = now(), last_status = 'ok', last_error = NULL WHERE id = $1", [s.id, feedUrl]);
+        await pool.query("UPDATE news_sources SET feed_url = $2, last_checked_at = now(), last_status = 'ok', last_error = NULL WHERE id = $1", [s.id, feedUrl]);
         results.push({ source: s.name, ok: true, added: n });
       } catch (err) {
-        await pool.query("UPDATE actu_sources SET last_checked_at = now(), last_status = 'erreur', last_error = $2 WHERE id = $1", [s.id, String(err.message).slice(0, 300)]);
+        await pool.query("UPDATE news_sources SET last_checked_at = now(), last_status = 'erreur', last_error = $2 WHERE id = $1", [s.id, String(err.message).slice(0, 300)]);
         results.push({ source: s.name, ok: false, error: err.message });
       }
     }
