@@ -33,6 +33,9 @@
   .sample b { color: var(--gold-deep); }
   .progress { height: 10px; background: var(--paper); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
   .progress > div { height: 100%; background: var(--gold); }
+  .lines-read { background: #faf6ee; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.6; margin-bottom: 12px; word-break: break-word; }
+  .lines-read div { border-bottom: 1px solid #efe7d6; padding: 2px 0; }
+  .lines-read div:last-child { border-bottom: none; }
 </style>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -64,8 +67,11 @@
 
     <div class="panel">
       <h2 style="margin-bottom:6px;">Publier un livre</h2>
-      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;">Choisissez le livre, puis son texte (fichier Word <b>.docx</b>, fichier <b>.txt</b>, ou texte collé). Vous pourrez vérifier l'aperçu avant de publier. Pour corriger un livre déjà en ligne, republiez-le : il est mis à jour sans effacer les favoris des lecteurs.</p>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;">Choisissez le fichier du livre (Word <b>.docx</b>, <b>.txt</b>, ou texte collé) : le site reconnaît le livre, les chapitres et les versets tout seul. Vérifiez l'aperçu, puis publiez. Pour corriger un livre déjà en ligne, republiez-le : il est mis à jour sans effacer les favoris des lecteurs.</p>
       <div id="msg-box"></div>
+
+      <div class="field"><label>Fichier du livre (Word .docx ou .txt)</label><input type="file" id="f-file"></div>
+      <div class="field"><label>… ou coller le texte ici</label><textarea id="f-text" rows="5" placeholder="Chapitre 1&#10;1 Au commencement…&#10;2 …"></textarea></div>
 
       <div class="field"><label>Livre</label>
         <select id="f-canon"></select>
@@ -79,16 +85,13 @@
       </div>
       <div class="field" style="max-width:260px;"><label>Ordre dans la Bible</label><input type="number" id="f-order"></div>
 
-      <div class="field"><label>Fichier du livre (.docx ou .txt)</label><input type="file" id="f-file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></div>
-      <div class="field"><label>… ou coller le texte ici</label><textarea id="f-text" rows="6" placeholder="Chapitre 1&#10;1 Au commencement…&#10;2 …"></textarea></div>
-
       <details style="margin-bottom:16px;font-size:13.5px;color:var(--ink-soft);">
         <summary style="cursor:pointer;font-weight:600;">Comment préparer le texte ?</summary>
         <ul style="margin:10px 0 0 18px;line-height:1.7;">
-          <li>Une ligne « Chapitre 1 » (ou « Psaume 23 ») avant chaque chapitre.</li>
-          <li>Les versets numérotés : « 1 Au commencement… », un verset par ligne, ou plusieurs dans un paragraphe.</li>
-          <li>Numéros en exposant dans Word : reconnus automatiquement.</li>
+          <li>Le site reconnaît : « Chapitre 1 », « Psaume 23 », « Genèse 1 », ou la numérotation qui repart à 1.</li>
+          <li>Les versets : « 1 Au commencement… », un verset par ligne ou plusieurs dans un paragraphe ; numéros seuls sur leur ligne, en exposant, ou numérotation automatique de Word : tout est reconnu.</li>
           <li>Un intertitre (sans numéro) placé avant un verset est conservé au-dessus de ce verset.</li>
+          <li>Les anciens fichiers Word <b>.doc</b> ne sont pas lisibles : enregistrez-les en <b>.docx</b>.</li>
         </ul>
       </details>
 
@@ -139,18 +142,50 @@ if (!token || !user || user.role !== 'admin') {
 
 function showMsg(text, type) { $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`; window.scrollTo({ top: $('msg-box').offsetTop - 80, behavior: 'smooth' }); }
 
+// Lit la réponse du serveur ; si ce n'est pas du JSON (erreur serveur), donne quand même une explication claire
+async function readJson(r) {
+  const raw = await r.text();
+  try { return JSON.parse(raw); } catch (e) {
+    return { message: r.status === 413
+      ? 'Le fichier est trop volumineux pour le serveur. Publiez la Bible livre par livre.'
+      : `Le serveur a répondu une erreur (code ${r.status}). Réessayez ; si cela continue, le fichier est peut-être illisible ou trop lourd.` };
+  }
+}
+
+const norm = (s) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+function applyCanon(i) {
+  const b = CANON[Number(i)];
+  $('f-canon').value = String(i);
+  $('f-name').value = b[0]; $('f-abbr').value = b[1]; $('f-testament').value = b[2]; $('f-order').value = (Number(i) + 1) * 10;
+}
+
+// Reconnaît le livre d'après les premières lignes du fichier (« Genèse », « Livre de Ruth », « Évangile selon Jean », « Genèse 1 »…)
+function detectCanon(lines) {
+  const prefix = /^(?:le |la |les )?(?:livre|evangile|epitre|lettre|prophete|premier livre|second livre)?\s*(?:de la |de l |de |d |du |des |selon |aux |a )?/;
+  const names = CANON.map((b, i) => [norm(b[0]), i]).sort((a, b) => b[0].length - a[0].length);
+  for (const line of (lines || []).slice(0, 8)) {
+    if (line.length > 70) continue;
+    const n = norm(line).replace(/ \d{1,3}$/, '');
+    for (const cand of [n, n.replace(prefix, '').trim()]) {
+      const hit = names.find(([name]) => name === cand);
+      if (hit) return hit[1];
+    }
+  }
+  return -1;
+}
+
 function initForm() {
   $('f-canon').innerHTML = '<option value="">— Autre livre (saisie libre) —</option>' +
     CANON.map((b, i) => `<option value="${i}">${i + 1}. ${b[0]}</option>`).join('');
   $('f-canon').addEventListener('change', () => {
     const i = $('f-canon').value;
     if (i === '') return;
-    const b = CANON[Number(i)];
-    $('f-name').value = b[0]; $('f-abbr').value = b[1]; $('f-testament').value = b[2]; $('f-order').value = (Number(i) + 1) * 10;
+    applyCanon(i);
     resetPreview();
   });
   ['f-file', 'f-text'].forEach((id) => $(id).addEventListener('input', resetPreview));
-  $('f-file').addEventListener('change', resetPreview);
+  $('f-file').addEventListener('change', () => { resetPreview(); if ($('f-file').files[0]) $('btn-preview').click(); }); // l'aperçu se lance tout seul
 }
 
 function resetPreview() { $('preview-box').innerHTML = ''; $('btn-publish').disabled = true; }
@@ -175,10 +210,11 @@ $('btn-preview').addEventListener('click', async () => {
   $('preview-box').innerHTML = '<div class="msg success">Analyse du texte en cours…</div>';
   try {
     const r = await fetch('/api/bible/admin/preview', { method: 'POST', headers: H, body: buildForm(false) });
-    const d = await r.json();
+    const d = await readJson(r);
+    if (r.status === 401 || r.status === 403) { $('preview-box').innerHTML = '<div class="msg error">Session expirée ou accès refusé : reconnectez-vous en tant qu\'administrateur.</div>'; return; }
     if (!r.ok) { $('preview-box').innerHTML = `<div class="msg error">${esc(d.message || 'Erreur')}</div>`; return; }
     renderPreview(d);
-  } catch (e) { $('preview-box').innerHTML = '<div class="msg error">Erreur réseau — réessayez.</div>'; }
+  } catch (e) { $('preview-box').innerHTML = '<div class="msg error">Le serveur ne répond pas (réseau ou serveur en cours de démarrage). Patientez quelques secondes, puis réessayez.</div>'; }
 });
 
 function sample(label, s) {
@@ -187,13 +223,36 @@ function sample(label, s) {
     `${v.heading ? `<i>[${esc(v.heading)}]</i><br>` : ''}<b>${v.verse}</b> ${esc(v.text)}`).join('<br>')}</div>`;
 }
 
+function linesRead(d, open) {
+  if (!d.firstLines || !d.firstLines.length) return '';
+  return `<details ${open ? 'open' : ''} style="margin-bottom:12px;font-size:13.5px;"><summary style="cursor:pointer;font-weight:600;color:var(--ink-soft);">Début du fichier tel que le site l'a lu (${d.linesRead} ligne(s))</summary>
+    <div class="lines-read">${d.firstLines.map((l) => `<div>${esc(l)}</div>`).join('')}</div></details>`;
+}
+
 function renderPreview(d) {
-  const blocking = d.duplicates > 0 || !d.totalVerses;
-  $('preview-box').innerHTML = `
+  // Le livre est reconnu tout seul d'après le début du fichier, tant que vous n'en avez pas choisi un vous-même
+  let recognised = '';
+  if ($('f-canon').value === '' && !$('f-name').value.trim()) {
+    const i = detectCanon(d.firstLines);
+    if (i >= 0) { applyCanon(i); recognised = `<div class="msg success">📖 Livre reconnu automatiquement : <b>${esc(CANON[i][0])}</b>. Vérifiez-le dans « Livre » ci-dessus si besoin.</div>`; }
+  }
+
+  if (!d.totalVerses) {
+    $('preview-box').innerHTML = `${recognised}
+      <div class="msg error"><b>Aucun verset reconnu dans ce fichier.</b> Voici le début du fichier tel que le site l'a lu : vérifiez que les versets y sont bien numérotés (« 1 Au commencement… »).</div>
+      ${linesRead(d, true)}
+      <p style="font-size:13px;color:var(--ink-soft);">Si le début du fichier est vide ou illisible, enregistrez le document en <b>.docx</b> depuis Word (ou collez le texte dans la zone prévue), puis recommencez.</p>`;
+    $('btn-publish').disabled = true;
+    return;
+  }
+
+  const blocking = d.duplicates > 0;
+  $('preview-box').innerHTML = `${recognised}
     <div class="msg ${blocking ? 'error' : 'success'}"><b>${d.chapters.length} chapitre(s)</b> et <b>${d.totalVerses} verset(s)</b> détectés.</div>
     ${d.warnings.length ? `<div class="msg warn"><b>À vérifier :</b><ul style="margin:6px 0 0 18px;">${d.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div class="chips">${d.chapters.map((c) => `<span class="chip">Ch. ${c.chapter} : ${c.count}</span>`).join('')}</div>
     ${sample('Début', d.sampleStart)}${sample('Fin', d.sampleEnd)}
+    ${linesRead(d, false)}
     <p style="font-size:13px;color:var(--ink-soft);">Vérifiez que les premiers et derniers versets sont corrects, puis publiez.</p>`;
   $('btn-publish').disabled = blocking;
 }
@@ -204,13 +263,13 @@ $('btn-publish').addEventListener('click', async () => {
   showMsg('Publication en cours…', 'success');
   try {
     const r = await fetch('/api/bible/admin/books', { method: 'POST', headers: H, body: buildForm(true) });
-    const d = await r.json();
+    const d = await readJson(r);
     if (!r.ok) { showMsg(esc(d.message || 'Erreur'), 'error'); $('btn-publish').disabled = false; return; }
     showMsg(esc(d.message), 'success');
-    $('f-file').value = ''; $('f-text').value = ''; $('f-canon').value = '';
+    $('f-file').value = ''; $('f-text').value = ''; $('f-canon').value = ''; $('f-name').value = ''; $('f-abbr').value = ''; $('f-order').value = '';
     $('preview-box').innerHTML = '';
     loadBooks();
-  } catch (e) { showMsg('Erreur réseau — réessayez.', 'error'); $('btn-publish').disabled = false; }
+  } catch (e) { showMsg('Le serveur ne répond pas. Patientez quelques secondes, puis réessayez.', 'error'); $('btn-publish').disabled = false; }
 });
 
 async function loadBooks() {
