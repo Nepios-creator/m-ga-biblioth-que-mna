@@ -21,4 +21,11 @@ if ('serviceWorker' in navigator) {
     contact.src = '/js/home-contact.js';
     document.body.appendChild(contact);
   }
+
+  // Page Bible : notes de compréhension écrites sous le verset (Entrée = nouveau paragraphe)
+  if (location.pathname.endsWith('/bible.html')) {
+    const bibleNotes = document.createElement('script');
+    bibleNotes.src = '/js/bible-notes.js';
+    document.body.appendChild(bibleNotes);
+  }
 })();
