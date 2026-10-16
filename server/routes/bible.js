@@ -2,10 +2,19 @@ const express = require('express');
 const multer = require('multer');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin } = require('../lib/auth-middleware');
-const { docxToRawLines, parseBible } = require('../lib/bible-parse');
+const { docxToRawLines, parseBible, sniffFormat } = require('../lib/bible-parse');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10 Mo max
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25 Mo max
+
+// Téléversement avec un vrai message d'erreur lisible (au lieu d'une page d'erreur illisible)
+function uploadOne(req, res, next) {
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next();
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    res.status(400).json({ message: tooBig ? 'Fichier trop volumineux (25 Mo maximum). Publiez la Bible livre par livre.' : 'Téléversement impossible : ' + err.message });
+  });
+}
 
 // =====================================================================
 //  ADMINISTRATION (réservée aux administrateurs)
@@ -13,12 +22,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const admin = express.Router();
 admin.use(requireAuth, requireAdmin);
 
+// Lit le texte reçu (fichier ou texte collé). Le type du fichier est reconnu d'après son contenu,
+// pas d'après son nom : sur téléphone, le nom reçu n'a parfois pas d'extension.
 async function linesFromRequest(req) {
   if (req.file) {
-    const name = (req.file.originalname || '').toLowerCase();
-    if (name.endsWith('.docx')) return docxToRawLines(req.file.buffer);
-    if (name.endsWith('.txt')) return req.file.buffer.toString('utf8').split(/\r?\n/);
-    throw new Error('Format non supporté : utilisez un fichier Word (.docx) ou texte (.txt), ou collez le texte.');
+    const kind = sniffFormat(req.file.buffer);
+    if (kind === 'empty') throw new Error('Le fichier reçu est vide. Choisissez-le de nouveau.');
+    if (kind === 'text') {
+      let text = req.file.buffer.toString('utf8');
+      if (text.includes('\ufffd')) text = req.file.buffer.toString('latin1'); // fichier .txt ancien (Windows-1252)
+      return text.replace(/^\ufeff/, '').split(/\r?\n/);
+    }
+    return docxToRawLines(req.file.buffer); // .docx, ou message clair pour .doc / PDF / autre
   }
   const text = String((req.body && req.body.text) || '');
   if (!text.trim()) throw new Error('Aucun texte reçu : choisissez un fichier ou collez le texte.');
@@ -26,9 +41,10 @@ async function linesFromRequest(req) {
 }
 
 // Aperçu : analyse le texte sans rien enregistrer
-admin.post('/preview', upload.single('file'), async (req, res) => {
+admin.post('/preview', uploadOne, async (req, res) => {
   try {
-    const parsed = parseBible(await linesFromRequest(req));
+    const lines = await linesFromRequest(req);
+    const parsed = parseBible(lines);
     const chapters = parsed.chapters.map((c) => ({ chapter: c.chapter, count: c.verses.length }));
     const first = parsed.chapters[0];
     const lastCh = parsed.chapters[parsed.chapters.length - 1];
@@ -39,6 +55,9 @@ admin.post('/preview', upload.single('file'), async (req, res) => {
       chapters,
       sampleStart: first ? { chapter: first.chapter, verses: first.verses.slice(0, 3) } : null,
       sampleEnd: lastCh ? { chapter: lastCh.chapter, verses: lastCh.verses.slice(-2) } : null,
+      // Début du fichier tel que le site le lit : sert à reconnaître le livre et à comprendre un refus
+      linesRead: lines.filter((l) => String(l).trim()).length,
+      firstLines: lines.map((l) => String(l).trim()).filter(Boolean).slice(0, 8).map((l) => l.slice(0, 140)),
     });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -47,7 +66,7 @@ admin.post('/preview', upload.single('file'), async (req, res) => {
 
 // Publier (ou mettre à jour) un livre de la Bible. Les versets existants sont mis à jour sur place,
 // pour ne pas perdre les surlignages et favoris des lecteurs.
-admin.post('/books', upload.single('file'), async (req, res) => {
+admin.post('/books', uploadOne, async (req, res) => {
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Le nom du livre est requis' });
   const testament = req.body.testament === 'nouveau' ? 'nouveau' : 'ancien';
@@ -77,7 +96,7 @@ admin.post('/books', upload.single('file'), async (req, res) => {
       );
     } else {
       const ins = await client.query(
-        'INSERT INTO bible_books (name, abbreviation, testament, book_order) VALUES ($1,$2,$3,$4) RETURNING id',
+        'INSERT INTO bible_books (name, abbreviation, testament, book_order, published) VALUES ($1,$2,$3,$4,true) RETURNING id',
         [name, abbreviation, testament, bookOrder]
       );
       bookId = ins.rows[0].id;
