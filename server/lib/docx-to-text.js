@@ -12,6 +12,12 @@ function decodeXmlEntities(s) {
 // Un passage est en gras si <w:b/> est présent (et pas <w:b w:val="0"/>)
 const hasBold = (rPr) => /<w:b(?:\s*\/>|\s+w:val="(?:1|true|on)"\s*\/?>)/.test(rPr || '');
 
+// Titres écrits avec des lettres espacées (« C H A P I T R E  1 ») : on les recolle (« CHAPITRE 1 »)
+function despaceTitle(text) {
+  const m = text.match(/^((?:\p{Lu} ){3,}\p{Lu})(?= |$)(.*)$/u);
+  return m ? m[1].replace(/ /g, '') + m[2] : text;
+}
+
 // Découpe le document.xml en paragraphes : texte, alignement, taille de police, gras et style de titre Word
 function extractItems(xml) {
   const rawChunks = xml.split('</w:p>');
@@ -25,7 +31,7 @@ function extractItems(xml) {
     const jc = jcMatch ? jcMatch[1] : null;
 
     const textMatches = [...p.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)];
-    const text = decodeXmlEntities(textMatches.map((m) => m[1]).join('')).trim();
+    const text = despaceTitle(decodeXmlEntities(textMatches.map((m) => m[1]).join('')).trim());
     if (!text) continue;
 
     let maxSize = 0;
@@ -33,6 +39,17 @@ function extractItems(xml) {
     for (const block of rPrBlocks) {
       const szMatch = block[1].match(/<w:sz w:val="(\d+)"/);
       if (szMatch) maxSize = Math.max(maxSize, parseInt(szMatch[1], 10));
+    }
+
+    // Lettrine (grande première lettre isolée) : elle ne doit pas faire passer tout le paragraphe pour un titre
+    const runList = [...p.matchAll(/<w:r(?:\s[^>]*)?>([^]*?)<\/w:r>/g)];
+    const runSize = (m) => { const s = (m[1].match(/<w:rPr>([^]*?)<\/w:rPr>/) || [])[1] || ''; const z = s.match(/<w:sz w:val="(\d+)"/); return z ? parseInt(z[1], 10) : 0; };
+    const runLen = (m) => [...m[1].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((x) => x[1]).join('').trim().length;
+    const longRuns = runList.filter((m) => runLen(m) > 2);
+    const shortRuns = runList.filter((m) => runLen(m) > 0 && runLen(m) <= 2);
+    if (longRuns.length && shortRuns.length) {
+      const longMax = Math.max(0, ...longRuns.map(runSize));
+      if (shortRuns.some((m) => runSize(m) > longMax)) maxSize = longMax;
     }
 
     // Gras : tous les passages contenant du texte sont en gras
@@ -74,6 +91,8 @@ function bodySizeOf(items) {
 }
 
 const endsLikeSentence = (t) => /[.!?;:,»”]$/.test(t.trim());
+// Pour le titre d'un chapitre, un point d'interrogation ou d'exclamation final est normal (« Qui était Lucifer ? »)
+const endsLikeBodySentence = (t) => /[.;:,»”]$/.test(t.trim());
 
 // Même convention que l'espace d'étude : "# " = grand titre, "## " = sous-titre, sinon paragraphe
 function buildParagraphs(items) {
@@ -115,9 +134,9 @@ function buildParagraphs(items) {
         // Le titre principal du chapitre suit le numéro : on le rattache au titre (jusqu'à 3 lignes)
         while (j < n && titleParts.length < 3) {
           const nx = items[j];
-          if (part(nx.text) || chap(nx.text) || nx.text.length > 140 || endsLikeSentence(nx.text)) break;
+          if (part(nx.text) || chap(nx.text) || nx.text.length > 140 || endsLikeBodySentence(nx.text)) break;
           const styled = nx.level > 0 || (boldIsDistinctive && nx.bold) || isBigger(nx.size) || nx.jc === 'center';
-          if (!styled && !(titleParts.length === 0 && nx.text.length <= 90)) break; // texte courant isolé : le titre d'un chapitre sans mise en forme tient sur une ligne
+          if (!styled && !(titleParts.length === 0 && nx.text.length <= 90 && !/[?!]$/.test(nx.text.trim()))) break; // texte courant isolé : le titre d'un chapitre sans mise en forme tient sur une ligne
           // Après la 1re ligne, on n'en ajoute d'autres que si le titre est centré sur plusieurs lignes ;
           // sinon la ligne suivante est un sous-titre du chapitre, pas la suite du titre principal
           if (titleParts.length > 0 && !(nx.jc === 'center' && items[j - 1].jc === 'center')) break;
