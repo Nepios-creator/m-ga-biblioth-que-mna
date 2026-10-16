@@ -41,6 +41,33 @@ async function docxToBlocks(buffer) {
   if (!file) throw new Error('Fichier Word illisible (document.xml absent). ' + WORD_HELP);
   const xml = await file.async('string');
 
+  // Notes de bas de page / de fin de Word : leur texte devient le commentaire de la lettre correspondante
+  const noteBodies = { footnote: {}, endnote: {} };
+  for (const kindName of ['footnote', 'endnote']) {
+    const nf = zip.file('word/' + kindName + 's.xml');
+    if (!nf) continue;
+    const nx = await nf.async('string');
+    for (const m of nx.matchAll(new RegExp('<w:' + kindName + '\\b([^>]*)>([\\s\\S]*?)<\\/w:' + kindName + '>', 'g'))) {
+      const id = (m[1].match(/w:id="(-?\d+)"/) || [])[1];
+      if (/w:type="(?:separator|continuationSeparator|continuationNotice)"/.test(m[1])) continue;
+      const paras = [...m[2].matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map((pp) => textOf(pp[0]).trim()).filter(Boolean);
+      if (id !== undefined && paras.length) noteBodies[kindName][id] = paras.join('\n');
+    }
+  }
+  // Taille du texte courant du document : les lettres de renvoi (a, b, c…) sont plus petites
+  let defaultSize = 22;
+  const sf = zip.file('word/styles.xml');
+  if (sf) { const sx = await sf.async('string'); const dm = sx.match(/<w:docDefaults>[\s\S]*?<w:sz w:val="(\d+)"/); if (dm) defaultSize = parseInt(dm[1], 10); }
+  const votes0 = {};
+  for (const rm of xml.matchAll(/<w:r[ >][\s\S]*?<\/w:r>/g)) {
+    const len = textOf(rm[0]).length;
+    if (!len) continue;
+    const sz = parseInt((rm[0].match(/<w:sz w:val="(\d+)"/) || [])[1] || defaultSize, 10);
+    votes0[sz] = (votes0[sz] || 0) + len;
+  }
+  let docBody = defaultSize, best0 = -1;
+  for (const [sz, v] of Object.entries(votes0)) if (v > best0) { docBody = Number(sz); best0 = v; }
+
   // Commentaires Word natifs (« Insertion > Commentaire »)
   const nativeText = {};
   const cfile = zip.file('word/comments.xml');
@@ -58,6 +85,9 @@ async function docxToBlocks(buffer) {
   const open = {};      // commentaires natifs dont la plage est ouverte : id → { anchor, block }
   const nativeRanges = {};
   const counters = {};  // numérotation automatique de Word : un compteur par liste
+  let noteCount = 0;
+  const noteDefs = [];  // notes de bas de page : { letter, text }
+  const letterFor = (n) => (n <= 26 ? String.fromCharCode(96 + n) : letterFor(Math.floor((n - 1) / 26)) + String.fromCharCode(97 + ((n - 1) % 26)));
   let boxDepth = 0;
   const headingLike = (t) => t.length < 60 && (/^(?:chapitre|chap\.?|psaumes?|ps\.?)\s*\d{1,3}\b/i.test(t) || /^[A-Za-zÀ-ÿ0-9'’ .]{0,30}\s\d{1,3}$/.test(t) || /^\d{1,3}$/.test(t));
   let bodySizeVotes = {};
@@ -87,6 +117,13 @@ async function docxToBlocks(buffer) {
         continue;
       }
       const run = m[0];
+      // Appel de note de bas de page : lettre a, b, c… dans l'ordre d'apparition
+      const fnRef = run.match(/<w:(footnote|endnote)Reference\b[^>]*w:id="(-?\d+)"/);
+      if (fnRef) {
+        const body = noteBodies[fnRef[1]][fnRef[2]];
+        if (body) { flushSup(); const letter = letterFor(++noteCount); out += '⟦#' + letter + '⟧'; noteDefs.push({ letter, text: body }); }
+        continue;
+      }
       const rPr = (run.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/) || [])[1] || '';
       const superscript = /<w:vertAlign w:val="superscript"\s*\/>/.test(rPr)
         || /<w:position w:val="[1-9]\d*"\s*\/>/.test(rPr)
@@ -98,6 +135,15 @@ async function docxToBlocks(buffer) {
         if (t[0].startsWith('<w:t')) runText += decodeXmlEntities(t[1]);
         else if (t[0].startsWith('<w:br')) runText += '\n';
         else runText += ' ';
+      }
+      // Petite lettre de renvoi (a, b, c…) collée à un mot : exposant, texte plus petit, ou style de renvoi.
+      // Elle est marquée ⟦#a⟧ pour ne jamais se mélanger au texte du verset (« 1er », « 2e » sont exclus).
+      const lm = runText.trim().match(/^\(?([a-zA-Z])\)?$/);
+      if (lm && !sup && out.length > 0 && !/[\d\n]$/.test(out)) {
+        const sz1 = parseInt((rPr.match(/<w:sz w:val="(\d+)"/) || [])[1] || 0, 10);
+        const smallRun = sz1 && docBody && sz1 <= docBody * 0.8;
+        const styledRun = /<w:rStyle w:val="[^"]*(?:renvoi|lettre|notemark|footnotemark|appel)[^"]*"/i.test(rPr);
+        if (superscript || smallRun || styledRun) { out += '⟦#' + lm[1].toLowerCase() + '⟧'; continue; }
       }
       if (runText.trim()) {
         hasText = true;
@@ -154,7 +200,7 @@ async function docxToBlocks(buffer) {
   for (const [id, r] of Object.entries(nativeRanges)) {
     if (nativeText[id]) natives.push({ id, text: nativeText[id].text, author: nativeText[id].author, anchorText: r.anchor.replace(/\s+/g, ' ').trim(), block: r.block });
   }
-  return { blocks, natives };
+  return { blocks, natives, noteDefs };
 }
 
 // Ancienne interface : seulement les lignes de texte
@@ -228,16 +274,27 @@ function parseBible(rawLines) {
     } else if (last && n > last + 1) {
       warn(`Chapitre ${chapter} : saut de numérotation entre ${last} et ${n}.`);
     }
-    current = { verse: n, text: (text || '').trim(), heading: pendingHeading };
+    current = { verse: n, text: (text || '').trim(), heading: pendingHeading, notes: [] };
     pendingHeading = null;
     verses.push(current);
     last = n;
   }
 
+  // Ajoute du texte au verset en cours. Les lettres de renvoi ⟦#a⟧ ne sont jamais écrites dans le texte :
+  // on retient seulement l'endroit du verset où elles se trouvent.
   function appendText(t) {
-    t = (t || '').trim();
-    if (!t || !current) return;
-    current.text = current.text ? current.text + ' ' + t : t;
+    if (!current) return;
+    let afterToken = false;
+    for (const part of String(t || '').split(/(⟦#[^⟧]{1,3}⟧)/)) {
+      const mm = part.match(/^⟦#([^⟧]{1,3})⟧$/);
+      if (mm) { current.notes.push({ letter: mm[1], offset: current.text.length }); afterToken = true; continue; }
+      const tt = part.trim();
+      if (!tt) continue;
+      // Juste après une lettre de renvoi, le texte reprend tel quel (« commencement,a Dieu » ne doit pas devenir « commencement , Dieu »)
+      const glue = !current.text || (afterToken && !/^\s/.test(part));
+      current.text = glue ? current.text + tt : current.text + ' ' + tt;
+      afterToken = false;
+    }
   }
 
   // Cherche, dans une ligne, le début du verset attendu (numéro précédé d'une ponctuation de fin de phrase)
@@ -288,7 +345,7 @@ function parseBible(rawLines) {
     }
 
     // 2) Numéros de verset en exposant (Word) : ⟦n⟧
-    if (line.includes('⟦')) {
+    if (/⟦\d{1,3}⟧/.test(line)) {
       for (const part of line.split(/(⟦\d{1,3}⟧)/).filter((p) => p !== '')) {
         const mm = part.match(/^⟦(\d{1,3})⟧$/);
         if (mm) {
@@ -298,7 +355,8 @@ function parseBible(rawLines) {
         } else if (current) {
           appendText(part);
         } else {
-          pendingHeading = (pendingHeading ? pendingHeading + ' ' : '') + part.trim();
+          const clean = part.replace(/⟦#[^⟧]+⟧/g, '').trim();
+          if (clean) pendingHeading = (pendingHeading ? pendingHeading + ' ' : '') + clean;
         }
       }
       return;
@@ -344,11 +402,12 @@ function parseBible(rawLines) {
       const nextLead = nextLine.match(LEAD_RE);
       const nextIsVerse = !!(nextLead && plausible(Number(nextLead[1])));
       const looksLikeHeading = line.length < 100 && !/[.!?;:»”]$/.test(line);
-      if (nextIsVerse && looksLikeHeading) { pendingHeading = line; return; }
+      if (nextIsVerse && looksLikeHeading) { pendingHeading = line.replace(/⟦#[^⟧]+⟧/g, '').trim(); return; }
       absorb(line);
       return;
     }
-    pendingHeading = pendingHeading ? pendingHeading + ' ' + line : line;
+    const cleanLine = line.replace(/⟦#[^⟧]+⟧/g, '').trim();
+    if (cleanLine) pendingHeading = pendingHeading ? pendingHeading + ' ' + cleanLine : cleanLine;
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -417,13 +476,20 @@ function looksLikeVerse(text, lastSeen) {
 
 // Sépare les paragraphes du document en versets et en commentaires, puis rattache chaque commentaire à son verset.
 // `blocks` : paragraphes (avec mise en forme) ; `natives` : commentaires Word natifs.
-function parseBibleDocument(blocks, natives) {
+function parseBibleDocument(blocks, natives, noteDefs) {
   const verseLines = [];
   const lineBlock = [];   // numéro de paragraphe d'origine de chaque ligne de verset
   const items = [];       // commentaires repérés : { afterLine, ... }
   let inSection = false;  // on est dans une rubrique « Commentaires »
   let inRun = false;      // le paragraphe précédent était un commentaire : la suite (sans numéro de verset) en fait partie
   let lastSeen = 0;       // dernier numéro de verset aperçu (estimation)
+  let lastItem = null;    // dernier commentaire repéré (pour y rattacher ses paragraphes suivants)
+
+  // Lettres de renvoi (a, b, c…) présentes dans les versets
+  const letters = new Set();
+  blocks.forEach((b) => { for (const m of b.text.matchAll(/⟦#([^⟧]{1,3})⟧/g)) letters.add(m[1]); });
+  (noteDefs || []).forEach((n) => letters.add(n.letter));
+  const NOTE_LABEL_RE = /^\(?\[?(?:(?:v\.?\s*)?(\d{1,3})\s*)?([a-zA-Z])\s*[)\].:—–\-]\s*(\S[\s\S]*)$/;
 
   // Si presque tout le document a la même mise en forme (tout en italique, tout encadré…), elle ne distingue plus rien
   const total = Math.max(1, blocks.length);
@@ -446,12 +512,29 @@ function parseBibleDocument(blocks, natives) {
     const b = blocks[bi];
     const text = b.text.replace(/\n/g, ' ').trim();
     if (!text) continue;
-    const plain = text.replace(/⟦(\d{1,3})⟧/g, '$1 ').replace(/\s+/g, ' ').trim();
+    const plain = text.replace(/⟦#[^⟧]+⟧/g, '').replace(/⟦(\d{1,3})⟧/g, '$1 ').replace(/\s+/g, ' ').trim();
 
     // Un titre de chapitre met fin à une rubrique de commentaires
-    if (isChapterHeading(plain)) { inSection = false; inRun = false; pushLines(b); continue; }
+    if (isChapterHeading(plain)) { inSection = false; inRun = false; lastItem = null; pushLines(b); continue; }
 
     const verseStart = looksLikeVerse(text, lastSeen);
+
+    // Note à lettre : « a. … », « a) … », « 3a : … », « (a) … » — seulement pour une lettre vraiment utilisée dans les versets
+    let noteLabel = null;
+    if (letters.size && !verseStart) {
+      const nm = plain.match(NOTE_LABEL_RE);
+      if (nm && letters.has(nm[2].toLowerCase())) noteLabel = { letter: nm[2].toLowerCase(), verseHint: nm[1] ? Number(nm[1]) : null, body: nm[3] };
+      else if (inSection || inRun || b.italic) {
+        const pm = plain.match(/^([a-z])\s+(\S[\s\S]*)$/);
+        if (pm && letters.has(pm[1])) noteLabel = { letter: pm[1], verseHint: null, body: pm[2] };
+      }
+    }
+    if (noteLabel) {
+      const item = { kind: 'note', letter: noteLabel.letter, verseHint: noteLabel.verseHint, paragraphs: [noteLabel.body.trim()], afterLine: verseLines.length, block: b.idx };
+      items.push(item); lastItem = item; inRun = true;
+      continue;
+    }
+
     const marker = plain.match(MARKER_RE);
     const styleSaysComment = COMMENT_STYLE_RE.test(b.style || '');
     const boxCue = boxUseful && (b.inBox || b.shaded || b.bordered) || styleSaysComment;
@@ -462,7 +545,7 @@ function parseBibleDocument(blocks, natives) {
     // Titre seul « Commentaire(s) » / « Notes » / « Passages importants » : ce qui suit est du commentaire
     const afterMarker = marker ? plain.replace(MARKER_RE, '').replace(/^[\s:—–\-.]+/, '').replace(/[:.]$/, '').trim() : '';
     const headingOnly = marker && (afterMarker === '' || /^(?:du chapitre|de ce chapitre|du passage|du texte|importants?|bibliques?)$/i.test(afterMarker));
-    if (headingOnly) { inSection = true; inRun = true; continue; }
+    if (headingOnly) { inSection = true; inRun = true; lastItem = null; continue; }
 
     // Un intertitre (court, sans ponctuation) juste avant un verset n'est pas la suite d'un commentaire
     const nextText = ((blocks[bi + 1] || {}).text || '').trim();
@@ -474,7 +557,7 @@ function parseBibleDocument(blocks, natives) {
     if (isComment && verseStart && !marker && !boxCue) isComment = false;
     if (verseStart && !marker && !boxCue) { inSection = false; inRun = false; }
 
-    if (!isComment) { inRun = false; pushLines(b); continue; }
+    if (!isComment) { inRun = false; lastItem = null; pushLines(b); continue; }
     inRun = true;
 
     // Contenu du commentaire : marqueur et références de versets retirés du début du texte
@@ -490,19 +573,50 @@ function parseBibleDocument(blocks, natives) {
     }
     rest = rest.replace(/^[\s:—–\-.)]+/, '').trim();
     if (!rest && !ref) continue;
-    items.push({ afterLine: verseLines.length, block: b.idx, title, ref, body: rest, explicit: !!ref, boxed: boxCue });
+
+    // Suite d'une note à lettre : le paragraphe s'ajoute à cette note
+    if (!ref && !mk && lastItem && lastItem.kind === 'note') { lastItem.paragraphs.push(rest); continue; }
+
+    const item = { afterLine: verseLines.length, block: b.idx, title, ref, body: rest, explicit: !!ref, boxed: boxCue };
+    items.push(item); lastItem = item;
   }
 
   // Analyse des versets (les commentaires n'y sont plus mélangés)
   const parsed = parseBible(verseLines);
 
-  // Rattachement : référence indiquée dans le document, sinon le verset qui précède le commentaire
-  const verseExists = (ch, v) => (parsed.chapters.find((c) => c.chapter === ch) || { verses: [] }).verses.some((x) => x.verse === v);
+  // Lettres de renvoi trouvées dans les versets, dans l'ordre du texte
+  const markers = [];
+  parsed.chapters.forEach((c) => c.verses.forEach((v) => (v.notes || []).forEach((n) => markers.push({ chapter: c.chapter, verse: v.verse, letter: n.letter, used: false }))));
+
   const lastOf = (ch) => { const c = parsed.chapters.find((x) => x.chapter === ch); return c && c.verses.length ? Math.max(...c.verses.map((v) => v.verse)) : 0; };
+  const lastChapter = parsed.chapters.length ? parsed.chapters[parsed.chapters.length - 1].chapter : 1;
   const comments = [];
   const notes = [];
+
+  // Notes à lettres (écrites dans le document, puis notes de bas de page Word) : chacune est reliée à sa lettre dans les versets
+  const noteItems = items.filter((i) => i.kind === 'note')
+    .concat((noteDefs || []).map((n) => ({ kind: 'note', letter: n.letter, verseHint: null, paragraphs: n.text.split('\n'), afterLine: Infinity })));
+  for (const it of noteItems) {
+    let m = markers.find((x) => !x.used && x.letter === it.letter && (!it.verseHint || x.verse === it.verseHint));
+    if (!m && it.verseHint) m = markers.find((x) => !x.used && x.letter === it.letter);
+    if (m) {
+      m.used = true;
+      comments.push({ chapter: m.chapter, verse_start: m.verse, verse_end: m.verse, title: null, letter: it.letter, paragraphs: it.paragraphs, how: 'note', _explicit: true });
+    } else {
+      const prev = it.afterLine > 0 && it.afterLine !== Infinity ? parsed.trace[it.afterLine - 1] : null;
+      const ch = prev ? prev.chapter : lastChapter;
+      const v = prev && prev.last > 0 ? prev.last : lastOf(ch);
+      comments.push({ chapter: ch, verse_start: v, verse_end: v, title: `Note ${it.letter}`, paragraphs: it.paragraphs, how: 'position', _explicit: true });
+      notes.push(`La note « ${it.letter} » n'a pas de lettre correspondante dans les versets : elle est placée à sa position dans le document.`);
+    }
+  }
+  const orphans = markers.filter((m) => !m.used);
+  orphans.slice(0, 6).forEach((m) => notes.push(`La lettre « ${m.letter} » du verset ${m.verse} n'a pas de commentaire correspondant.`));
+
+  // Autres commentaires : référence indiquée dans le document, sinon le verset qui précède le commentaire
   for (const it of items) {
-    const prev = it.afterLine > 0 ? parsed.trace[findOrig(verseLines, parsed, it.afterLine - 1)] : null;
+    if (it.kind === 'note') continue;
+    const prev = it.afterLine > 0 ? parsed.trace[it.afterLine - 1] : null;
     const ctxChapter = prev ? prev.chapter : (parsed.chapters[0] ? parsed.chapters[0].chapter : 1);
     let vs, ve, how;
     if (it.ref) {
@@ -519,7 +633,7 @@ function parseBibleDocument(blocks, natives) {
   const merged = [];
   for (const c of comments) {
     const p = merged[merged.length - 1];
-    if (p && !c._explicit && !c.title && c._line === p._line && c.chapter === p.chapter) p.paragraphs.push(...c.paragraphs);
+    if (p && !c._explicit && !c.title && !c.letter && c._line !== undefined && c._line === p._line && c.chapter === p.chapter) p.paragraphs.push(...c.paragraphs);
     else merged.push(c);
   }
 
@@ -538,12 +652,15 @@ function parseBibleDocument(blocks, natives) {
     if (hit) merged.push({ chapter: hit.chapter, verse_start: hit.verse, verse_end: hit.verse, title: n.author ? `Commentaire (${n.author})` : 'Commentaire', paragraphs: n.text.split('\n'), how: 'word' });
   }
 
-  merged.sort((a, b) => a.chapter - b.chapter || a.verse_end - b.verse_end || a.verse_start - b.verse_start);
+  merged.sort((a, b) => a.chapter - b.chapter || a.verse_end - b.verse_end || a.verse_start - b.verse_start || String(a.letter || '').localeCompare(String(b.letter || '')));
   merged.forEach((c) => { delete c._line; delete c._explicit; delete c._block; });
 
   const warnings = parsed.warnings.slice();
   notes.forEach((n) => { if (warnings.length < 30 && !warnings.includes(n)) warnings.push(n); });
-  return { chapters: parsed.chapters, totalVerses: parsed.totalVerses, warnings, duplicates: parsed.duplicates, chapterAssumed: parsed.chapterAssumed, comments: merged };
+  return {
+    chapters: parsed.chapters, totalVerses: parsed.totalVerses, warnings, duplicates: parsed.duplicates, chapterAssumed: parsed.chapterAssumed,
+    comments: merged, notes: markers.map((m) => ({ chapter: m.chapter, verse: m.verse, letter: m.letter, matched: m.used })),
+  };
 }
 
 // Retrouve l'indice d'origine (dans verseLines) d'une ligne : parseBible ignore les lignes vides, pas les nôtres
@@ -552,7 +669,7 @@ function findOrig(verseLines, parsed, i) { return i; }
 // Pour un texte collé ou un .txt : mêmes règles, sans mise en forme
 function parseBibleText(rawLines) {
   const blocks = rawLines.map((l, idx) => ({ text: String(l), italic: false, bold: false, shaded: false, bordered: false, inBox: false, style: '', size: 0, bodySize: 0, idx }));
-  return parseBibleDocument(blocks, []);
+  return parseBibleDocument(blocks, [], []);
 }
 
 module.exports = { docxToRawLines, docxToBlocks, parseBible, parseBibleDocument, parseBibleText, sniffFormat };
