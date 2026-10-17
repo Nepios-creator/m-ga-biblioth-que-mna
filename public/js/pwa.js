@@ -7,6 +7,11 @@ if ('serviceWorker' in navigator) {
 // Ajouts communs (menu, raccourcis admin) sur toutes les pages
 (function () {
   // Téléphone : onglets fixes, confort de lecture, installation (sans effet sur ordinateur)
+  // Plein écran permanent sur toutes les pages (tant que vous ne le désactivez pas)
+  const fs = document.createElement('script');
+  fs.src = '/js/fullscreen.js';
+  document.body.appendChild(fs);
+
   const mobile = document.createElement('script');
   mobile.src = '/js/mobile-app.js';
   document.body.appendChild(mobile);
