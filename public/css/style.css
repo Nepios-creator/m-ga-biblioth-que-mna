@@ -170,3 +170,206 @@ footer { border-top: 1px solid var(--line); padding: 40px 24px; text-align: cent
   .hero h1 { font-size: 32px; }
   nav { display: none; }
 }
+
+
+/* =====================================================================
+   HABILLAGE « PUBLICATIONS EN LIGNE »
+   Même organisation que ministrybooks.org, avec les couleurs du ministère.
+   Tout ce qui précède est inchangé ; ce bloc ne fait que changer l'apparence
+   (aucun texte, bouton, lien ou fonction du site n'est modifié).
+   ===================================================================== */
+
+:root {
+  --lsm-linen: #efe6d2;
+  --lsm-linen-edge: #e2d6b8;
+  --lsm-offwhite: #fbf9f4;
+  --lsm-tex:
+    radial-gradient(rgba(110, 80, 30, 0.09) 1px, transparent 1.3px),
+    repeating-linear-gradient(0deg, rgba(110, 80, 30, 0.04) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(110, 80, 30, 0.04) 0 1px, transparent 1px 4px);
+}
+
+/* ---------- 1. En-tête : titre centré, puis rangée de compte, puis barre de menu ---------- */
+header { display: contents; }
+
+header .brand {
+  display: flex !important; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; text-align: center;
+  padding: 22px 16px 8px; background: #fff;
+  font-size: clamp(17px, 4.4vw, 32px); font-weight: 500; letter-spacing: 0.05em;
+  text-transform: uppercase; line-height: 1.25; color: var(--ink);
+}
+header .brand a { color: inherit; }
+header .brand img {
+  display: block; width: 62px !important; height: 62px !important;
+  border: 2px solid var(--gold); margin: 0 0 4px;
+}
+header .brand::after {
+  content: "Bibliothèque numérique";
+  font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 500;
+  font-size: 0.72em; letter-spacing: 0.01em; text-transform: none; color: var(--gold-deep);
+}
+
+/* Rangée « accueil / Créer un compte / Se connecter » (ajoutée par /js/lsm-layout.js) */
+.lsm-account {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 12px; padding: 10px 14px 20px; background: #fff;
+}
+.lsm-account .lsm-home {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; color: var(--blue);
+}
+.lsm-account .lsm-home svg { width: 34px; height: 34px; display: block; }
+.lsm-account .btn { padding: 11px 20px; font-size: 16px; border-radius: 8px; }
+
+/* Barre de menu sombre : icône au-dessus du nom, toujours visible en haut */
+nav {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  background: #16130f; border-bottom: 3px solid var(--gold);
+  position: sticky; top: 0; z-index: 30;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+}
+nav a {
+  margin: 0; min-width: 100px; padding: 11px 16px 9px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-align: center; font-size: 14.5px; font-weight: 600; line-height: 1.15; color: #f6eedb;
+  border-bottom: 3px solid transparent; margin-bottom: -3px;
+}
+nav a::before { content: "📄"; font-size: 24px; line-height: 1; filter: brightness(0) invert(1); }
+nav a[href="/"]::before { content: "🏠"; }
+nav a[href="/a-propos.html"]::before { content: "ℹ️"; }
+nav a[href="/catalogue.html"]::before { content: "📚"; }
+nav a[href="/espace-etude.html"]::before { content: "🎓"; }
+nav a[href="/assistant.html"]::before { content: "💬"; }
+nav a[href="/bible.html"]::before { content: "📖"; }
+nav a[href="/actualites.html"]::before { content: "📰"; }
+nav a[href="/audio.html"]::before { content: "🎧"; }
+nav a[href="/admin.html"]::before { content: "⚙️"; }
+nav a[href="/login.html"]::before { content: "👤"; }
+nav a:hover { color: #e8c978; }
+nav a.on { color: #e8c978; border-bottom-color: var(--gold); }
+@media (max-width: 820px) { header nav { display: none; } }
+
+/* ---------- 2. Boutons : rectangles arrondis, gros et lisibles ---------- */
+.btn { border-radius: 10px; padding: 13px 26px; font-size: 16px; }
+.btn-ghost { background: #fff; border: 2px solid var(--blue); color: var(--blue-deep); }
+.btn-ghost:hover { background: #eef5fb; border-color: var(--blue-deep); }
+
+/* ---------- 3. Bannière d'accueil : fond lin clair, gros titre, deux boutons larges ---------- */
+.hero, section.section.alt {
+  background-color: var(--lsm-linen);
+  background-image: var(--lsm-tex);
+  background-size: 7px 7px, auto, auto;
+}
+.hero {
+  padding: 30px 20px 48px; color: var(--ink);
+  border-bottom: 1px solid var(--lsm-linen-edge);
+}
+.hero::before, .hero::after { content: none; }
+
+/* Étagère de volumes (à la place de l'image du diaporama) — page d'accueil seulement */
+.hero:has(.actions)::before {
+  content: ""; display: block; position: relative; left: auto; top: auto;
+  font-size: 0; opacity: 1;
+  width: min(100%, 480px); height: 150px; margin: 0 auto 28px;
+  filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.25));
+  background:
+    repeating-linear-gradient(90deg, #16130f 0 11px, #c9a24b 11px 13px, #1f5386 13px 25px, #c9a24b 25px 27px, #3a2c18 27px 38px, #a67f2e 38px 40px) 50% 0 / 100% 44px no-repeat,
+    repeating-linear-gradient(90deg, #1f5386 0 13px, #c9a24b 13px 15px, #16130f 15px 27px, #c9a24b 27px 29px, #3a2c18 29px 42px, #a67f2e 42px 44px) 50% 53px / 96% 44px no-repeat,
+    repeating-linear-gradient(90deg, #3a2c18 0 12px, #c9a24b 12px 14px, #16130f 14px 27px, #c9a24b 27px 29px, #1f5386 29px 41px, #a67f2e 41px 43px) 50% 106px / 92% 44px no-repeat;
+}
+
+.hero h1 {
+  font-size: clamp(30px, 7.4vw, 52px); font-weight: 500; letter-spacing: 0.03em;
+  text-transform: uppercase; line-height: 1.15; color: var(--ink); max-width: 820px; margin: 0 auto 14px;
+}
+.hero p {
+  font-family: 'Fraunces', Georgia, serif; font-style: italic;
+  font-size: clamp(18px, 4.6vw, 24px); line-height: 1.5; color: var(--gold-deep);
+  max-width: 680px; margin: 0 auto 26px;
+}
+.hero .actions { flex-direction: column; align-items: center; gap: 14px; }
+.hero .actions .btn { width: min(100%, 400px); padding: 15px 22px; font-size: 19px; text-align: center; }
+.hero .actions .btn-ghost {
+  background: #fff !important; color: var(--blue-deep) !important; border: 2px solid var(--blue) !important;
+}
+.hero #install-btn {
+  width: min(100%, 400px); padding: 14px 22px; font-size: 17px;
+  background: transparent !important; color: var(--blue-deep) !important; border: 2px solid var(--gold-deep) !important;
+}
+.hero #ios-install-hint { color: var(--ink-soft) !important; }
+
+/* ---------- 4. Sections : fond clair, titres dorés centrés ---------- */
+section.section { padding: 54px 0; background: var(--lsm-offwhite); }
+section.section.alt { border-color: var(--lsm-linen-edge); }
+section.section .container { text-align: center; }
+section.section h2 {
+  font-size: clamp(28px, 6.4vw, 38px); font-weight: 500; color: var(--gold-deep);
+  text-align: center; margin-bottom: 12px;
+}
+section.section p.lead { margin-left: auto; margin-right: auto; text-align: center; color: var(--ink); font-size: 18px; }
+.tag { background: none; padding: 0; color: var(--gold-deep); letter-spacing: 0.16em; font-size: 12.5px; }
+
+/* « Qui sommes-nous » : portrait + texte (centré sur téléphone) */
+.about .bio { text-align: left; }
+@media (max-width: 820px) {
+  .about .bio { text-align: center; }
+  .about .bio > div[style*="flex"] { justify-content: center; }
+  .about .portrait { max-width: 280px; margin: 0 auto; width: 100%; }
+}
+
+/* ---------- 5. Caractéristiques : grandes pastilles rondes, titre doré, texte centré ---------- */
+.about:not(:has(.portrait)) { grid-template-columns: 1fr; gap: 26px; text-align: center; }
+.about:not(:has(.portrait)) .grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 14px; max-width: 900px; margin: 6px auto 0;
+}
+@media (min-width: 900px) {
+  .about:not(:has(.portrait)) .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.card:has(> .icon) {
+  position: relative; background: transparent; border: 0; border-radius: 0; padding: 4px 4px 8px; text-align: center;
+}
+.card:has(> .icon)::before {
+  content: ""; display: block; width: 112px; height: 112px; margin: 0 auto -112px;
+  border-radius: 50%; background: var(--blue); box-shadow: 0 5px 12px rgba(0, 0, 0, 0.2);
+}
+.card > .icon {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 112px; height: 112px; margin: 0 auto 16px; font-size: 46px; line-height: 1;
+  filter: brightness(0) invert(1);               /* pictogramme blanc dans la pastille */
+}
+.card:has(> .icon) h3 { font-size: clamp(20px, 5.4vw, 26px); font-weight: 500; color: var(--gold-deep); margin-bottom: 8px; }
+.card:has(> .icon) p { font-size: 17px; color: var(--ink); line-height: 1.55; }
+.card.try-card .try-link { color: var(--blue-deep); }
+.card.try-card:hover, .card.try-card:focus-visible { box-shadow: none; border-color: transparent; }
+
+/* ---------- 6. Liste « fonctionnalités » (administration) : cadre doré arrondi, lignes centrées ---------- */
+.admin-box ul {
+  background: #fff; border: 2px solid var(--gold-deep); border-radius: 20px; padding: 6px 18px; text-align: center;
+}
+.admin-box li { padding: 15px 6px; font-size: 17px; }
+.admin-example { background: var(--gold-deep); border-radius: 20px; text-align: center; }
+
+/* ---------- 7. Feuille de route : pastilles bleues ---------- */
+.roadmap { text-align: left; max-width: 640px; margin: 0 auto; }
+
+/* ---------- 8. Pied de page sombre ---------- */
+footer {
+  background: #16130f; color: #e9dcc0; border-top: 0; padding: 34px 22px 42px;
+  text-align: center; font-size: 15px;
+}
+footer a { color: #f6eedb; font-weight: 600; }
+footer a:hover { color: #e8c978; }
+.lsm-top {
+  display: flex; align-items: center; justify-content: center; height: 50px;
+  background: var(--gold-deep); color: #fff; text-decoration: none; border-top: 3px solid var(--gold);
+}
+.lsm-top svg { width: 28px; height: 28px; display: block; }
+.lsm-top:hover { background: var(--gold); }
+
+/* ---------- 9. Catalogue : même cadre doré pour la liste gratuite ---------- */
+html body .free-list { border: 2px solid var(--gold-deep); border-radius: 20px; overflow: hidden; }
+html body .section-title { color: var(--gold-deep); font-weight: 500; text-align: center; font-size: 26px; }
+html body .letter.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+html body .filter-row input { border-radius: 10px; }
