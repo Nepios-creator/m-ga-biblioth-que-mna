@@ -28,4 +28,11 @@ if ('serviceWorker' in navigator) {
     bibleNotes.src = '/js/bible-notes.js';
     document.body.appendChild(bibleNotes);
   }
+
+  // Page de lecture d'un livre : taille du texte, thèmes, progression, chapitre suivant
+  if (location.pathname.endsWith('/lecture.html')) {
+    const lectureExtras = document.createElement('script');
+    lectureExtras.src = '/js/lecture-extras.js';
+    document.body.appendChild(lectureExtras);
+  }
 })();
