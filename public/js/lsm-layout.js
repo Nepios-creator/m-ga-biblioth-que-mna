@@ -100,5 +100,120 @@
       mo.observe(document.body, { childList: true });
       setTimeout(function () { mo.disconnect(); }, 15000);
     }
+
+    // 6. Page d'accueil : texte du haut, diaporama d'affiches, citation du jour raccourcie
+    if (path === '/' || path === '/index.html') {
+      var hero = document.querySelector('.hero');
+      if (hero) {
+        var h1 = hero.querySelector('h1');
+        var intro = hero.querySelector('p');
+        if (h1 && !hero.querySelector('.lsm-sub')) {
+          h1.textContent = 'Lire et écouter';
+          var sub = document.createElement('div');
+          sub.className = 'lsm-sub';
+          sub.textContent = 'le MNA';
+          h1.parentNode.insertBefore(sub, h1.nextSibling);
+        }
+        if (intro) intro.textContent = 'Se familiariser avec les enseignements du Docteur S-J Nepios';
+
+        // Diaporama des deux livres (images à déposer dans /img/)
+        var SLIDES = [
+          { src: '/img/affiche-satan.jpg', alt: 'La vraie histoire de Satan — Docteur S-J Nepios', bg: '#000c1f' },
+          { src: '/img/affiche-mysteres.jpg', alt: 'Les trois mystères de Christ — Docteur S-J Nepios', bg: '#0d0f15' }
+        ];
+        if (!hero.querySelector('.lsm-carousel')) {
+          var car = document.createElement('div');
+          car.className = 'lsm-carousel';
+          car.setAttribute('role', 'region');
+          car.setAttribute('aria-label', 'Nos livres');
+          car.innerHTML = SLIDES.map(function (sl, i) {
+            return '<div class="lsm-slide' + (i === 0 ? ' on' : '') + '" style="background:' + sl.bg + '"><img src="' + sl.src + '" alt="' + sl.alt + '"' + (i === 0 ? '' : ' loading="lazy"') + '></div>';
+          }).join('') +
+            '<button type="button" class="lsm-arrow lsm-prev" aria-label="Livre précédent">&#8249;</button>' +
+            '<button type="button" class="lsm-arrow lsm-next" aria-label="Livre suivant">&#8250;</button>';
+          var dots = document.createElement('div');
+          dots.className = 'lsm-dots';
+          dots.innerHTML = SLIDES.map(function (sl, i) {
+            return '<button type="button" aria-label="Livre ' + (i + 1) + '"' + (i === 0 ? ' class="on"' : '') + '></button>';
+          }).join('');
+          hero.insertBefore(car, hero.firstChild);
+          hero.insertBefore(dots, car.nextSibling);
+
+          var slides = car.querySelectorAll('.lsm-slide');
+          var dotBtns = dots.querySelectorAll('button');
+          var cur = 0, timer = null;
+          function show(n) {
+            cur = (n + slides.length) % slides.length;
+            for (var i = 0; i < slides.length; i++) {
+              slides[i].classList.toggle('on', i === cur);
+              dotBtns[i].classList.toggle('on', i === cur);
+            }
+          }
+          function play() {
+            clearInterval(timer);
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (!calm) timer = setInterval(function () { show(cur + 1); }, 4500);
+          }
+          car.querySelector('.lsm-prev').addEventListener('click', function () { show(cur - 1); play(); });
+          car.querySelector('.lsm-next').addEventListener('click', function () { show(cur + 1); play(); });
+          for (var d = 0; d < dotBtns.length; d++) {
+            (function (n) { dotBtns[n].addEventListener('click', function () { show(n); play(); }); })(d);
+          }
+          var x0 = null;
+          car.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+          car.addEventListener('touchend', function (e) {
+            if (x0 === null) return;
+            var dx = e.changedTouches[0].clientX - x0;
+            x0 = null;
+            if (Math.abs(dx) > 40) { show(dx < 0 ? cur + 1 : cur - 1); play(); }
+          }, { passive: true });
+          play();
+        }
+      }
+      doc.classList.add('lsm-ready');
+
+      // Citation du jour : version courte, le texte complet reste accessible
+      var qEl = document.getElementById('quote-text');
+      var shareRow = document.getElementById('quote-share');
+      if (qEl && shareRow) {
+        var full = '', expanded = false, busy = false, more = null;
+        var MAX = 190;
+        var shorten = function (t) {
+          if (t.length <= MAX) return t;
+          var cut = t.slice(0, MAX), best = -1, re = /[.!?»”](?=\s|$)/g, m;
+          while ((m = re.exec(cut))) { if (m.index > 70) best = m.index + 1; }
+          if (best > 0) return cut.slice(0, best).trim();
+          return cut.replace(/\s+\S*$/, '').replace(/[,;:\s]+$/, '') + '…';
+        };
+        var apply = function () {
+          if (busy) return;
+          var cur = qEl.textContent || '';
+          if (!full || (cur !== full && cur !== shorten(full))) full = cur;   // nouvelle citation reçue
+          if (!full || full.indexOf('Chargement') === 0) return;
+          busy = true;
+          var short = shorten(full);
+          var target = expanded ? full : short;
+          if (qEl.textContent !== target) qEl.textContent = target;   // pas de réécriture inutile : évite toute boucle
+          if (short !== full) {
+            if (!more) {
+              more = document.createElement('button');
+              more.type = 'button';
+              more.className = 'btn btn-ghost lsm-more';
+              var ref = document.getElementById('share-copy');
+              if (ref) more.setAttribute('style', ref.getAttribute('style') || '');
+              more.addEventListener('click', function () { expanded = !expanded; busy = false; apply(); });
+              shareRow.insertBefore(more, shareRow.firstChild);
+            }
+            more.textContent = expanded ? 'Réduire' : 'Lire la suite';
+            more.style.display = '';
+          } else if (more) {
+            more.style.display = 'none';
+          }
+          setTimeout(function () { busy = false; }, 0);
+        };
+        new MutationObserver(function () { setTimeout(apply, 0); }).observe(qEl, { childList: true, characterData: true, subtree: true });
+        apply();
+      }
+    }
   } catch (e) { /* ne jamais empêcher le site de fonctionner */ }
 })();
