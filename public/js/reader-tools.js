@@ -1,17 +1,23 @@
 // Confort commun à toute l'application :
-//  1) zoom à deux doigts (agrandir de 5 fois, réduire jusqu'à la moitié) sur toutes les pages, en plein écran ou non ;
+//  1) zoom à deux doigts (agrandir jusqu'à 5 fois) sur toutes les pages, en plein écran ou non ;
+//     la page ne se dézoome JAMAIS toute seule : elle remplit toujours la largeur de l'écran, comme une application ;
 //  2) pendant la lecture d'un livre : boutons A− / A+ pour changer la taille du texte, comme dans la Bible.
 (function () {
   'use strict';
   try {
-    // ---------- 1) Zoom à deux doigts ----------
-    var VIEWPORT = 'width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=5, user-scalable=yes';
+    // ---------- 1) Affichage « application » + zoom à deux doigts ----------
+    // minimum-scale=1 : le navigateur ne peut plus réduire la page pour la faire tenir (aspect « ordinateur »)
+    var VIEWPORT = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover';
     var vp = document.querySelector('meta[name="viewport"]');
     if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; document.head.appendChild(vp); }
     if (vp.getAttribute('content') !== VIEWPORT) vp.setAttribute('content', VIEWPORT);
     var zs = document.createElement('style');
     zs.id = 'mna-zoom-css';
-    zs.textContent = 'html,body{touch-action:pan-x pan-y pinch-zoom}';
+    zs.textContent =
+      'html,body{touch-action:pan-x pan-y pinch-zoom}' +
+      // Aucun élément ne peut déborder de l'écran : la page garde la largeur du téléphone
+      'html,body{max-width:100%;overflow-x:hidden}' +
+      'img,video,canvas,svg,iframe:not(#mna-shell){max-width:100%}';
     document.head.appendChild(zs);
 
     // ---------- 2) Taille du texte des livres ----------
