@@ -1,5 +1,5 @@
 const CACHE_NAME = 'mna-biblio-v2';
-const CORE_ASSETS = ['/', '/offline.html', '/css/style.css', '/css/mobile.css', '/js/pwa.js', '/js/mobile-app.js', '/js/fullscreen.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CORE_ASSETS = ['/', '/offline.html', '/css/style.css', '/css/mobile.css', '/js/pwa.js', '/js/mobile-app.js', '/js/fullscreen.js', '/js/reader-tools.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
