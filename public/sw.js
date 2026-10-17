@@ -2,22 +2,25 @@
 //  - les pages et fichiers de l'application sont gardés sur le téléphone ;
 //  - la Bible (texte public) est gardée sur le téléphone, chapitre par chapitre ;
 //  - les listes consultées (catalogue, actualités…) restent consultables hors connexion ;
-//  - le texte des livres, les paiements, l'administration et les connexions ne sont JAMAIS gardés.
-const CACHE = 'mna-biblio-v3';   // pages et fichiers de l'application
+//  - le texte des livres, les paiements, l'administration et les connexions ne sont JAMAIS gardés ;
+//  - les fichiers audio (lecture en continu, écran éteint) sont laissés au navigateur : jamais interceptés.
+const CACHE = 'mna-biblio-v4';   // pages et fichiers de l'application
 const PUBLIC = 'mna-bible-v1';   // Bible et actualités (contenu public)
 const PRIVATE = 'mna-api-v1';    // autres listes, propres à chaque compte (effacées à la déconnexion)
 const KEEP = [CACHE, PUBLIC, PRIVATE];
 
 const PRECACHE = [
   '/', '/a-propos.html', '/catalogue.html', '/espace-etude.html', '/assistant.html', '/bible.html',
-  '/actualites.html', '/actualite.html', '/login.html', '/lecture.html', '/offline.html',
+  '/actualites.html', '/actualite.html', '/login.html', '/lecture.html', '/offline.html', '/audio.html',
   '/css/style.css', '/css/actualites.css', '/css/mobile.css',
   '/js/pwa.js', '/js/mobile-app.js', '/js/fullscreen.js', '/js/reader-tools.js', '/js/offline.js',
   '/js/site-extras.js', '/js/home.js', '/js/home-contact.js', '/js/actualites-nav.js', '/js/reader-common.js',
   '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'
 ];
 
-const DENY_API = /^\/api\/(auth|admin|payments?|reader)(\/|$)|read-link/i;
+// Jamais gardés : connexions, administration (y compris celle des livres audio), paiements, lecteur de livres,
+// et les liens d'écoute audio (temporaires : un lien gardé serait périmé)
+const DENY_API = /^\/api\/(auth|admin|payments?|reader)(\/|$)|^\/api\/audio\/(admin(\/|$)|tracks\/)|read-link/i;
 const PUBLIC_API = /^\/api\/(bible\/books(\/|$)|actualit)/i;
 
 self.addEventListener('install', (event) => {
@@ -106,7 +109,9 @@ async function fontStrategy(req) {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || req.headers.has('range')) return;
+  // Lecture audio/vidéo (demandes par morceaux, « Range ») : laissée au navigateur, sinon la lecture
+  // en continu — surtout écran éteint — serait cassée
+  if (req.method !== 'GET' || req.headers.has('range') || req.destination === 'audio' || req.destination === 'video') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) {
     if (/(^|\.)fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) event.respondWith(fontStrategy(req));

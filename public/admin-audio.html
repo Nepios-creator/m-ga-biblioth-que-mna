@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration — Livres audio</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; margin-bottom: 30px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14.5px; font-family: inherit; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .msg.warn { background: #fff4dc; color: #8a5a00; }
+  .hidden { display: none; }
+  .book-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .book-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .book-top .info strong { display: block; }
+  .book-top .info span { font-size: 12.5px; color: var(--ink-soft); }
+  .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .mini { border: 1px solid var(--line); background: #fff; padding: 7px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; font-family: inherit; color: var(--ink); }
+  .mini.del { background: #fdeaea; color: #a33; border-color: #f3caca; }
+  .mini.pub { background: #e8f6ec; color: #2a7a44; border-color: #c4e6cd; }
+  .mini.off { background: #f0ebe0; color: #7a6f5d; }
+  .sub { background: var(--paper); border-radius: 10px; padding: 14px; margin-top: 12px; }
+  .t-line { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .t-line:last-child { border-bottom: none; }
+  .t-line input[type=text] { flex: 1; min-width: 140px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px; }
+  .t-line .meta { font-size: 12px; color: var(--ink-soft); }
+  .up-item { margin-bottom: 8px; font-size: 13px; }
+  .bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+  .bar > div { height: 100%; background: var(--gold); width: 0%; transition: width .2s; }
+  code { background: #f0ebe0; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/admin.html">Panneau admin</a><a href="/audio.html">Voir les livres audio</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel"><h2>Accès refusé</h2><p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p></div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:16px;">← Panneau admin</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Livres audio</h1>
+    <p style="color:var(--ink-soft);margin-bottom:24px;">Créez un livre audio, ajoutez ses pistes (chapitres) et choisissez s'il est gratuit ou en vente.</p>
+
+    <div id="storage-warn"></div>
+    <div id="msg-box"></div>
+
+    <div class="panel">
+      <h2 id="form-title" style="margin-bottom:16px;">Nouveau livre audio</h2>
+      <form id="book-form">
+        <input type="hidden" id="f-id">
+        <div class="field"><label>Titre *</label><input type="text" id="f-title" required></div>
+        <div class="row2">
+          <div class="field"><label>Auteur / narrateur</label><input type="text" id="f-author"></div>
+          <div class="field"><label>Image de couverture</label><input type="file" id="f-cover" accept="image/*"></div>
+        </div>
+        <div class="field"><label>Description</label><textarea id="f-description" rows="3"></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Accès</label>
+            <select id="f-access"><option value="gratuit">Gratuit</option><option value="a_vendre">En vente</option></select>
+          </div>
+          <div class="field" id="price-field"><label>Prix en $ (si en vente)</label><input type="number" step="0.01" min="0" id="f-price"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary" id="btn-save">Créer le livre audio</button>
+          <button type="button" class="btn btn-ghost hidden" id="btn-cancel-edit">Annuler la modification</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-bottom:16px;">Mes livres audio</h2>
+      <div id="books-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const user = (() => { try { return JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) { return null; } })();
+const H = { Authorization: `Bearer ${token}` };
+const HJ = { 'Content-Type': 'application/json', ...H };
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let books = [];
+let open = null; // { id, type: 'tracks' | 'access' }
+let maxMb = 50;
+
+function showMsg(text, type) { $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function fmtDur(s) { s = Math.round(s || 0); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
+function fmtSize(b) { b = Number(b || 0); return b > 1048576 ? (b / 1048576).toFixed(1) + ' Mo' : Math.round(b / 1024) + ' Ko'; }
+
+if (!token || !user || user.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  init();
+}
+
+async function init() {
+  const r = await fetch('/api/audio/admin/status', { headers: H });
+  const st = r.ok ? await r.json() : { storage: false };
+  maxMb = st.maxFileMb || 50;
+  if (!st.storage) {
+    const miss = st.missing || [];
+    let html = '';
+    if (miss.length) {
+      html = `<div class="msg warn"><b>Dernière étape avant d'envoyer des fichiers audio :</b> le stockage n'est pas encore relié.<br>
+        Dans Render : votre service → <b>Environment → Add Environment Variable</b>, puis ajoutez :<br>
+        ${miss.includes('SUPABASE_URL') ? `• <code>SUPABASE_URL</code> = l'adresse de votre projet Supabase (Project Settings → API → <b>Project URL</b>)<br>` : ''}
+        ${miss.includes('SUPABASE_SERVICE_KEY') ? `• <code>SUPABASE_SERVICE_KEY</code> = la clé secrète (Project Settings → API Keys → <code>service_role</code> ou <code>secret</code>)<br>` : ''}
+        Enregistrez : le site redémarre tout seul. <i>Cette clé est secrète : ne la partagez avec personne.</i></div>`;
+    } else {
+      html = `<div class="msg warn"><b>Le stockage audio ne répond pas.</b><br>${esc(st.bucketError || 'Vérifiez l\'adresse et la clé Supabase dans Render.')}</div>`;
+    }
+    $('storage-warn').innerHTML = html;
+  }
+  toggleAccessFields();
+  loadBooks();
+}
+
+$('f-access').addEventListener('change', toggleAccessFields);
+function toggleAccessFields() { $('price-field').style.display = $('f-access').value === 'a_vendre' ? 'block' : 'none'; }
+
+// ---------- Création / modification d'un livre audio ----------
+function resetForm() {
+  $('book-form').reset(); $('f-id').value = '';
+  $('form-title').textContent = 'Nouveau livre audio';
+  $('btn-save').textContent = 'Créer le livre audio';
+  $('btn-cancel-edit').classList.add('hidden');
+  toggleAccessFields();
+}
+$('btn-cancel-edit').addEventListener('click', resetForm);
+
+$('book-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData();
+  fd.append('title', $('f-title').value);
+  fd.append('author', $('f-author').value);
+  fd.append('description', $('f-description').value);
+  fd.append('access_type', $('f-access').value);
+  fd.append('price', $('f-price').value);
+  if ($('f-cover').files[0]) fd.append('cover', $('f-cover').files[0]);
+  const id = $('f-id').value;
+  const r = await fetch(id ? `/api/audio/admin/books/${id}` : '/api/audio/admin/books', { method: id ? 'PUT' : 'POST', headers: H, body: fd });
+  const d = await r.json();
+  if (!r.ok) return showMsg(esc(d.message || 'Erreur'), 'error');
+  showMsg(id ? 'Livre audio modifié.' : 'Livre audio créé. Ajoutez maintenant ses pistes avec le bouton « 🎵 Pistes ».', 'success');
+  resetForm();
+  await loadBooks();
+});
+
+// ---------- Liste ----------
+async function loadBooks() {
+  const r = await fetch('/api/audio/admin/books', { headers: H });
+  if (!r.ok) { $('books-list').innerHTML = '<p>Erreur de chargement.</p>'; return; }
+  books = await r.json();
+  renderBooks();
+}
+
+function renderBooks() {
+  if (!books.length) { $('books-list').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre audio pour le moment.</p>'; return; }
+  $('books-list').innerHTML = books.map((b) => `
+    <div class="book-box" id="box-${b.id}">
+      <div class="book-top">
+        <div class="info"><strong>${esc(b.title)}</strong>
+          <span>${esc(b.author || 'Auteur non précisé')} · ${b.access_type === 'a_vendre' ? 'En vente' + (b.price ? ' (' + Number(b.price).toFixed(2) + ' $)' : '') : 'Gratuit'} · ${b.tracks} piste(s) · ${fmtSize(b.total_size)}${b.access_type === 'a_vendre' ? ' · ' + b.buyers + ' acheteur(s)' : ''}</span></div>
+        <button class="mini ${b.published ? 'pub' : 'off'}" data-act="publish" data-id="${b.id}">${b.published ? '👁 Publié' : '🚫 Masqué'}</button>
+      </div>
+      <div class="acts">
+        <button class="mini" data-act="tracks" data-id="${b.id}">🎵 Pistes</button>
+        ${b.access_type === 'a_vendre' ? `<button class="mini" data-act="access" data-id="${b.id}">🔑 Acheteurs</button>` : ''}
+        <button class="mini" data-act="edit" data-id="${b.id}">✏️ Modifier</button>
+        <button class="mini del" data-act="delete" data-id="${b.id}">Supprimer</button>
+      </div>
+      <div id="sub-${b.id}"></div>
+    </div>`).join('');
+  document.querySelectorAll('#books-list [data-act]').forEach((btn) => btn.addEventListener('click', () => onAction(btn.dataset.act, Number(btn.dataset.id))));
+  if (open) renderSub(open.id, open.type);
+}
+
+async function onAction(act, id) {
+  const b = books.find((x) => x.id === id);
+  if (act === 'publish') {
+    await fetch(`/api/audio/admin/books/${id}/publish`, { method: 'PUT', headers: HJ, body: JSON.stringify({ published: !b.published }) });
+    return loadBooks();
+  }
+  if (act === 'delete') {
+    if (!confirm(`Supprimer « ${b.title} » avec toutes ses pistes audio ? Cette action est définitive.`)) return;
+    const r = await fetch(`/api/audio/admin/books/${id}`, { method: 'DELETE', headers: H });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); return showMsg(esc(d.message || 'Erreur'), 'error'); }
+    if (open && open.id === id) open = null;
+    return loadBooks();
+  }
+  if (act === 'edit') {
+    $('f-id').value = b.id; $('f-title').value = b.title; $('f-author').value = b.author || '';
+    $('f-description').value = b.description || ''; $('f-access').value = b.access_type; $('f-price').value = b.price || '';
+    $('form-title').textContent = 'Modifier « ' + b.title + ' »';
+    $('btn-save').textContent = 'Enregistrer les modifications';
+    $('btn-cancel-edit').classList.remove('hidden');
+    toggleAccessFields();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  // pistes / acheteurs : ouvre ou ferme le panneau
+  if (open && open.id === id && open.type === act) { open = null; $(`sub-${id}`).innerHTML = ''; return; }
+  if (open) { const prev = $(`sub-${open.id}`); if (prev) prev.innerHTML = ''; }
+  open = { id, type: act };
+  renderSub(id, act);
+}
+
+function renderSub(id, type) {
+  if (type === 'tracks') renderTracks(id); else renderAccess(id);
+}
+
+// ---------- Pistes ----------
+async function renderTracks(id) {
+  const box = $(`sub-${id}`);
+  if (!box) return;
+  box.innerHTML = '<div class="sub">Chargement des pistes…</div>';
+  const r = await fetch(`/api/audio/admin/books/${id}/tracks`, { headers: H });
+  const tracks = r.ok ? await r.json() : [];
+  const book = books.find((b) => b.id === id);
+  box.innerHTML = `
+    <div class="sub">
+      <b>Pistes</b>
+      <div style="margin:8px 0;">${tracks.length ? tracks.map((t, i) => `
+        <div class="t-line" data-tid="${t.id}">
+          <span class="meta">${i + 1}.</span>
+          <input type="text" value="${esc(t.title)}" data-field="title">
+          <span class="meta">${t.duration_seconds ? fmtDur(t.duration_seconds) + ' · ' : ''}${fmtSize(t.size_bytes)}</span>
+          ${book.access_type === 'a_vendre' ? `<label class="meta"><input type="checkbox" data-field="preview" ${t.is_preview ? 'checked' : ''}> Extrait gratuit</label>` : ''}
+          <button class="mini" data-m="up" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="mini" data-m="down" ${i === tracks.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="mini del" data-m="del">✕</button>
+        </div>`).join('') : '<p class="meta" style="color:var(--ink-soft);">Aucune piste pour le moment.</p>'}</div>
+      <div class="field" style="margin-top:14px;"><label>Ajouter des pistes (plusieurs fichiers possibles, ${maxMb} Mo maximum chacun)</label>
+        <input type="file" id="up-files-${id}" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav" multiple></div>
+      <button class="btn btn-primary" id="up-btn-${id}" style="padding:9px 16px;font-size:13.5px;">Envoyer les fichiers</button>
+      <div id="up-list-${id}" style="margin-top:12px;"></div>
+      <p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin-top:10px;">Astuce : un livre audio est un ensemble de pistes (chapitres). Nommez vos fichiers 01, 02, 03… pour qu'ils se classent dans l'ordre.</p>
+    </div>`;
+
+  box.querySelectorAll('.t-line').forEach((line) => {
+    const tid = Number(line.dataset.tid);
+    const idx = tracks.findIndex((t) => t.id === tid);
+    line.querySelector('[data-field="title"]').addEventListener('change', async (e) => {
+      await fetch(`/api/audio/admin/tracks/${tid}`, { method: 'PUT', headers: HJ, body: JSON.stringify({ title: e.target.value }) });
+    });
+    const prev = line.querySelector('[data-field="preview"]');
+    if (prev) prev.addEventListener('change', async (e) => {
+      await fetch(`/api/audio/admin/tracks/${tid}`, { method: 'PUT', headers: HJ, body: JSON.stringify({ is_preview: e.target.checked }) });
+    });
+    line.querySelectorAll('[data-m]').forEach((btn) => btn.addEventListener('click', async () => {
+      if (btn.dataset.m === 'del') {
+        if (!confirm('Supprimer cette piste ?')) return;
+        await fetch(`/api/audio/admin/tracks/${tid}`, { method: 'DELETE', headers: H });
+      } else {
+        const j = btn.dataset.m === 'up' ? idx - 1 : idx + 1;
+        const order = tracks.slice();
+        [order[idx], order[j]] = [order[j], order[idx]];
+        await Promise.all(order.map((t, k) => fetch(`/api/audio/admin/tracks/${t.id}`, { method: 'PUT', headers: HJ, body: JSON.stringify({ track_order: k + 1 }) })));
+      }
+      await loadBooks();
+    }));
+  });
+  $(`up-btn-${id}`).addEventListener('click', () => uploadFiles(id));
+}
+
+function getDuration(file) {
+  return new Promise((resolve) => {
+    const a = new Audio(); const u = URL.createObjectURL(file);
+    const done = (v) => { URL.revokeObjectURL(u); resolve(v); };
+    a.preload = 'metadata'; a.src = u;
+    a.onloadedmetadata = () => done(isFinite(a.duration) ? Math.round(a.duration) : null);
+    a.onerror = () => done(null);
+    setTimeout(() => done(null), 8000);
+  });
+}
+
+function putFile(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`Échec de l'envoi (code ${xhr.status})`));
+    xhr.onerror = () => reject(new Error('Erreur réseau pendant l\'envoi : vérifiez votre connexion et réessayez.'));
+    const fd = new FormData();
+    fd.append('cacheControl', '3600');
+    fd.append('', file);
+    xhr.send(fd);
+  });
+}
+
+async function uploadFiles(bookId) {
+  const input = $(`up-files-${bookId}`);
+  const files = Array.from(input.files).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (!files.length) return showMsg('Choisissez d\'abord un ou plusieurs fichiers audio.', 'error');
+  const list = $(`up-list-${bookId}`);
+  $(`up-btn-${bookId}`).disabled = true;
+  list.innerHTML = files.map((f, i) => `<div class="up-item" id="up-${bookId}-${i}">${esc(f.name)} <span class="meta">(${fmtSize(f.size)})</span><div class="bar"><div></div></div><div class="meta" data-s>En attente…</div></div>`).join('');
+  let ok = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const item = $(`up-${bookId}-${i}`);
+    const bar = item.querySelector('.bar > div'), status = item.querySelector('[data-s]');
+    try {
+      if (f.size > maxMb * 1024 * 1024) throw new Error(`Fichier trop lourd (${fmtSize(f.size)}). Maximum ${maxMb} Mo : découpez-le en chapitres ou compressez-le.`);
+      status.textContent = 'Préparation…';
+      const duration = await getDuration(f);
+      const r = await fetch(`/api/audio/admin/books/${bookId}/tracks/upload-url`, { method: 'POST', headers: HJ, body: JSON.stringify({ filename: f.name, size: f.size }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message || 'Erreur');
+      status.textContent = 'Envoi en cours…';
+      await putFile(d.upload_url, f, (p) => { bar.style.width = Math.round(p * 100) + '%'; status.textContent = `Envoi en cours… ${Math.round(p * 100)} %`; });
+      const title = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+      const r2 = await fetch(`/api/audio/admin/books/${bookId}/tracks`, { method: 'POST', headers: HJ,
+        body: JSON.stringify({ title, storage_path: d.storage_path, size_bytes: f.size, mime: f.type || null, duration_seconds: duration, is_preview: false }) });
+      if (!r2.ok) { const d2 = await r2.json().catch(() => ({})); throw new Error(d2.message || 'Enregistrement impossible'); }
+      bar.style.width = '100%'; status.textContent = '✅ Terminé'; ok++;
+    } catch (err) {
+      status.style.color = '#a33'; status.textContent = '❌ ' + err.message;
+    }
+  }
+  $(`up-btn-${bookId}`).disabled = false;
+  if (ok) { showMsg(`${ok} piste(s) ajoutée(s).`, 'success'); await loadBooks(); }
+}
+
+// ---------- Acheteurs ----------
+async function renderAccess(id) {
+  const box = $(`sub-${id}`);
+  if (!box) return;
+  box.innerHTML = '<div class="sub">Chargement…</div>';
+  const r = await fetch(`/api/audio/admin/books/${id}/access`, { headers: H });
+  const users = r.ok ? await r.json() : [];
+  box.innerHTML = `
+    <div class="sub">
+      <b>Acheteurs ayant accès au livre complet</b>
+      <p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin:6px 0 10px;">Après un paiement reçu par WhatsApp, saisissez l'e-mail du compte de l'acheteur. Il pourra écouter tout le livre.</p>
+      <div style="margin-bottom:12px;">${users.length ? users.map((u) => `
+        <div class="t-line"><span style="flex:1;">${esc(u.full_name || '')} <span class="meta">${esc(u.email)}</span></span>
+          <button class="mini del" data-uid="${u.id}">Retirer l'accès</button></div>`).join('') : '<p class="meta" style="color:var(--ink-soft);">Aucun acheteur pour le moment.</p>'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="email" id="grant-email-${id}" placeholder="E-mail du compte de l'acheteur" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit;">
+        <button class="btn btn-primary" id="grant-btn-${id}" style="padding:9px 16px;font-size:13.5px;">Accorder l'accès</button>
+      </div>
+    </div>`;
+  box.querySelectorAll('[data-uid]').forEach((btn) => btn.addEventListener('click', async () => {
+    await fetch(`/api/audio/admin/books/${id}/access/${btn.dataset.uid}`, { method: 'DELETE', headers: H });
+    await loadBooks();
+  }));
+  $(`grant-btn-${id}`).addEventListener('click', async () => {
+    const email = $(`grant-email-${id}`).value.trim();
+    if (!email) return;
+    const r2 = await fetch(`/api/audio/admin/books/${id}/access`, { method: 'POST', headers: HJ, body: JSON.stringify({ email }) });
+    const d = await r2.json();
+    if (!r2.ok) return showMsg(esc(d.message || 'Erreur'), 'error');
+    showMsg(`Accès accordé à ${esc(d.email)}.`, 'success');
+    await loadBooks();
+  });
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>

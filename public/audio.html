@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livres audio — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; padding: 34px 20px 190px; }
+  .hidden { display: none !important; }
+  .a-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
+  .a-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; text-align: left; font-family: inherit; padding: 0; }
+  .a-card:active { transform: scale(.98); }
+  .a-cover { aspect-ratio: 1 / 1; background: linear-gradient(135deg, #2a241b, #5b4a26); display: flex; align-items: center; justify-content: center; font-size: 56px; color: #f1e3b8; overflow: hidden; }
+  .a-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .a-body { padding: 14px 14px 16px; }
+  .a-body h3 { font-family: 'Fraunces', serif; font-size: 17px; line-height: 1.25; margin: 0 0 4px; }
+  .a-meta { font-size: 12.5px; color: var(--ink-soft); }
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; margin-top: 8px; }
+  .badge.free { background: #e8f6ec; color: #2a7a44; }
+  .badge.paid { background: #fff1d6; color: #8a5a00; }
+  .back { margin-bottom: 18px; }
+  .d-head { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; }
+  .d-head .a-cover { width: 150px; flex-shrink: 0; border-radius: 14px; font-size: 48px; }
+  .d-head h2 { font-family: 'Fraunces', serif; font-size: 26px; line-height: 1.2; margin: 0 0 6px; }
+  .d-desc { color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; margin-top: 8px; }
+  .buy-box { background: #fff7e6; border: 1px solid #f0d9a0; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; font-size: 14.5px; }
+  .t-row { display: flex; align-items: center; gap: 12px; padding: 14px 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
+  .t-row.playing { border-color: var(--gold); background: #fffaf0; }
+  .t-row.locked { opacity: .65; }
+  .t-num { width: 30px; height: 30px; border-radius: 50%; background: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .t-title { flex: 1; font-size: 15.5px; line-height: 1.3; }
+  .t-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .t-pos { height: 3px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .t-pos > div { height: 100%; background: var(--gold); }
+  .msg { font-size: 14px; padding: 10px 14px; border-radius: 8px; background: #fdeaea; color: #a33; margin-bottom: 14px; }
+  .empty { color: var(--ink-soft); text-align: center; padding: 40px 10px; }
+
+  /* Lecteur fixe en bas de l'écran */
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #16130f; color: #f4ede0; box-shadow: 0 -6px 24px rgba(0,0,0,.3); }
+  .player-in { max-width: 860px; margin: 0 auto; padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .p-top { display: flex; align-items: center; gap: 12px; }
+  .p-titles { flex: 1; min-width: 0; }
+  .p-title { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-sub { font-size: 12px; color: #c9bd9e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-btn { background: transparent; border: none; color: #f4ede0; font-size: 22px; cursor: pointer; padding: 6px 8px; font-family: inherit; }
+  .p-btn.big { width: 52px; height: 52px; border-radius: 50%; background: var(--gold); color: #16130f; font-size: 22px; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .p-btn.txt { font-size: 12.5px; font-weight: 700; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 6px 11px; }
+  .p-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; color: #c9bd9e; }
+  .p-bar input[type=range] { flex: 1; accent-color: var(--gold); height: 28px; }
+  .p-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/bible.html">Bible</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div id="view-list">
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Livres audio</h1>
+    <p style="color:var(--ink-soft);margin-bottom:24px;">Écoutez les livres directement sur le site. La lecture continue écran éteint, et vous reprenez là où vous vous étiez arrêté.</p>
+    <div id="list-box"><div class="empty">Chargement…</div></div>
+  </div>
+
+  <div id="view-detail" class="hidden">
+    <button class="btn btn-ghost back" id="btn-back">← Tous les livres audio</button>
+    <div id="detail-box"></div>
+  </div>
+</div>
+
+<!-- Lecteur -->
+<div class="player hidden" id="player"><div class="player-in">
+  <div class="p-top">
+    <div class="p-titles"><div class="p-title" id="p-title">—</div><div class="p-sub" id="p-sub"></div></div>
+    <button class="p-btn" id="p-prev" aria-label="Piste précédente">⏮</button>
+    <button class="p-btn" id="p-back15" aria-label="Reculer de 15 secondes">⟲15</button>
+    <button class="p-btn big" id="p-play" aria-label="Lecture / pause">▶</button>
+    <button class="p-btn" id="p-fwd15" aria-label="Avancer de 15 secondes">15⟳</button>
+    <button class="p-btn" id="p-next" aria-label="Piste suivante">⏭</button>
+  </div>
+  <div class="p-bar"><span id="p-cur">0:00</span><input type="range" id="p-seek" min="0" max="100" value="0" step="1"><span id="p-dur">0:00</span></div>
+  <div class="p-row">
+    <button class="p-btn txt" id="p-speed">1×</button>
+    <button class="p-btn txt" id="p-sleep">🌙 Minuterie</button>
+  </div>
+</div></div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+if (!token) { window.location.href = '/login.html'; }
+const H = { Authorization: `Bearer ${token}` };
+const HJ = { 'Content-Type': 'application/json', ...H };
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const audio = $('audio');
+
+// current/tracks = livre affiché ; queue/playingBook = livre en cours d'écoute (peuvent différer si l'on navigue pendant la lecture)
+const state = { books: [], current: null, tracks: [], index: -1, hasAccess: false, queue: [], playingBook: null };
+
+async function api(path, opts) {
+  let r;
+  try { r = await fetch(path, { headers: H, ...(opts || {}) }); }
+  catch (e) { return new Response(JSON.stringify({ message: 'Vous êtes hors connexion.' }), { status: 503, headers: { 'Content-Type': 'application/json' } }); }
+  if (r.status === 401) { window.location.href = '/login.html'; throw new Error('401'); }
+  return r;
+}
+function fmt(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+function fmtLong(sec) {
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
+}
+
+// ---------- Liste des livres audio ----------
+async function loadList() {
+  const r = await api('/api/audio/books');
+  if (!r.ok) { $('list-box').innerHTML = '<div class="empty">Impossible de charger les livres audio pour le moment. Vérifiez votre connexion et réessayez.</div>'; return; }
+  state.books = await r.json();
+  if (!state.books.length) { $('list-box').innerHTML = '<div class="empty">Les livres audio seront ajoutés bientôt. Revenez nous voir !</div>'; return; }
+  $('list-box').innerHTML = `<div class="a-grid">${state.books.map((b) => `
+    <button class="a-card" data-id="${b.id}">
+      <div class="a-cover">${b.has_cover ? `<img src="/api/audio/books/${b.id}/cover" alt="">` : '🎧'}</div>
+      <div class="a-body">
+        <h3>${esc(b.title)}</h3>
+        <div class="a-meta">${esc(b.author || '')}${b.author ? ' · ' : ''}${b.tracks} piste${b.tracks > 1 ? 's' : ''}${b.duration ? ' · ' + fmtLong(b.duration) : ''}</div>
+        ${b.access_type === 'a_vendre' && !b.has_access
+          ? `<span class="badge paid">${b.price ? Number(b.price).toFixed(2) + ' $' : 'En vente'}</span>`
+          : `<span class="badge free">${b.access_type === 'a_vendre' ? 'Acheté' : 'Gratuit'}</span>`}
+      </div>
+    </button>`).join('')}</div>`;
+  document.querySelectorAll('.a-card').forEach((c) => c.addEventListener('click', () => openBook(Number(c.dataset.id))));
+}
+
+// ---------- Détail d'un livre ----------
+async function openBook(id) {
+  const r = await api(`/api/audio/books/${id}`);
+  if (!r.ok) { alert('Livre audio introuvable'); return; }
+  const d = await r.json();
+  state.current = d.book; state.tracks = d.tracks; state.hasAccess = d.has_access;
+  $('view-list').classList.add('hidden'); $('view-detail').classList.remove('hidden');
+  window.scrollTo({ top: 0 });
+  renderDetail();
+}
+function renderDetail() {
+  const b = state.current;
+  const paid = b.access_type === 'a_vendre' && !state.hasAccess;
+  const wa = `https://wa.me/243999983163?text=${encodeURIComponent('Bonjour, je souhaite acheter le livre audio : ' + b.title)}`;
+  $('detail-box').innerHTML = `
+    <div class="d-head">
+      <div class="a-cover">${b.has_cover !== false ? `<img src="/api/audio/books/${b.id}/cover" alt="" onerror="this.parentNode.textContent='🎧'">` : '🎧'}</div>
+      <div style="flex:1;min-width:200px;">
+        <h2>${esc(b.title)}</h2>
+        <div class="a-meta">${esc(b.author || '')}</div>
+        ${b.description ? `<div class="d-desc">${esc(b.description)}</div>` : ''}
+      </div>
+    </div>
+    ${paid ? `<div class="buy-box"><b>Ce livre audio est en vente${b.price ? ' : ' + Number(b.price).toFixed(2) + ' $' : ''}.</b><br>Les pistes marquées « Extrait gratuit » sont écoutables dès maintenant. Pour le livre complet :<br>
+      <a href="${wa}" target="_blank" class="btn btn-primary" style="margin-top:10px;">Acheter via WhatsApp</a></div>` : ''}
+    <div id="tracks-box">${state.tracks.map((t, i) => `
+      <div class="t-row ${t.playable ? '' : 'locked'} ${(state.playingBook && state.playingBook.id === b.id && i === state.index) ? 'playing' : ''}" data-i="${i}">
+        <div class="t-num">${t.playable ? (i + 1) : '🔒'}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="t-title">${esc(t.title)}</div>
+          <div class="t-sub">${t.duration_seconds ? fmt(t.duration_seconds) : ''}${t.is_preview && paid ? ' · Extrait gratuit' : ''}${t.position > 5 && t.playable ? ' · repris à ' + fmt(t.position) : ''}</div>
+          ${t.position > 5 && t.duration_seconds ? `<div class="t-pos"><div style="width:${Math.min(100, Math.round(t.position / t.duration_seconds * 100))}%"></div></div>` : ''}
+        </div>
+      </div>`).join('')}</div>`;
+  document.querySelectorAll('.t-row').forEach((row) => row.addEventListener('click', () => startFromDetail(Number(row.dataset.i))));
+}
+$('btn-back').onclick = () => { $('view-detail').classList.add('hidden'); $('view-list').classList.remove('hidden'); window.scrollTo({ top: 0 }); };
+
+// ---------- Lecture ----------
+function startFromDetail(i) {
+  if (!state.tracks[i] || !state.tracks[i].playable) { playTrackLocked(); return; }
+  state.queue = state.tracks;
+  state.playingBook = state.current;
+  playTrack(i);
+}
+function playTrackLocked() { alert('Cette piste fait partie du livre en vente. Utilisez le bouton « Acheter via WhatsApp » pour l\'obtenir.'); }
+
+async function playTrack(i, startAt) {
+  const t = state.queue[i];
+  if (!t) return;
+  if (!t.playable) { alert('Cette piste fait partie du livre en vente. Utilisez le bouton « Acheter via WhatsApp » pour l\'obtenir.'); return; }
+  saveProgress();
+  state.index = i;
+  const r = await api(`/api/audio/tracks/${t.id}/url`);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(data.message || 'Lecture impossible pour le moment.'); return; }
+  state.trackUrlLoadedAt = Date.now();
+  audio.src = data.url;
+  const resume = typeof startAt === 'number' ? startAt : (t.position > 5 && (!t.duration_seconds || t.position < t.duration_seconds - 5) ? t.position : 0);
+  audio.addEventListener('loadedmetadata', function once() {
+    audio.removeEventListener('loadedmetadata', once);
+    if (resume) audio.currentTime = resume;
+  });
+  audio.playbackRate = speeds[speedIdx];
+  try { await audio.play(); } catch (e) { /* l'utilisateur peut appuyer sur lecture */ }
+  $('player').classList.remove('hidden');
+  $('p-title').textContent = t.title;
+  $('p-sub').textContent = state.playingBook.title + (state.playingBook.author ? ' — ' + state.playingBook.author : '');
+  updateMediaSession();
+  if (!$('view-detail').classList.contains('hidden')) renderDetail();
+}
+
+function updateMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  const b = state.playingBook, t = state.queue[state.index];
+  if (!b || !t) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: t.title, artist: b.author || 'Ministère de la Nouvelle Alliance', album: b.title,
+    artwork: [{ src: `${location.origin}/api/audio/books/${b.id}/cover`, sizes: '512x512', type: 'image/jpeg' }],
+  });
+  const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch (e) {} };
+  set('play', () => audio.play());
+  set('pause', () => audio.pause());
+  set('seekbackward', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+  set('seekforward', () => { audio.currentTime = Math.min(audio.duration || Infinity, audio.currentTime + 15); });
+  set('previoustrack', () => prevTrack());
+  set('nexttrack', () => nextTrack());
+  set('seekto', (d) => { if (d.seekTime != null) audio.currentTime = d.seekTime; });
+}
+function updatePosition() {
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !isFinite(audio.duration)) return;
+  try { navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate, position: audio.currentTime }); } catch (e) {}
+}
+
+function prevTrack() {
+  if (audio.currentTime > 5) { audio.currentTime = 0; return; }
+  for (let i = state.index - 1; i >= 0; i--) if (state.queue[i].playable) { playTrack(i, 0); return; }
+}
+function nextTrack() {
+  for (let i = state.index + 1; i < state.queue.length; i++) if (state.queue[i].playable) { playTrack(i, 0); return; }
+}
+
+$('p-play').onclick = () => { if (audio.paused) audio.play(); else audio.pause(); };
+$('p-back15').onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 15); };
+$('p-fwd15').onclick = () => { audio.currentTime = Math.min(audio.duration || Infinity, audio.currentTime + 15); };
+$('p-prev').onclick = prevTrack;
+$('p-next').onclick = nextTrack;
+
+let seeking = false;
+$('p-seek').addEventListener('input', () => { seeking = true; $('p-cur').textContent = fmt($('p-seek').value); });
+$('p-seek').addEventListener('change', () => { audio.currentTime = Number($('p-seek').value); seeking = false; });
+
+audio.addEventListener('play', () => { $('p-play').textContent = '⏸'; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
+audio.addEventListener('pause', () => { $('p-play').textContent = '▶'; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; saveProgress(); });
+audio.addEventListener('loadedmetadata', () => { $('p-seek').max = Math.floor(audio.duration) || 100; $('p-dur').textContent = fmt(audio.duration); updatePosition(); });
+audio.addEventListener('timeupdate', () => {
+  if (!seeking) { $('p-seek').value = Math.floor(audio.currentTime); $('p-cur').textContent = fmt(audio.currentTime); }
+});
+audio.addEventListener('ended', () => {
+  const t = state.queue[state.index];
+  if (t) { t.position = 0; fetch(`/api/audio/tracks/${t.id}/progress`, { method: 'PUT', headers: HJ, body: JSON.stringify({ position: 0 }) }); }
+  nextTrack();
+});
+// Si le lien temporaire expire ou si le réseau coupe, on redemande un lien et on reprend au même endroit
+audio.addEventListener('error', async () => {
+  const t = state.queue[state.index];
+  if (!t || !audio.src) return;
+  const at = audio.currentTime || 0;
+  if (Date.now() - (state.trackUrlLoadedAt || 0) < 5000) return; // évite une boucle d'erreurs
+  playTrack(state.index, at);
+});
+
+// Enregistre la position d'écoute toutes les 10 secondes et à chaque pause
+function saveProgress() {
+  const t = state.queue[state.index];
+  if (!t || !audio.currentTime) return;
+  t.position = Math.floor(audio.currentTime);
+  fetch(`/api/audio/tracks/${t.id}/progress`, { method: 'PUT', headers: HJ, body: JSON.stringify({ position: t.position }), keepalive: true }).catch(() => {});
+}
+setInterval(() => { if (!audio.paused) { saveProgress(); updatePosition(); } }, 10000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
+
+// Vitesse de lecture
+const speeds = [1, 1.25, 1.5, 0.85];
+let speedIdx = 0;
+$('p-speed').onclick = () => { speedIdx = (speedIdx + 1) % speeds.length; audio.playbackRate = speeds[speedIdx]; $('p-speed').textContent = speeds[speedIdx] + '×'; updatePosition(); };
+
+// Minuterie de sommeil
+const sleepOptions = [0, 15, 30, 60];
+let sleepIdx = 0, sleepTimeout = null;
+$('p-sleep').onclick = () => {
+  sleepIdx = (sleepIdx + 1) % sleepOptions.length;
+  clearTimeout(sleepTimeout);
+  const min = sleepOptions[sleepIdx];
+  if (!min) { $('p-sleep').textContent = '🌙 Minuterie'; return; }
+  $('p-sleep').textContent = `🌙 ${min} min`;
+  sleepTimeout = setTimeout(() => { audio.pause(); sleepIdx = 0; $('p-sleep').textContent = '🌙 Minuterie'; }, min * 60000);
+};
+
+loadList();
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
