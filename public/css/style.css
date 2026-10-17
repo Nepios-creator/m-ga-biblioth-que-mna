@@ -440,3 +440,57 @@ html body .quote-poster .quote-text.q-long {
 .quote-poster .author-role { font-size: 12px; }
 .quote-poster .quote-share { justify-content: flex-start !important; margin-top: 14px !important; gap: 8px !important; }
 .quote-poster .quote-share .btn { padding: 6px 12px !important; font-size: 12.5px !important; min-height: 0 !important; border-radius: 8px; }
+
+/* ---------- 12. Catalogue et Actualités : bandeau bleu simple, le titre seul qui surgit du fond ---------- */
+body:has(#books-grid) > section.hero,
+body:has(.nw-wrap) > section.hero {
+  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  min-height: 170px; padding: 46px 20px !important; border: 0; text-align: center;
+  background-color: #1f5386;
+  background-image:
+    radial-gradient(ellipse at 50% 130%, rgba(255, 255, 255, 0.18), transparent 62%),
+    linear-gradient(160deg, #173f69 0%, #1f5386 45%, #2f6fb0 100%);
+  background-size: auto;
+  color: #fff;
+}
+/* deux lueurs douces qui dérivent lentement derrière le titre */
+body:has(#books-grid) > section.hero::before,
+body:has(.nw-wrap) > section.hero::before,
+body:has(#books-grid) > section.hero::after,
+body:has(.nw-wrap) > section.hero::after {
+  content: ""; display: block; position: absolute; border-radius: 50%; pointer-events: none;
+  width: 280px; height: 280px; filter: blur(34px); opacity: 1; font-size: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
+}
+body:has(#books-grid) > section.hero::before,
+body:has(.nw-wrap) > section.hero::before { left: -70px; top: -110px; animation: lsmDriftA 11s ease-in-out infinite alternate; }
+body:has(#books-grid) > section.hero::after,
+body:has(.nw-wrap) > section.hero::after  { right: -80px; bottom: -130px; background: radial-gradient(circle, rgba(201, 162, 75, 0.30), transparent 70%); animation: lsmDriftB 13s ease-in-out infinite alternate; }
+
+body:has(#books-grid) > section.hero p,
+body:has(.nw-wrap) > section.hero p { display: none; }
+
+body:has(#books-grid) > section.hero h1,
+body:has(.nw-wrap) > section.hero h1 {
+  position: relative; z-index: 1; margin: 0; max-width: 100%;
+  color: #fff !important; font-size: clamp(28px, 7.6vw, 50px) !important; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.14em; line-height: 1.2;
+  text-shadow: 0 4px 22px rgba(0, 0, 0, 0.25);
+  animation: lsmEmerge 1.6s cubic-bezier(0.18, 0.7, 0.2, 1) both, lsmFloat 5.5s ease-in-out 1.6s infinite;
+}
+@keyframes lsmEmerge {
+  0%   { opacity: 0; transform: scale(0.6); filter: blur(14px); letter-spacing: 0.5em; }
+  60%  { opacity: 1; filter: blur(2px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); letter-spacing: 0.14em; }
+}
+@keyframes lsmFloat {
+  0%, 100% { transform: translateY(0); text-shadow: 0 4px 22px rgba(0, 0, 0, 0.25); }
+  50%      { transform: translateY(-7px); text-shadow: 0 12px 28px rgba(0, 0, 0, 0.32); }
+}
+@keyframes lsmDriftA { to { transform: translate(90px, 60px); } }
+@keyframes lsmDriftB { to { transform: translate(-80px, -50px); } }
+@media (prefers-reduced-motion: reduce) {
+  body:has(#books-grid) > section.hero h1, body:has(.nw-wrap) > section.hero h1,
+  body:has(#books-grid) > section.hero::before, body:has(.nw-wrap) > section.hero::before,
+  body:has(#books-grid) > section.hero::after,  body:has(.nw-wrap) > section.hero::after { animation: none; }
+}
