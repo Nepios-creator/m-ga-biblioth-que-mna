@@ -122,7 +122,9 @@
   /* Accueil */
   html.mna-on .hero { padding: 26px 18px 44px; }
   html.mna-on .hero h1 { font-size: clamp(28px, 8.6vw, 40px); line-height: 1.15; }
-  html.mna-on .hero p { font-size: 19px; margin-bottom: 24px; }
+  html.mna-on .hero p { margin-bottom: 24px; }
+  html.mna-on .hero:has(.actions) h1 { font-size: clamp(34px, 10vw, 46px); }
+  html.mna-on .quote-poster .quote-share .btn { min-height: 0; }
   html.mna-on .hero .actions { flex-direction: column; align-items: center; max-width: none; }
   html.mna-on .hero .actions .btn { width: 100%; max-width: 400px; min-height: 54px; font-size: 19px; }
   html.mna-on section.section { padding: 46px 0; }
@@ -134,10 +136,10 @@
   html.mna-on .card:has(> .icon) { padding: 4px 2px 8px; }
   html.mna-on .card:has(> .icon) h3 { font-size: 22px; }
   html.mna-on .card:has(> .icon) p { font-size: 16.5px; }
-  html.mna-on .quote-poster { padding: 40px 22px 28px; border-radius: 18px; }
-  html.mna-on .quote-poster .quote-text { font-size: 21px; }
-  html.mna-on .quote-poster .author-name { font-size: 15px; }
-  html.mna-on .quote-poster .author-role { font-size: 13px; }
+  html.mna-on .quote-poster { padding: 18px 16px 14px; border-radius: 12px; }
+  html.mna-on .quote-poster .quote-text { font-size: 18.5px; }
+  html.mna-on .quote-poster .author-name { font-size: 14.5px; }
+  html.mna-on .quote-poster .author-role { font-size: 12.5px; }
   html.mna-on .cta-final { margin: 0 14px 52px; padding: 40px 20px; }
   html.mna-on .cta-final h2 { font-size: 26px; }
   html.mna-on footer { padding: 30px 18px calc(36px + env(safe-area-inset-bottom)); font-size: 15px; }
