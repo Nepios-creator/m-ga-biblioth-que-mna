@@ -1,11 +1,11 @@
 // Confort commun à toute l'application :
-//  1) zoom à deux doigts (agrandir de 5 fois, réduire jusqu'à la moitié) sur toutes les pages, en plein écran ou non ;
+//  1) zoom à deux doigts (agrandir jusqu'à 5 fois, revenir à la taille normale) sur toutes les pages, en plein écran ou non ;
 //  2) pendant la lecture d'un livre : boutons A− / A+ pour changer la taille du texte, comme dans la Bible.
 (function () {
   'use strict';
   try {
     // ---------- 1) Zoom à deux doigts ----------
-    var VIEWPORT = 'width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=5, user-scalable=yes';
+    var VIEWPORT = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes';
     var vp = document.querySelector('meta[name="viewport"]');
     if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; document.head.appendChild(vp); }
     if (vp.getAttribute('content') !== VIEWPORT) vp.setAttribute('content', VIEWPORT);
