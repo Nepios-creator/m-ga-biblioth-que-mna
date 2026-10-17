@@ -9,6 +9,12 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#16130f">
+<style>
+  /* Publication d'un réseau social affichée en entier, comme sur le réseau d'origine */
+  .nw-social { max-width: 600px; margin: 0 auto 26px; }
+  .nw-social iframe { display: block; width: 100%; border: 0; border-radius: 12px; background: #fff; }
+  .nw-social .fb-post, .nw-social .fb-video { display: block; text-align: center; }
+</style>
 </head>
 <body>
 
@@ -69,11 +75,99 @@ function cardHtml(a) {
     </a>`;
 }
 
+// ---------- Publications des réseaux sociaux : intégration officielle (texte, images, vidéos au complet) ----------
+// Reconnaît le lien d'une publication Facebook, Instagram, X (Twitter), TikTok ou LinkedIn et renvoie son affichage d'origine.
+function socialEmbed(raw) {
+  let u;
+  try { u = new URL(raw); } catch (e) { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const host = u.hostname.toLowerCase().replace(/^(www|m|mbasic|web|touch|mobile)\./, '');
+  const path = u.pathname;
+
+  // Facebook (publications, photos, vidéos, reels) — affichage officiel qui ajuste sa hauteur tout seul
+  if (host === 'facebook.com' || host === 'fb.com' || host === 'fb.watch') {
+    let href = raw;
+    if (host !== 'fb.watch') {
+      ['fbclid', 'mibextid', 'rdid', 'share_url', 'ref', '__tn__', '__cft__[0]'].forEach((k) => u.searchParams.delete(k));
+      u.hash = '';
+      href = 'https://www.facebook.com' + u.pathname + u.search;
+    }
+    const video = host === 'fb.watch' || /\/(videos?|watch|reel)(\/|$)/.test(path);
+    const html = video
+      ? `<div class="fb-video" data-href="${esc(href)}" data-width="auto" data-show-text="true" data-allowfullscreen="true"></div>`
+      : `<div class="fb-post" data-href="${esc(href)}" data-width="auto" data-show-text="true"></div>`;
+    return { html, facebook: true };
+  }
+
+  // Instagram (publications et reels)
+  if (host === 'instagram.com') {
+    const m = /\/(p|reel|reels|tv)\/([\w-]+)/.exec(path);
+    if (!m) return null;
+    const kind = m[1] === 'reels' ? 'reel' : m[1];
+    return { html: `<iframe src="https://www.instagram.com/${kind}/${m[2]}/embed/captioned/" style="height:720px" scrolling="no" allowtransparency="true" allowfullscreen loading="lazy" title="Publication Instagram"></iframe>` };
+  }
+
+  // X (Twitter)
+  if (host === 'x.com' || host === 'twitter.com') {
+    const m = /\/status(?:es)?\/(\d+)/.exec(path);
+    if (!m) return null;
+    return { html: `<iframe src="https://platform.twitter.com/embed/Tweet.html?id=${m[1]}&lang=fr&dnt=true" style="height:560px" scrolling="no" allowfullscreen loading="lazy" title="Publication X"></iframe>` };
+  }
+
+  // TikTok
+  if (host === 'tiktok.com') {
+    const m = /\/video\/(\d+)/.exec(path);
+    if (!m) return null;
+    return { html: `<iframe src="https://www.tiktok.com/embed/v2/${m[1]}" style="height:760px" allowfullscreen loading="lazy" title="Vidéo TikTok"></iframe>` };
+  }
+
+  // LinkedIn
+  if (host === 'linkedin.com') {
+    const m = /urn:li:(share|ugcPost|activity):(\d+)/.exec(decodeURIComponent(path)) || /activity-(\d+)/.exec(path);
+    if (!m) return null;
+    const urn = m.length === 3 ? `urn:li:${m[1]}:${m[2]}` : `urn:li:activity:${m[1]}`;
+    return { html: `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" style="height:640px" allowfullscreen loading="lazy" title="Publication LinkedIn"></iframe>` };
+  }
+  return null;
+}
+
+// Charge le module officiel de Facebook (une seule fois) pour afficher les publications Facebook
+function loadFacebook() {
+  if (!document.getElementById('fb-root')) {
+    const r = document.createElement('div');
+    r.id = 'fb-root';
+    document.body.appendChild(r);
+  }
+  if (window.FB && window.FB.XFBML) { window.FB.XFBML.parse($('content')); return; }
+  if (document.getElementById('fb-sdk')) return;
+  const s = document.createElement('script');
+  s.id = 'fb-sdk';
+  s.async = true;
+  s.defer = true;
+  s.crossOrigin = 'anonymous';
+  s.src = 'https://connect.facebook.net/fr_FR/sdk.js#xfbml=1&version=v19.0';
+  document.body.appendChild(s);
+}
+
+// Instagram et X indiquent la hauteur réelle de leur publication : le cadre s'ajuste pour tout montrer
+window.addEventListener('message', (e) => {
+  if (!/^https:\/\/(www\.instagram\.com|platform\.twitter\.com)$/.test(e.origin)) return;
+  let d = e.data;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch (x) { return; } }
+  let h = 0;
+  if (d && d.type === 'MEASURE' && d.details) h = Number(d.details.height);
+  else if (d && d['twttr.embed'] && d['twttr.embed'].params && d['twttr.embed'].params[0]) h = Number(d['twttr.embed'].params[0].height);
+  if (!h || !isFinite(h)) return;
+  document.querySelectorAll('.nw-social iframe').forEach((f) => { if (f.contentWindow === e.source) f.style.height = Math.ceil(h) + 'px'; });
+});
+
 function render(a) {
   document.title = a.title + ' — Ministère de la Nouvelle Alliance';
   const url = location.origin + '/actualite.html?id=' + a.id;
   const place = [a.region, a.country].filter(Boolean).join(' · ');
   const shareText = encodeURIComponent(a.title + '\n' + url);
+  // Si la source est une publication de réseau social, elle s'affiche en entier à la place de l'image de couverture seule
+  const social = !a.video_embed && a.source_url ? socialEmbed(a.source_url) : null;
 
   $('content').innerHTML = `
     <div class="nw-meta"><span class="nw-badge">${esc(CAT[a.category] || 'Actualité')}</span>${place ? `<span>🌍 ${esc(place)}</span>` : ''}${a.language && a.language !== 'fr' ? `<span>· ${esc(LANGS[a.language] || a.language.toUpperCase())}</span>` : ''}</div>
@@ -84,7 +178,7 @@ function render(a) {
       ${a.author ? `<span>Par ${esc(a.author)}</span>` : ''}
       ${a.source_name ? `<span>Source : ${a.source_url ? `<a href="${esc(a.source_url)}" target="_blank" rel="noopener nofollow">${esc(a.source_name)}</a>` : esc(a.source_name)}</span>` : ''}
     </div>
-    ${a.cover ? `<img class="nw-cover" src="${esc(a.cover)}" alt="">` : ''}
+    ${social ? `<div class="nw-social">${social.html}</div>` : (a.cover ? `<img class="nw-cover" src="${esc(a.cover)}" alt="">` : '')}
     ${a.video_embed ? `<div class="nw-video"><iframe src="${esc(a.video_embed)}" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}
     <div class="nw-body">${a.body_html}</div>
     ${a.images && a.images.length ? `<div class="nw-gallery">${a.images.map((i) =>
@@ -100,6 +194,8 @@ function render(a) {
     </div>
     ${a.related && a.related.length ? `<h2 style="font-size:22px;margin:36px 0 16px;">À lire aussi</h2><div class="nw-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">${a.related.map(cardHtml).join('')}</div>` : ''}
   `;
+
+  if (social && social.facebook) loadFacebook();
 
   $('copy').addEventListener('click', async () => {
     try {
