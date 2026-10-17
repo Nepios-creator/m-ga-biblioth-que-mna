@@ -165,15 +165,45 @@
   /* Bible */
   html.mna-on .tb-btn { min-height: 44px; }
 
-  /* Assistant : la zone d'écriture reste accessible en bas de l'écran */
+  /* Assistant : écran de discussion plein écran, comme WhatsApp.
+     La zone d'écriture reste toujours en bas, au-dessus du clavier ; seuls les messages défilent. */
   html.mna-on .bubble { font-size: 16.5px; }
-  html.mna-on .convo-item { font-size: 15.5px; padding: 12px; }
+  html.mna-on .convo-item { font-size: 15px; padding: 9px 12px; }
   html.mna-on .bubble-actions button { font-size: 14px; padding: 6px 0; }
-  html.mna-on .disclaimer { font-size: 13px; }
-  html.mna-on .chat-input-row {
-    position: sticky; bottom: 0; z-index: 5; background: var(--paper, #faf6ee);
-    padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
+  html.mna-on .disclaimer { font-size: 11.5px; padding-top: 2px; }
+
+  html.mna-on body:has(.chat-layout) { overflow: hidden; padding-top: 0; }
+  html.mna-on body:has(.chat-layout) > header { display: none; }
+  html.mna-on body:has(.chat-layout) .chat-layout {
+    position: fixed; left: 0; right: 0; margin: 0; max-width: none; min-height: 0;
+    top: calc(var(--mna-bar-h) + var(--lsm-top, 0px));
+    height: calc(var(--lsm-vh, 100dvh) - var(--mna-bar-h));
+    display: flex; flex-direction: column; background: var(--paper, #faf6ee);
   }
+  /* Clavier ouvert : la barre d'onglets s'efface pour laisser toute la place à la discussion */
+  html.mna-on.lsm-kbd body:has(.chat-layout) #mna-appbar { display: none; }
+  html.mna-on.lsm-kbd body:has(.chat-layout) .chat-layout { top: var(--lsm-top, 0px); height: var(--lsm-vh, 100dvh); }
+
+  /* Les discussions passent en bandeau horizontal compact */
+  html.mna-on body:has(.chat-layout) .sidebar {
+    flex: none; display: flex; flex-direction: row; align-items: center; gap: 8px;
+    max-height: none; padding: 8px 10px; overflow-x: auto; overflow-y: hidden;
+    border-right: 0; border-bottom: 1px solid var(--line); scrollbar-width: none;
+  }
+  html.mna-on body:has(.chat-layout) .sidebar::-webkit-scrollbar { display: none; }
+  html.mna-on body:has(.chat-layout) .sidebar .btn { width: auto; flex: none; margin: 0; min-height: 40px; padding: 8px 14px; font-size: 14.5px; white-space: nowrap; }
+  html.mna-on body:has(.chat-layout) #convo-list { display: flex; gap: 6px; }
+  html.mna-on body:has(.chat-layout) #convo-list p { white-space: nowrap; margin: 0; }
+  html.mna-on body:has(.chat-layout) .convo-item { flex: none; max-width: 190px; margin: 0; background: #fff; border: 1px solid var(--line); }
+
+  html.mna-on body:has(.chat-layout) .chat-main { flex: 1; min-height: 0; padding: 8px 10px calc(6px + env(safe-area-inset-bottom)); }
+  html.mna-on body:has(.chat-layout) .chat-box { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  html.mna-on body:has(.chat-layout) .chat-input-row {
+    flex: none; position: static; align-items: flex-end; gap: 8px; padding: 8px 0 4px; background: var(--paper, #faf6ee);
+  }
+  html.mna-on body:has(.chat-layout) .chat-input-row textarea { min-height: 48px; max-height: 120px; border-radius: 22px; padding: 12px 16px; }
+  html.mna-on body:has(.chat-layout) .chat-input-row .btn { min-height: 48px; border-radius: 24px; padding: 0 18px; flex: none; }
+  html.mna-on.lsm-kbd body:has(.chat-layout) .disclaimer { display: none; }
 
   /* Petits textes écrits directement dans les pages : taille minimale confortable */
   html.mna-on [style*="font-size:11"],
