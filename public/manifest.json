@@ -1,15 +1,24 @@
 {
+  "id": "/",
   "name": "Ministère de la Nouvelle Alliance — Bibliothèque",
   "short_name": "MNA Bibliothèque",
   "description": "La bibliothèque numérique du Ministère de la Nouvelle Alliance",
+  "lang": "fr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#faf6ee",
   "theme_color": "#16130f",
+  "categories": ["books", "education"],
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ] n'
+  ],
+  "shortcuts": [
+    { "name": "Bible", "url": "/bible.html" },
+    { "name": "Actualités", "url": "/actualites.html" },
+    { "name": "Espace d'étude", "url": "/espace-etude.html" },
+    { "name": "Catalogue", "url": "/catalogue.html" }
+  ]
 }
