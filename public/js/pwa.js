@@ -30,6 +30,11 @@ if ('serviceWorker' in navigator) {
   extras.src = '/js/site-extras.js';
   document.body.appendChild(extras);
 
+  // Habillage « publications en ligne » : rangée de compte, menu doré, retour en haut, barre collée en haut
+  const lsm = document.createElement('script');
+  lsm.src = '/js/lsm-layout.js';
+  document.body.appendChild(lsm);
+
   // Page d'accueil : cadres interactifs, section Bible et ajustement des citations
   if (location.pathname === '/' || location.pathname === '/index.html') {
     const home = document.createElement('script');
