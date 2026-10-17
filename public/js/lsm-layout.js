@@ -86,6 +86,7 @@
     function placeBar() {
       var bar = document.getElementById('mna-appbar');
       if (!bar) return false;
+      if (document.querySelector('.chat-layout')) return true;               // discussion plein écran : barre fixe
       if (!header || header.parentNode !== document.body) return true;      // on garde la barre fixe d'origine
       if (!overflowOk(doc) || !overflowOk(document.body)) return true;       // sinon le collage en haut ne marcherait pas
       if (bar.previousElementSibling !== header) {
@@ -214,6 +215,32 @@
         new MutationObserver(function () { setTimeout(apply, 0); }).observe(qEl, { childList: true, characterData: true, subtree: true });
         apply();
       }
+    }
+
+    // 7. Assistant IA : zone d'écriture toujours visible au-dessus du clavier (comme WhatsApp)
+    if (document.querySelector('.chat-layout')) {
+      var vpMeta = document.querySelector('meta[name="viewport"]');
+      if (vpMeta && vpMeta.content.indexOf('interactive-widget') < 0) vpMeta.content += ', interactive-widget=resizes-content';
+      var vv = window.visualViewport;
+      var maxH = 0;
+      var syncVv = function () {
+        var h = vv ? vv.height : window.innerHeight;
+        var top = vv ? vv.offsetTop : 0;
+        if (h > maxH) maxH = h;
+        doc.style.setProperty('--lsm-vh', h + 'px');
+        doc.style.setProperty('--lsm-top', top + 'px');
+        var open = maxH - h > 150;
+        var was = doc.classList.contains('lsm-kbd');
+        doc.classList.toggle('lsm-kbd', open);
+        if (open !== was) {
+          var box = document.getElementById('chat-box');
+          if (box) setTimeout(function () { box.scrollTop = box.scrollHeight; }, 60);
+        }
+        if (window.scrollY) window.scrollTo(0, 0);
+      };
+      if (vv) { vv.addEventListener('resize', syncVv); vv.addEventListener('scroll', syncVv); }
+      window.addEventListener('orientationchange', function () { maxH = 0; setTimeout(syncVv, 300); });
+      syncVv();
     }
   } catch (e) { /* ne jamais empêcher le site de fonctionner */ }
 })();
