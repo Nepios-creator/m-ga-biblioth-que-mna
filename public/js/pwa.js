@@ -7,6 +7,11 @@ if ('serviceWorker' in navigator) {
 // Ajouts communs (menu, raccourcis admin) sur toutes les pages
 (function () {
   // Téléphone : onglets fixes, confort de lecture, installation (sans effet sur ordinateur)
+  // Utilisation sans connexion (Bible téléchargée, message hors connexion)
+  const offline = document.createElement('script');
+  offline.src = '/js/offline.js';
+  document.body.appendChild(offline);
+
   // Zoom à deux doigts partout + taille du texte pendant la lecture des livres
   const tools = document.createElement('script');
   tools.src = '/js/reader-tools.js';

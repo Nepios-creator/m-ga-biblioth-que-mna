@@ -19,8 +19,20 @@
       var f = D.exitFullscreen || D.webkitExitFullscreen;
       if (f && isFS()) { try { var p = f.call(D); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
     }
-    function flagOn() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
-    function setFlag(on) { try { if (on) localStorage.setItem(KEY, '1'); else localStorage.removeItem(KEY); } catch (e) {} }
+    // Sur téléphone, le plein écran est le mode par défaut : il ne s'arrête que si vous touchez « Quitter le plein écran »
+    function isPhone() {
+      try {
+        return window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 820;
+      } catch (e) { return false; }
+    }
+    function flagOn() {
+      var v = null;
+      try { v = localStorage.getItem(KEY); } catch (e) {}
+      if (v === '1') return true;
+      if (v === '0') return false;
+      return isPhone();
+    }
+    function setFlag(on) { try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {} }
     function shell() { return D.getElementById('mna-shell'); }
 
     // ---------- La coque : un cadre plein écran qui ne se recharge jamais ----------
@@ -30,7 +42,7 @@
       var st = D.createElement('style');
       st.id = 'mna-shell-css';
       st.textContent =
-        'html.mna-shell-on,html.mna-shell-on body{overflow:hidden !important;height:100% !important;margin:0 !important;padding:0 !important}' +
+        'html.mna-shell-on,html.mna-shell-on body{overflow:hidden !important;height:100% !important;margin:0 !important;padding:0 !important;background:#faf6ee}' +
         'html.mna-shell-on body > *:not(#mna-shell){display:none !important}' +
         '#mna-shell{position:fixed;top:0;left:0;width:100%;height:100%;border:0;background:#faf6ee;z-index:2147483000;display:block !important}';
       D.head.appendChild(st);
@@ -172,6 +184,19 @@
       tries++;
       if (addTab() || tries > 40) clearInterval(timer);
     }, 250);
+
+    // Invitation : le navigateur exige un toucher pour passer en plein écran ; ce premier toucher suffit, partout
+    if (!framed && supported() && flagOn() && isPhone()) {
+      setTimeout(function () {
+        if (isFS() || shell() || document.getElementById('mna-fs-hint')) return;
+        var h = document.createElement('div');
+        h.id = 'mna-fs-hint';
+        h.textContent = 'Touchez l\'écran pour passer en plein écran';
+        h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:46;max-width:90vw;box-sizing:border-box;padding:11px 18px;border-radius:999px;background:#16130f;color:#f6eedb;border:1px solid #c9a24b;font:600 14.5px/1.3 "Inter",system-ui,sans-serif;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none';
+        document.body.appendChild(h);
+        setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 4500);
+      }, 1200);
+    }
 
     // La page d'accueil crée ses boutons un peu après le chargement : on remet les textes à jour
     [0, 400, 1200, 2500].forEach(function (ms) { setTimeout(labels, ms); });
