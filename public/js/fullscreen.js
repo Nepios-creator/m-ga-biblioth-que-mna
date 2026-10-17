@@ -89,10 +89,15 @@
         var l = heads[i].parentNode.querySelector('.try-link');
         if (l) l.textContent = on ? 'Quitter le plein écran ✕' : 'Passer en plein écran →';
       }
+      var rb = document.getElementById('btn-fullscreen');
+      if (rb) rb.textContent = on ? '✕ Quitter le plein écran' : '⛶ Plein écran';
       var t = document.querySelector('#mna-appbar .mna-tab-fs');
       if (t) t.lastChild.textContent = on ? 'Quitter le plein écran' : 'Plein écran';
     }
     function fsCard(target) {
+      // Bouton « Plein écran » du lecteur de livres
+      var btn = target && target.closest ? target.closest('#btn-fullscreen') : null;
+      if (btn) return btn;
       var c = target && target.closest ? target.closest('.card') : null;
       if (!c) return null;
       var h = c.querySelector('h3');

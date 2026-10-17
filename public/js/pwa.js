@@ -7,6 +7,11 @@ if ('serviceWorker' in navigator) {
 // Ajouts communs (menu, raccourcis admin) sur toutes les pages
 (function () {
   // Téléphone : onglets fixes, confort de lecture, installation (sans effet sur ordinateur)
+  // Zoom à deux doigts partout + taille du texte pendant la lecture des livres
+  const tools = document.createElement('script');
+  tools.src = '/js/reader-tools.js';
+  document.body.appendChild(tools);
+
   // Plein écran permanent sur toutes les pages (tant que vous ne le désactivez pas)
   const fs = document.createElement('script');
   fs.src = '/js/fullscreen.js';
