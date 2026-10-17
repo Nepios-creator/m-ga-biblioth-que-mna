@@ -119,8 +119,16 @@
 
         // Diaporama des deux livres (images à déposer dans /img/)
         var SLIDES = [
-          { src: '/img/affiche-satan.jpg', alt: 'La vraie histoire de Satan — Docteur S-J Nepios', bg: '#000c1f' },
-          { src: '/img/affiche-mysteres.jpg', alt: 'Les trois mystères de Christ — Docteur S-J Nepios', bg: '#0d0f15' }
+          { src: '/img/affiche-satan.jpg', alt: 'La vraie histoire de Satan — Docteur S-J Nepios' },
+          { src: '/img/photo-1.jpg', alt: 'Cérémonie de l\'École Biblique Kainos : les diplômés debout' },
+          { src: '/img/affiche-mysteres.jpg', alt: 'Les trois mystères de Christ — Docteur S-J Nepios' },
+          { src: '/img/photo-2.jpg', alt: 'Cérémonie de l\'École Biblique Kainos : moment de prière des diplômés' },
+          { src: '/img/livre-satan-pile.jpg', alt: 'La vraie histoire de Satan — le livre' },
+          { src: '/img/photo-3.jpg', alt: 'Remise des attestations à l\'École Biblique Kainos' },
+          { src: '/img/photo-4.jpg', alt: 'Prière avec imposition des mains' },
+          { src: '/img/photo-5.jpg', alt: 'Moment de prière à genoux' },
+          { src: '/img/photo-6.jpg', alt: 'Assemblée lors de la cérémonie de l\'École Biblique Kainos' },
+          { src: '/img/photo-7.jpg', alt: 'La salle lors de la cérémonie de l\'École Biblique Kainos' }
         ];
         if (!hero.querySelector('.lsm-carousel')) {
           var car = document.createElement('div');
@@ -128,7 +136,7 @@
           car.setAttribute('role', 'region');
           car.setAttribute('aria-label', 'Nos livres');
           car.innerHTML = SLIDES.map(function (sl, i) {
-            return '<div class="lsm-slide' + (i === 0 ? ' on' : '') + '" style="background:' + sl.bg + '"><img src="' + sl.src + '" alt="' + sl.alt + '"' + (i === 0 ? '' : ' loading="lazy"') + '></div>';
+            return '<div class="lsm-slide' + (i === 0 ? ' on' : '') + '" style="--bg:url(' + sl.src + ')"><img src="' + sl.src + '" alt="' + sl.alt + '"' + (i === 0 ? '' : ' loading="lazy"') + '></div>';
           }).join('') +
             '<button type="button" class="lsm-arrow lsm-prev" aria-label="Livre précédent">&#8249;</button>' +
             '<button type="button" class="lsm-arrow lsm-next" aria-label="Livre suivant">&#8250;</button>';
