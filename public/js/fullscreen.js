@@ -12,6 +12,10 @@
     try { if (window.top !== window) { void window.top.document.body; T = window.top; framed = true; } } catch (e) { T = window; framed = false; }
     var D = T.document, root = D.documentElement;
 
+    // Application installée ouverte directement en plein écran (affichage « fullscreen » du manifeste) :
+    // l'écran est déjà plein dès l'ouverture, il n'y a rien à activer.
+    try { if (window.matchMedia('(display-mode: fullscreen)').matches) { root.classList.add('mna-app-fullscreen'); return; } } catch (e) {}
+
     function supported() { return !!(root.requestFullscreen || root.webkitRequestFullscreen); }
     function isFS() { return !!(D.fullscreenElement || D.webkitFullscreenElement); }
     function request() { var f = root.requestFullscreen || root.webkitRequestFullscreen; return f ? f.call(root) : null; }
