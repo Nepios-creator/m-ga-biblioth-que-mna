@@ -3,7 +3,10 @@
 // Pourquoi ce n'était pas le cas : les navigateurs quittent automatiquement le plein écran à chaque changement de page.
 // Solution : au moment d'activer le plein écran, la page ouverte devient une « coque » qui contient le site dans un cadre
 // plein écran. Les pages changent à l'intérieur du cadre ; la coque, elle, ne change jamais, donc le plein écran reste.
-// Le réglage est mémorisé : si le navigateur l'interrompt (retour arrière, rechargement), il reprend au prochain toucher.
+//
+// Sur téléphone, le plein écran est la vue PAR DÉFAUT à chaque accès (site ou application installée).
+// « Quitter le plein écran » ne vaut que pour la session en cours : à la prochaine ouverture, on repart en plein écran.
+// Sur ordinateur, le réglage reste mémorisé comme avant.
 (function () {
   'use strict';
   try {
@@ -31,12 +34,26 @@
     }
     function flagOn() {
       var v = null;
+      if (isPhone()) {
+        // Téléphone : plein écran par défaut à chaque nouvel accès ; seul un « Quitter » fait pendant la session l'arrête
+        try { v = sessionStorage.getItem(KEY); } catch (e) {}
+        return v !== '0';
+      }
       try { v = localStorage.getItem(KEY); } catch (e) {}
       if (v === '1') return true;
       if (v === '0') return false;
-      return isPhone();
+      return false;
     }
-    function setFlag(on) { try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {} }
+    function setFlag(on) {
+      try {
+        if (isPhone()) {
+          sessionStorage.setItem(KEY, on ? '1' : '0');
+          localStorage.removeItem(KEY); // ancien réglage mémorisé : il ne doit plus empêcher le plein écran par défaut
+        } else {
+          localStorage.setItem(KEY, on ? '1' : '0');
+        }
+      } catch (e) {}
+    }
     function shell() { return D.getElementById('mna-shell'); }
 
     // ---------- La coque : un cadre plein écran qui ne se recharge jamais ----------
@@ -128,7 +145,7 @@
         toggle();
         return;
       }
-      // Plein écran interrompu par le navigateur : il reprend au premier toucher
+      // Plein écran pas encore actif (ou interrompu par le navigateur) : il démarre / reprend au premier toucher
       if (e.target && e.target.closest && e.target.closest('.mna-tab-fs')) return;
       if (!flagOn() || !supported() || isFS()) return;
       var go = null;
@@ -198,8 +215,8 @@
         h.textContent = 'Touchez l\'écran pour passer en plein écran';
         h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:46;max-width:90vw;box-sizing:border-box;padding:11px 18px;border-radius:999px;background:#16130f;color:#f6eedb;border:1px solid #c9a24b;font:600 14.5px/1.3 "Inter",system-ui,sans-serif;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none';
         document.body.appendChild(h);
-        setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 4500);
-      }, 1200);
+        setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 7000);
+      }, 500);
     }
 
     // La page d'accueil crée ses boutons un peu après le chargement : on remet les textes à jour
