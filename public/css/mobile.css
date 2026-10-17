@@ -2,7 +2,7 @@
    Chargé par /js/mobile-app.js uniquement sur petit écran. Tout est dans la requête ci-dessous,
    donc l'affichage sur ordinateur (plus de 820 px de large) ne change pas. */
 
-:root { --mna-bar-h: 60px; }
+:root { --mna-bar-h: 76px; }
 
 #mna-appbar, #mna-install, #mna-ios { display: none; }
 
@@ -15,7 +15,7 @@
     text-size-adjust: 100%;
     --ink-soft: #4f4535; /* gris plus foncé : textes secondaires plus lisibles */
   }
-  html.mna-on body { padding-top: var(--mna-bar-h); font-size: 17px; line-height: 1.65; }
+  html.mna-on body { padding-top: var(--mna-bar-h); font-size: 18px; line-height: 1.65; }
   html.mna-on body > header { display: none !important; } /* remplacé par la barre d'onglets */
   html.mna-on a, html.mna-on button, html.mna-on summary {
     touch-action: manipulation;
@@ -33,13 +33,13 @@
     view-transition-name: mna-appbar;
   }
   #mna-appbar .mna-logo {
-    flex: none; display: block; width: 40px; height: 40px; border-radius: 50%;
+    flex: none; display: block; width: 52px; height: 52px; border-radius: 50%;
     overflow: hidden; border: 2px solid #c9a24b; background: #fff;
   }
   #mna-appbar .mna-logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
   #mna-appbar .mna-tabs {
     flex: 1; min-width: 0; height: 100%;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 10px;
     overflow-x: auto; overflow-y: hidden;
     padding: 0 26px 0 12px;
     scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -48,15 +48,15 @@
   }
   #mna-appbar .mna-tabs::-webkit-scrollbar { display: none; }
   #mna-appbar .mna-tab {
-    flex: none; display: inline-flex; align-items: center; gap: 7px;
-    height: 42px; padding: 0 16px; box-sizing: border-box;
+    flex: none; display: inline-flex; align-items: center; gap: 9px;
+    height: 56px; padding: 0 20px; box-sizing: border-box;
     border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(255, 255, 255, 0.11); color: #f6eedb;
-    font: 600 16px/1 'Inter', system-ui, -apple-system, sans-serif;
+    font: 600 18.5px/1 'Inter', system-ui, -apple-system, sans-serif;
     white-space: nowrap; scroll-snap-align: center; cursor: pointer;
     transition: background 0.15s, color 0.15s, transform 0.12s;
   }
-  #mna-appbar .mna-tab .mna-ic { font-size: 18px; line-height: 1; }
+  #mna-appbar .mna-tab .mna-ic { font-size: 24px; line-height: 1; }
   #mna-appbar .mna-tab:active { transform: scale(0.95); }
   #mna-appbar .mna-tab.on { background: #c9a24b; border-color: #c9a24b; color: #1b1409; font-weight: 700; }
   #mna-appbar .mna-tab-install { background: transparent; border: 1px dashed #c9a24b; color: #e8c978; }
@@ -109,57 +109,57 @@
   html.mna-on .container { padding-left: 18px; padding-right: 18px; }
   html.mna-on .btn {
     display: inline-flex; align-items: center; justify-content: center;
-    min-height: 46px; padding: 12px 24px; font-size: 16px; text-align: center;
+    min-height: 52px; padding: 14px 26px; font-size: 17.5px; text-align: center;
   }
 
   /* Accueil */
   html.mna-on .hero { padding: 52px 20px 46px; }
   html.mna-on .hero::before, html.mna-on .hero::after { display: none; }
-  html.mna-on .hero h1 { font-size: 31px; line-height: 1.2; }
-  html.mna-on .hero p { font-size: 17px; margin-bottom: 26px; }
+  html.mna-on .hero h1 { font-size: 35px; line-height: 1.2; }
+  html.mna-on .hero p { font-size: 18.5px; margin-bottom: 26px; }
   html.mna-on .hero .actions { flex-direction: column; align-items: stretch; max-width: 340px; margin-left: auto; margin-right: auto; }
   html.mna-on section.section { padding: 44px 0; }
-  html.mna-on section.section h2 { font-size: 26px; line-height: 1.25; }
-  html.mna-on section.section p.lead { font-size: 17px; }
-  html.mna-on .tag { font-size: 13px; }
+  html.mna-on section.section h2 { font-size: 29px; line-height: 1.25; }
+  html.mna-on section.section p.lead { font-size: 18.5px; }
+  html.mna-on .tag { font-size: 14.5px; }
   html.mna-on .about { gap: 24px; }
   html.mna-on .card { padding: 20px; }
-  html.mna-on .card h3 { font-size: 18px; }
-  html.mna-on .card p { font-size: 15.5px; }
+  html.mna-on .card h3 { font-size: 20.5px; }
+  html.mna-on .card p { font-size: 17.5px; }
   html.mna-on .quote-poster { padding: 40px 22px 28px; border-radius: 18px; }
-  html.mna-on .quote-poster .quote-text { font-size: 21px; }
-  html.mna-on .quote-poster .author-name { font-size: 15px; }
-  html.mna-on .quote-poster .author-role { font-size: 13px; }
+  html.mna-on .quote-poster .quote-text { font-size: 23px; }
+  html.mna-on .quote-poster .author-name { font-size: 17px; }
+  html.mna-on .quote-poster .author-role { font-size: 15px; }
   html.mna-on .cta-final { margin: 0 14px 52px; padding: 40px 20px; }
-  html.mna-on .cta-final h2 { font-size: 26px; }
-  html.mna-on footer { padding: 30px 18px calc(36px + env(safe-area-inset-bottom)); font-size: 15px; }
+  html.mna-on .cta-final h2 { font-size: 29px; }
+  html.mna-on footer { padding: 30px 18px calc(36px + env(safe-area-inset-bottom)); font-size: 16.5px; }
 
   /* Catalogue */
-  html.mna-on .free-title { font-size: 17.5px; }
-  html.mna-on .free-badge { font-size: 12.5px; }
-  html.mna-on .book-card h3 { font-size: 15px; }
-  html.mna-on .book-card .meta { font-size: 12.5px; }
+  html.mna-on .free-title { font-size: 19px; }
+  html.mna-on .free-badge { font-size: 14px; }
+  html.mna-on .book-card h3 { font-size: 17px; }
+  html.mna-on .book-card .meta { font-size: 14.5px; }
 
   /* Espace d'étude */
   html.mna-on .wrap { padding: 22px 14px 70px; }
   html.mna-on .panel { padding: 18px 16px; }
   html.mna-on .study-book, html.mna-on .part-row { flex-wrap: wrap; }
-  html.mna-on .study-book h3 { font-size: 18px; }
-  html.mna-on .study-book .meta { font-size: 14.5px; }
-  html.mna-on .badge { font-size: 12.5px; }
-  html.mna-on .sel-bar .sel-text { font-size: 14.5px; }
-  html.mna-on .sel-bar .sel-actions .btn { font-size: 14px; padding: 9px 14px; min-height: 44px; }
-  html.mna-on .anno-item { font-size: 15px; }
-  html.mna-on .quiz-choice { padding: 13px 14px; font-size: 16.5px; }
+  html.mna-on .study-book h3 { font-size: 20px; }
+  html.mna-on .study-book .meta { font-size: 16px; }
+  html.mna-on .badge { font-size: 14px; }
+  html.mna-on .sel-bar .sel-text { font-size: 16px; }
+  html.mna-on .sel-bar .sel-actions .btn { font-size: 15.5px; padding: 9px 14px; min-height: 48px; }
+  html.mna-on .anno-item { font-size: 16.5px; }
+  html.mna-on .quiz-choice { padding: 14px 14px; font-size: 18px; }
 
   /* Bible */
-  html.mna-on .tb-btn { min-height: 44px; }
+  html.mna-on .tb-btn { min-height: 48px; font-size: 15.5px; }
 
   /* Assistant : la zone d'écriture reste accessible en bas de l'écran */
-  html.mna-on .bubble { font-size: 16.5px; }
-  html.mna-on .convo-item { font-size: 15.5px; padding: 12px; }
-  html.mna-on .bubble-actions button { font-size: 14px; padding: 6px 0; }
-  html.mna-on .disclaimer { font-size: 13px; }
+  html.mna-on .bubble { font-size: 18px; }
+  html.mna-on .convo-item { font-size: 17px; padding: 12px; }
+  html.mna-on .bubble-actions button { font-size: 15.5px; padding: 6px 0; }
+  html.mna-on .disclaimer { font-size: 14.5px; }
   html.mna-on .chat-input-row {
     position: sticky; bottom: 0; z-index: 5; background: var(--paper, #faf6ee);
     padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
@@ -168,7 +168,7 @@
   /* Petits textes écrits directement dans les pages : taille minimale confortable */
   html.mna-on [style*="font-size:11"],
   html.mna-on [style*="font-size:12"],
-  html.mna-on [style*="font-size:13"] { font-size: 14.5px !important; }
+  html.mna-on [style*="font-size:13"] { font-size: 16px !important; }
 
   @media (prefers-reduced-motion: reduce) {
     #mna-appbar .mna-tab { transition: none; }
