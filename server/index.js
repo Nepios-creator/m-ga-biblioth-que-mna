@@ -14,6 +14,7 @@ const bibleRoutes = require('./routes/bible');
 const audioRoutes = require('./routes/audio');
 const statsRoutes = require('./routes/stats');
 const membersRoutes = require('./routes/members');
+const adminsRoutes = require('./routes/admins');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
 const { fillMissingPartContent, autoSplitStudyBooks } = require('./lib/fill-part-content');
 const { autoGenerateQuizzes } = require('./lib/generate-quizzes');
@@ -135,6 +136,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/track', statsRoutes.trackRouter);
 // Administration : liste des membres + messages, et statistiques (réservées aux administrateurs)
 // — placées avant /api/admin pour être prises en compte en premier
+app.use('/api/admin/admins', adminsRoutes);
 app.use('/api/admin/members', membersRoutes);
 app.use('/api/admin/stats', statsRoutes.adminRouter);
 app.use('/api/admin', adminRoutes);
