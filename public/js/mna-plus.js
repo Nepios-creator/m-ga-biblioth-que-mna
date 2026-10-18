@@ -1,5 +1,5 @@
 // Ajouts du site (fichier nouveau) :
-//   1. bandeau « Traduire » (traduction de toute la page, Bible et livres lus dans la page compris) ;
+//   1. petit bouton « Traduire » (un seul, toujours au même endroit) : traduit tout le site, Bible et livres lus dans la page compris ;
 //   2. carte de profil sur l'accueil : nom, adresse e-mail, photo de profil ;
 //   3. œil « voir le mot de passe » sur les formulaires de connexion et d'inscription.
 // Ce script n'enlève et ne modifie aucun contenu existant. Les styles sont dans /css/mna-plus.css.
@@ -37,27 +37,50 @@
       ['st', 'Sesotho'], ['tl', 'Filipino'], ['bn', 'বাংলা — bengali'], ['ur', 'اردو — ourdou'], ['fa', 'فارسی — persan']
     ];
 
+    // La langue choisie est gardée dans NOTRE cookie « mna_lang » : c'est lui qui fait foi.
+    // Le cookie de Google (« googtrans ») est ensuite recréé à partir de lui, à chaque ouverture de page.
+    // Avant : Google laissait des copies de son cookie à d'autres « adresses » (domaine principal, avec ou sans point)
+    // que le site n'effaçait pas ; la copie « anglais » restait donc et l'emportait sur tout nouveau choix.
     function getCookie(name) {
       var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
       return m ? decodeURIComponent(m[1]) : '';
     }
     function currentLang() {
-      var m = getCookie('googtrans').match(/^\/[^\/]+\/(.+)$/);
-      return m ? m[1] : 'fr';
+      var v = getCookie('mna_lang');
+      return /^[A-Za-z]{2,3}(-[A-Za-z]{2,4})?$/.test(v) ? v : 'fr';
+    }
+    function rememberLang(code) {
+      document.cookie = 'mna_lang=' + code + '; path=/; max-age=31536000; SameSite=Lax';
+    }
+
+    // Toutes les « adresses » sous lesquelles le cookie de Google peut se trouver
+    function cookieDomains() {
+      var host = location.hostname, out = [''];
+      if (!host || /^[\d.]+$/.test(host) || host.indexOf(':') !== -1) return out;
+      var parts = host.split('.');
+      for (var i = 0; i < parts.length - 1; i++) {
+        var d = parts.slice(i).join('.');
+        out.push('; domain=' + d, '; domain=.' + d);
+      }
+      return out;
+    }
+    function clearGoogleCookie() {
+      var past = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; path=/';
+      cookieDomains().forEach(function (d) { document.cookie = past + d; });
+    }
+    // Remet le cookie de Google d'accord avec la langue choisie (français = aucun cookie)
+    function syncGoogleCookie(code) {
+      clearGoogleCookie();
+      if (code !== 'fr') document.cookie = 'googtrans=/fr/' + code + '; path=/';
     }
     function setLang(code) {
-      var host = location.hostname;
-      if (code === 'fr') {
-        ['', '; domain=' + host, '; domain=.' + host].forEach(function (d) {
-          document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + d;
-        });
-      } else {
-        var v = '/fr/' + code;
-        document.cookie = 'googtrans=' + v + '; path=/';
-        document.cookie = 'googtrans=' + v + '; path=/; domain=' + host;
-      }
+      rememberLang(code);
+      syncGoogleCookie(code);
       location.reload();
     }
+
+    // À chaque ouverture : plus jamais de langue « coincée » (un ancien cookie en anglais est effacé ici)
+    syncGoogleCookie(currentLang());
 
     // Le moteur de traduction n'est chargé que si une langue autre que le français est active
     function loadTranslator() {
@@ -80,6 +103,7 @@
 
     var GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c2.6 2.7 4 6 4 9.5s-1.4 6.8-4 9.5c-2.6-2.7-4-6-4-9.5s1.4-6.8 4-9.5z"/></svg>';
 
+    // Un seul petit bouton (globe + code de la langue) ; la liste des langues s'ouvre quand on le touche
     function buildBand() {
       var band = document.createElement('div');
       band.className = 'mna-tr notranslate';
@@ -88,19 +112,21 @@
       var opts = LANGS.map(function (l) {
         return '<option value="' + l[0] + '"' + (l[0] === cur ? ' selected' : '') + '>' + l[1] + '</option>';
       }).join('');
-      band.innerHTML = '<label>' + GLOBE + '<span>Traduire</span>' +
-        '<select aria-label="Traduire la page dans une autre langue">' + opts + '</select></label>';
+      band.innerHTML = '<label class="mna-tr-btn" title="Traduire tout le site">' + GLOBE +
+        '<span class="mna-tr-code">' + cur.split('-')[0].toUpperCase() + '</span>' +
+        '<select aria-label="Traduire tout le site dans une autre langue">' + opts + '</select></label>';
       band.querySelector('select').addEventListener('change', function (e) { setLang(e.target.value); });
       return band;
     }
 
-    // Le bandeau se place sous la rangée « accueil / Se connecter » (ajoutée par lsm-layout.js)
-    // Pas sur le lecteur de livre ni sur la page de vérification : ils gardent leur propre affichage.
+    // Le bouton se place sous la rangée « accueil / Se connecter » (ajoutée par lsm-layout.js), au même endroit sur toutes les pages
+    // Pas sur le lecteur de livre ni sur la page de vérification : ils gardent leur propre affichage
+    // (la langue choisie y reste appliquée : les livres et la Bible se lisent traduits).
     if (path !== '/lecture.html' && path !== '/verification.html') {
       var header = document.querySelector('body > header');
       if (header) {
         var mountBand = function () {
-          if (header.querySelector('.mna-tr')) return;
+          if (document.querySelector('.mna-tr')) return;   // jamais deux boutons
           var band = buildBand();
           var row = header.querySelector('.lsm-account');
           if (row) row.parentNode.insertBefore(band, row.nextSibling);
