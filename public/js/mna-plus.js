@@ -123,57 +123,62 @@
     function buildProfile() {
       var token = '', user = null;
       try { token = localStorage.getItem('mna_token') || ''; user = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
-      if (!token || !user) return;
-      var hero = document.querySelector('.hero');
-      if (!hero || document.querySelector('.mna-profile')) return;
+      if (!token || !user || document.querySelector('.mna-me')) return;
 
       var key = 'mna_avatar_' + (user.id || user.email || 'membre');
       var name = user.full_name || (user.email ? String(user.email).split('@')[0] : 'Membre');
       var photo = '';
       try { photo = localStorage.getItem(key) || ''; } catch (e) {}
 
-      var sec = document.createElement('section');
-      sec.className = 'mna-profile notranslate';
-      sec.setAttribute('translate', 'no');
-      sec.innerHTML =
-        '<div class="mna-profile-card">' +
-          '<div class="mna-avatar" id="mna-avatar"></div>' +
-          '<div class="mna-p-info">' +
-            '<div class="mna-p-name" id="mna-p-name"></div>' +
-            '<div class="mna-p-mail" id="mna-p-mail"></div>' +
-            '<div class="mna-p-actions">' +
-              '<button type="button" class="mna-p-btn" id="mna-p-add"></button>' +
-              '<button type="button" class="mna-p-btn plain" id="mna-p-del">Retirer la photo</button>' +
-            '</div>' +
-            '<div class="mna-p-note">La photo est gardée sur cet appareil.</div>' +
-            '<div class="mna-p-err" id="mna-p-err" hidden></div>' +
-            '<input type="file" id="mna-p-file" accept="image/*" hidden>' +
+      var box = document.createElement('div');
+      box.className = 'mna-me notranslate';
+      box.setAttribute('translate', 'no');
+      box.innerHTML =
+        '<button type="button" class="mna-me-btn" id="mna-me-btn" aria-label="Mon profil" aria-expanded="false"></button>' +
+        '<div class="mna-me-pop" id="mna-me-pop" hidden>' +
+          '<div class="mna-p-name" id="mna-p-name"></div>' +
+          '<div class="mna-p-mail" id="mna-p-mail"></div>' +
+          '<div class="mna-p-actions">' +
+            '<button type="button" class="mna-p-btn" id="mna-p-add"></button>' +
+            '<button type="button" class="mna-p-btn plain" id="mna-p-del">Retirer</button>' +
           '</div>' +
+          '<div class="mna-p-note">La photo est gardée sur cet appareil.</div>' +
+          '<div class="mna-p-err" id="mna-p-err" hidden></div>' +
+          '<input type="file" id="mna-p-file" accept="image/*" hidden>' +
         '</div>';
-      hero.parentNode.insertBefore(sec, hero.nextSibling);
+      document.body.appendChild(box);
 
-      var av = sec.querySelector('#mna-avatar');
-      var addBtn = sec.querySelector('#mna-p-add');
-      var delBtn = sec.querySelector('#mna-p-del');
-      var err = sec.querySelector('#mna-p-err');
-      var file = sec.querySelector('#mna-p-file');
-      sec.querySelector('#mna-p-name').textContent = name;
-      sec.querySelector('#mna-p-mail').textContent = user.email || '';
+      var btn = box.querySelector('#mna-me-btn');
+      var pop = box.querySelector('#mna-me-pop');
+      var addBtn = box.querySelector('#mna-p-add');
+      var delBtn = box.querySelector('#mna-p-del');
+      var err = box.querySelector('#mna-p-err');
+      var file = box.querySelector('#mna-p-file');
+      box.querySelector('#mna-p-name').textContent = name;
+      box.querySelector('#mna-p-mail').textContent = user.email || '';
 
       function paint() {
-        av.textContent = '';
+        btn.textContent = '';
         if (photo) {
           var img = document.createElement('img');
           img.src = photo; img.alt = 'Photo de profil';
-          av.appendChild(img);
+          btn.appendChild(img);
         } else {
-          av.textContent = (name.trim().charAt(0) || '?').toUpperCase();
+          btn.textContent = (name.trim().charAt(0) || '?').toUpperCase();
         }
         addBtn.textContent = photo ? 'Changer ma photo' : 'Ajouter ma photo';
         delBtn.hidden = !photo;
       }
       function showErr(t) { err.textContent = t; err.hidden = !t; }
+      function toggle(open) {
+        pop.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
       paint();
+
+      btn.addEventListener('click', function (e) { e.stopPropagation(); toggle(pop.hidden); });
+      document.addEventListener('click', function (e) { if (!box.contains(e.target)) toggle(false); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') toggle(false); });
 
       addBtn.addEventListener('click', function () { showErr(''); file.click(); });
       delBtn.addEventListener('click', function () {
@@ -189,7 +194,6 @@
         var url = URL.createObjectURL(f);
         var im = new Image();
         im.onload = function () {
-          // Recadrage carré et réduction (256 px) : photo légère, bien cadrée
           var S = 256, c = document.createElement('canvas');
           c.width = S; c.height = S;
           var side = Math.min(im.width, im.height);
