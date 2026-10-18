@@ -103,7 +103,7 @@
 
     var GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c2.6 2.7 4 6 4 9.5s-1.4 6.8-4 9.5c-2.6-2.7-4-6-4-9.5s1.4-6.8 4-9.5z"/></svg>';
 
-    // Un seul petit bouton (globe + code de la langue) ; la liste des langues s'ouvre quand on le touche
+    // Un seul petit bouton rond (globe) ; la liste des langues s'ouvre quand on le touche
     function buildBand() {
       var band = document.createElement('div');
       band.className = 'mna-tr notranslate';
@@ -113,7 +113,6 @@
         return '<option value="' + l[0] + '"' + (l[0] === cur ? ' selected' : '') + '>' + l[1] + '</option>';
       }).join('');
       band.innerHTML = '<label class="mna-tr-btn" title="Traduire tout le site">' + GLOBE +
-        '<span class="mna-tr-code">' + cur.split('-')[0].toUpperCase() + '</span>' +
         '<select aria-label="Traduire tout le site dans une autre langue">' + opts + '</select></label>';
       band.querySelector('select').addEventListener('change', function (e) { setLang(e.target.value); });
       return band;
