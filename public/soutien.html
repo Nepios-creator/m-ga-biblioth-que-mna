@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soutenir et agenda — Ministère de la Nouvelle Alliance</title>
+<meta name="description" content="Soutenir l'œuvre du Ministère de la Nouvelle Alliance et découvrir les événements à venir.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#16130f">
+<style>
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 80px; }
+  .wrap h1 { font-size: clamp(26px, 6.5vw, 36px); font-weight: 500; text-align: center; color: var(--gold-deep); margin-bottom: 8px; }
+  .wrap h2 { font-size: 22px; font-weight: 500; color: var(--gold-deep); margin: 30px 0 12px; text-align: center; }
+  .intro { text-align: center; color: var(--ink-soft); margin: 0 auto 10px; max-width: 540px; }
+  .box { background: var(--mna-card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  .pay { display: flex; align-items: center; gap: 12px; }
+  .pay .who { flex: 1; min-width: 0; }
+  .pay b { display: block; font-size: 17px; }
+  .pay span { font-size: 14px; color: var(--ink-soft); overflow-wrap: anywhere; }
+  .copy { flex: none; border: 2px solid var(--blue); background: transparent; color: var(--blue-deep); border-radius: 10px; padding: 9px 14px; font: 600 14px 'Inter', sans-serif; cursor: pointer; }
+  .ev { display: flex; gap: 14px; }
+  .date { flex: none; width: 58px; text-align: center; background: var(--blue); color: #fff; border-radius: 12px; padding: 8px 0 6px; line-height: 1.1; }
+  .date b { display: block; font-size: 24px; }
+  .date span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .ev h3 { font-size: 17px; margin: 0 0 2px; }
+  .ev p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .empty { text-align: center; color: var(--ink-soft); font-size: 15px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><a href="/">Ministère de la <span>Nouvelle Alliance</span></a></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/espace-etude.html">Espace d'étude</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <h1>Soutenir et agenda</h1>
+  <p class="intro" id="msg"></p>
+
+  <h2>Soutenir l'œuvre</h2>
+  <div id="pay"></div>
+
+  <h2>Événements à venir</h2>
+  <div id="events"></div>
+</main>
+
+<footer>Ministère de la Nouvelle Alliance — © 2026</footer>
+
+<script>
+/* =====================================================================
+   À MODIFIER ICI (sur GitHub : ouvrir ce fichier, crayon « Edit »)
+   ===================================================================== */
+const MESSAGE = "Votre soutien permet de continuer à mettre l'enseignement à la disposition de tous. Merci pour votre générosité.";
+
+// Un bloc par moyen de soutien. Exemple : { nom: 'M-Pesa', numero: '+243 ...', titulaire: 'Nom du titulaire' },
+const MOYENS = [
+  // { nom: 'M-Pesa', numero: '', titulaire: '' },
+  // { nom: 'Airtel Money', numero: '', titulaire: '' },
+];
+
+// Un bloc par événement. La date est au format AAAA-MM-JJ. Les événements passés disparaissent seuls.
+const EVENEMENTS = [
+  // { date: '2026-11-08', heure: '09:00', titre: 'Culte de dimanche', lieu: 'Kinshasa', details: '' },
+];
+/* ===================================================================== */
+
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+document.getElementById('msg').textContent = MESSAGE;
+
+document.getElementById('pay').innerHTML = MOYENS.length
+  ? MOYENS.map((m, i) => `<div class="box pay"><div class="who"><b>${esc(m.nom)}</b><span>${esc(m.numero)}${m.titulaire ? ' · ' + esc(m.titulaire) : ''}</span></div><button class="copy" data-i="${i}">Copier</button></div>`).join('')
+  : '<div class="box empty">Les moyens de soutien seront communiqués très bientôt.</div>';
+document.querySelectorAll('.copy').forEach((b) => b.onclick = () => {
+  const m = MOYENS[Number(b.dataset.i)];
+  navigator.clipboard.writeText(m.numero).then(() => { b.textContent = 'Copié ✓'; setTimeout(() => { b.textContent = 'Copier'; }, 1800); });
+});
+
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const now = new Date(); now.setHours(0, 0, 0, 0);
+const ev = EVENEMENTS.map((e) => ({ ...e, t: new Date(e.date + 'T00:00:00') })).filter((e) => !isNaN(e.t) && e.t >= now).sort((a, b) => a.t - b.t);
+document.getElementById('events').innerHTML = ev.length
+  ? ev.map((e) => `<div class="box ev"><div class="date"><b>${e.t.getDate()}</b><span>${MOIS[e.t.getMonth()]}</span></div><div><h3>${esc(e.titre)}</h3><p>${[e.heure, e.lieu].filter(Boolean).map(esc).join(' · ')}</p>${e.details ? `<p>${esc(e.details)}</p>` : ''}</div></div>`).join('')
+  : '<div class="box empty">Aucun événement annoncé pour le moment.</div>';
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>
