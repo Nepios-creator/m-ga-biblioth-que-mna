@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Membres et messages — Administration MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 30px 16px 120px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+  .hidden { display: none !important; }
+  .back { display: inline-block; margin-bottom: 14px; font-size: 14px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tabs button { flex: 1; min-width: 110px; padding: 11px 10px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 14.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .tabs button.active { background: #16130f; color: #e8c872; border-color: #16130f; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .card { background: var(--paper); border-radius: 10px; padding: 12px 14px; }
+  .card b { display: block; font-size: 22px; }
+  .card span { font-size: 12.5px; color: var(--ink-soft); }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field textarea { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .toolbar input[type=search] { flex: 1; min-width: 160px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; }
+  .btn-light { border: 1px solid var(--line); background: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-light:active { background: var(--paper); }
+  .member { display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .member:last-child { border-bottom: none; }
+  .member input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; flex: none; }
+  .member .who { min-width: 0; flex: 1; }
+  .member .who strong { display: block; word-break: break-word; }
+  .member .who .mail { font-size: 13.5px; color: #444; word-break: break-all; }
+  .member .who .meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; background: #16130f; color: #e8c872; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .msg.warn { background: #fff6dd; color: #7a5b00; }
+  .count { font-size: 14px; color: var(--ink-soft); }
+  .hint { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; }
+  .progress { height: 12px; background: var(--paper); border-radius: 8px; overflow: hidden; margin: 8px 0; }
+  .progress i { display: block; height: 100%; background: #2a7a44; width: 0; transition: width .4s; }
+  .camp { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .camp:last-child { border-bottom: none; }
+  .camp small { color: var(--ink-soft); display: block; margin-top: 2px; }
+  #selbar { position: fixed; left: 0; right: 0; bottom: 0; background: #16130f; color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; z-index: 50; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #selbar button { background: #e8c872; color: #16130f; border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; font-size: 14.5px; cursor: pointer; font-family: inherit; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel">
+      <h2>Accès refusé</h2>
+      <p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p>
+    </div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a class="back" href="/admin.html">← Panneau administrateur</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Membres et messages</h1>
+    <p style="color:var(--ink-soft);margin-bottom:18px;">Voyez qui a ouvert un compte et écrivez à vos membres par e-mail.</p>
+
+    <div class="tabs">
+      <button type="button" data-tab="membres" class="active">👥 Membres</button>
+      <button type="button" data-tab="ecrire">✉️ Écrire</button>
+      <button type="button" data-tab="histo">📜 Envois</button>
+    </div>
+
+    <!-- ===== MEMBRES ===== -->
+    <section id="tab-membres" class="panel">
+      <div class="cards" id="member-cards"></div>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Chercher un nom ou un e-mail…">
+        <button type="button" class="btn-light" id="toggle-all">Tout sélectionner</button>
+      </div>
+      <p class="count" id="list-count" style="margin-bottom:6px;"></p>
+      <div id="members-list"><p style="color:var(--ink-soft);">Chargement…</p></div>
+      <div style="text-align:center;margin-top:14px;"><button type="button" class="btn-light hidden" id="show-more">Afficher plus</button></div>
+    </section>
+
+    <!-- ===== ÉCRIRE ===== -->
+    <section id="tab-ecrire" class="panel hidden">
+      <div id="mail-warning"></div>
+      <div id="send-msg"></div>
+
+      <div class="field">
+        <label>Destinataires</label>
+        <div id="recipients-summary" style="font-size:15px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn-light" id="select-everyone">✅ Sélectionner tous les membres</button>
+          <button type="button" class="btn-light" id="goto-members">Choisir dans la liste</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="m-subject">Sujet</label>
+        <input type="text" id="m-subject" maxlength="200" placeholder="Ex : Nouvelle étude disponible">
+      </div>
+      <div class="field">
+        <label for="m-body">Message</label>
+        <textarea id="m-body" rows="10" placeholder="Bonjour {nom},&#10;&#10;Écrivez ici votre message…"></textarea>
+        <div class="hint">Astuce : écrivez <b>{nom}</b> pour insérer le prénom de chaque membre. Laissez une ligne vide pour séparer les paragraphes.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="send-btn">Envoyer le message</button>
+        <button type="button" class="btn-light" id="test-btn">M'envoyer un test</button>
+      </div>
+      <div id="send-progress" class="hidden" style="margin-top:16px;">
+        <div id="send-progress-text" style="font-size:14px;"></div>
+        <div class="progress"><i id="send-progress-bar"></i></div>
+      </div>
+    </section>
+
+    <!-- ===== HISTORIQUE ===== -->
+    <section id="tab-histo" class="panel hidden">
+      <h2 style="margin-bottom:10px;font-size:18px;">Messages envoyés</h2>
+      <div id="campaigns"><p style="color:var(--ink-soft);">Chargement…</p></div>
+    </section>
+  </div>
+</div>
+
+<div id="selbar" class="hidden">
+  <span id="selbar-text"></span>
+  <button type="button" id="selbar-write">✉️ Écrire</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const me = userRaw ? JSON.parse(userRaw) : null;
+const TZ = 'Africa/Kinshasa';
+
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('fr-FR', { timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('fr-FR', { timeZone: TZ, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+
+async function api(path, opts = {}) {
+  const headers = { Authorization: 'Bearer ' + token };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const r = await fetch('/api/admin/members' + path, { ...opts, headers });
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((data && data.message) || ('Erreur ' + r.status));
+  return data;
+}
+
+if (!token || !me || me.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  init();
+}
+
+let members = [];
+const selected = new Set();
+let filtered = [];
+let shown = 200;
+
+function init() {
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $('search').addEventListener('input', () => { shown = 200; renderList(); });
+  $('toggle-all').addEventListener('click', toggleAll);
+  $('show-more').addEventListener('click', () => { shown += 200; renderList(); });
+  $('select-everyone').addEventListener('click', () => { members.forEach((m) => selected.add(m.id)); updateSelection(); });
+  $('goto-members').addEventListener('click', () => showTab('membres'));
+  $('selbar-write').addEventListener('click', () => showTab('ecrire'));
+  $('send-btn').addEventListener('click', () => send('real'));
+  $('test-btn').addEventListener('click', () => send('test'));
+  loadMembers();
+  loadMailStatus();
+}
+
+function showTab(name) {
+  ['membres', 'ecrire', 'histo'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== name));
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  if (name === 'histo') loadCampaigns();
+  updateSelection();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function loadMembers() {
+  try {
+    members = (await api('/')).members;
+  } catch (err) {
+    $('members-list').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+    return;
+  }
+  const now = Date.now();
+  const days = (n) => members.filter((m) => now - new Date(m.created_at).getTime() < n * 86400000).length;
+  $('member-cards').innerHTML = `
+    <div class="card"><b>${members.length}</b><span>membres inscrits</span></div>
+    <div class="card"><b>${days(1)}</b><span>nouveaux (24 h)</span></div>
+    <div class="card"><b>${days(7)}</b><span>nouveaux (7 jours)</span></div>
+    <div class="card"><b>${days(30)}</b><span>nouveaux (30 jours)</span></div>`;
+  renderList();
+  updateSelection();
+}
+
+function renderList() {
+  const q = $('search').value.trim().toLowerCase();
+  filtered = members.filter((m) => !q || (m.email || '').toLowerCase().includes(q) || (m.full_name || '').toLowerCase().includes(q));
+  $('list-count').textContent = filtered.length === members.length
+    ? `${members.length} membre(s)`
+    : `${filtered.length} résultat(s) sur ${members.length}`;
+  if (!filtered.length) {
+    $('members-list').innerHTML = '<p style="color:var(--ink-soft);">Aucun membre trouvé.</p>';
+    $('show-more').classList.add('hidden');
+    return;
+  }
+  $('members-list').innerHTML = filtered.slice(0, shown).map((m) => `
+    <label class="member">
+      <input type="checkbox" data-id="${m.id}" ${selected.has(m.id) ? 'checked' : ''}>
+      <div class="who">
+        <strong>${esc(m.full_name || 'Sans nom')}${m.role === 'admin' ? '<span class="badge">admin</span>' : ''}</strong>
+        <div class="mail">${esc(m.email)}</div>
+        <div class="meta">Inscrit le ${fmtDate(m.created_at)} · ${m.last_visit ? 'dernière visite ' + fmtDateTime(m.last_visit) + ' (' + m.visits + ' page' + (m.visits > 1 ? 's' : '') + ')' : 'aucune visite enregistrée'}</div>
+      </div>
+    </label>`).join('');
+  $('show-more').classList.toggle('hidden', filtered.length <= shown);
+  $('members-list').querySelectorAll('input[type=checkbox]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const id = Number(cb.dataset.id);
+      if (cb.checked) selected.add(id); else selected.delete(id);
+      updateSelection();
+    });
+  });
+}
+
+function toggleAll() {
+  const allOn = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
+  filtered.forEach((m) => { if (allOn) selected.delete(m.id); else selected.add(m.id); });
+  renderList();
+  updateSelection();
+}
+
+function updateSelection() {
+  const n = selected.size;
+  const allOn = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
+  $('toggle-all').textContent = allOn ? 'Tout désélectionner' : `Tout sélectionner (${filtered.length})`;
+  $('selbar').classList.toggle('hidden', n === 0 || !$('tab-membres') || $('tab-membres').classList.contains('hidden'));
+  $('selbar-text').textContent = `${n} sélectionné${n > 1 ? 's' : ''}`;
+  const everyone = members.length > 0 && n === members.length;
+  $('recipients-summary').innerHTML = n === 0
+    ? '<span style="color:#a33;">Aucun destinataire choisi.</span>'
+    : everyone ? `<b>Tous les membres</b> (${n})` : `<b>${n}</b> membre${n > 1 ? 's' : ''} sélectionné${n > 1 ? 's' : ''}`;
+}
+
+async function loadMailStatus() {
+  try {
+    const s = await api('/mail-status');
+    if (!s.configured) {
+      $('mail-warning').innerHTML = `<div class="msg warn"><b>L'envoi d'e-mails n'est pas encore activé.</b><br>
+        Il manque sur Render : <b>${esc(s.missing.join(', '))}</b>. Vous pouvez déjà préparer et tester la liste des membres ;
+        l'envoi fonctionnera dès que la configuration sera faite.</div>`;
+    } else {
+      $('mail-warning').innerHTML = `<p class="hint" style="margin-bottom:12px;">Expéditeur : ${esc(s.from)}</p>`;
+    }
+  } catch (e) { /* silencieux */ }
+}
+
+let polling = null;
+async function send(kind) {
+  const subject = $('m-subject').value.trim();
+  const body = $('m-body').value.trim();
+  if (!subject || !body) { $('send-msg').innerHTML = '<div class="msg error">Écrivez un sujet et un message.</div>'; return; }
+  const payload = { subject, body };
+  if (kind === 'test') {
+    payload.mode = 'test';
+  } else {
+    const n = selected.size;
+    if (!n) { $('send-msg').innerHTML = '<div class="msg error">Choisissez au moins un destinataire.</div>'; return; }
+    if (!confirm(`Envoyer ce message à ${n} personne${n > 1 ? 's' : ''} ?`)) return;
+    if (n === members.length) payload.mode = 'all';
+    else { payload.mode = 'selected'; payload.user_ids = Array.from(selected); }
+  }
+  $('send-btn').disabled = true; $('test-btn').disabled = true;
+  $('send-msg').innerHTML = '';
+  try {
+    const r = await api('/send', { method: 'POST', body: JSON.stringify(payload) });
+    $('send-progress').classList.remove('hidden');
+    poll(r.id, r.total, kind === 'test');
+  } catch (err) {
+    $('send-msg').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+    $('send-btn').disabled = false; $('test-btn').disabled = false;
+  }
+}
+
+function poll(id, total, isTest) {
+  clearInterval(polling);
+  const tick = async () => {
+    try {
+      const c = await api('/campaigns/' + id);
+      const done = c.sent + c.failed;
+      $('send-progress-text').textContent = c.status === 'en_cours'
+        ? `Envoi en cours… ${c.sent} / ${total}`
+        : `${c.sent} envoyé(s)${c.failed ? ', ' + c.failed + ' échec(s)' : ''} sur ${total}`;
+      $('send-progress-bar').style.width = Math.min(100, Math.round((done / Math.max(total, 1)) * 100)) + '%';
+      if (c.status !== 'en_cours') {
+        clearInterval(polling);
+        $('send-btn').disabled = false; $('test-btn').disabled = false;
+        if (c.status === 'termine' && !c.failed) {
+          $('send-msg').innerHTML = `<div class="msg success">${isTest ? 'Test envoyé à votre adresse.' : 'Message envoyé !'}</div>`;
+          if (!isTest) { $('m-subject').value = ''; $('m-body').value = ''; }
+        } else {
+          $('send-msg').innerHTML = `<div class="msg error">${c.status === 'interrompu' ? 'Envoi interrompu. ' : ''}${esc(c.error_note || 'Certains messages n\'ont pas pu être envoyés.')}</div>`;
+        }
+      }
+    } catch (e) { /* on réessaie au prochain passage */ }
+  };
+  tick();
+  polling = setInterval(tick, 2000);
+}
+
+async function loadCampaigns() {
+  try {
+    const list = await api('/campaigns');
+    if (!list.length) { $('campaigns').innerHTML = '<p style="color:var(--ink-soft);">Aucun message envoyé pour le moment.</p>'; return; }
+    const label = { termine: '✅ Terminé', en_cours: '⏳ En cours', interrompu: '⚠️ Interrompu' };
+    const who = { tous: 'Tous les membres', selection: 'Sélection', test: 'Test' };
+    $('campaigns').innerHTML = list.map((c) => `
+      <div class="camp">
+        <strong>${esc(c.subject)}</strong>
+        <small>${fmtDateTime(c.created_at)} · ${who[c.audience] || c.audience} · ${c.sent}/${c.total} envoyé(s)${c.failed ? ' · ' + c.failed + ' échec(s)' : ''} · ${label[c.status] || c.status}</small>
+        ${c.error_note ? `<small style="color:#a33;">${esc(c.error_note)}</small>` : ''}
+      </div>`).join('');
+  } catch (err) {
+    $('campaigns').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+  }
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>

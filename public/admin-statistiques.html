@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statistiques des visites — Administration MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 30px 16px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 22px; }
+  .panel h2 { font-size: 18px; margin-bottom: 12px; }
+  .hidden { display: none !important; }
+  .back { display: inline-block; margin-bottom: 14px; font-size: 14px; }
+  .periods { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .periods button { flex: 1; min-width: 80px; padding: 10px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .periods button.active { background: #16130f; color: #e8c872; border-color: #16130f; }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 22px; }
+  @media (min-width: 640px) { .cards { grid-template-columns: repeat(4, 1fr); } }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .card .label { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  .card .big { font-size: 28px; font-weight: 700; margin: 4px 0 2px; }
+  .card .sub { font-size: 12.5px; color: var(--ink-soft); }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; background: #e8f6ec; color: #2a7a44; padding: 5px 12px; border-radius: 20px; margin-bottom: 14px; font-weight: 600; }
+  .live i { width: 8px; height: 8px; background: #2a7a44; border-radius: 50%; display: inline-block; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; background: #fff; }
+  .hbar { margin-bottom: 10px; }
+  .hbar .row { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 3px; }
+  .hbar .row span:first-child { min-width: 0; word-break: break-word; }
+  .hbar .track { height: 9px; background: var(--paper); border-radius: 6px; overflow: hidden; }
+  .hbar .track i { display: block; height: 100%; background: #b8860b; border-radius: 6px; }
+  .two { display: grid; grid-template-columns: 1fr; gap: 22px; }
+  @media (min-width: 720px) { .two { grid-template-columns: 1fr 1fr; } }
+  .note { font-size: 12.5px; color: var(--ink-soft); margin-top: 10px; line-height: 1.5; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel">
+      <h2>Accès refusé</h2>
+      <p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p>
+    </div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a class="back" href="/admin.html">← Panneau administrateur</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Statistiques des visites</h1>
+    <p style="color:var(--ink-soft);margin-bottom:16px;">Combien de personnes visitent le site, jour après jour.</p>
+
+    <div id="live"></div>
+    <div id="err"></div>
+    <div class="cards" id="cards"></div>
+
+    <div class="periods" id="periods">
+      <button type="button" data-d="7">7 jours</button>
+      <button type="button" data-d="30" class="active">30 jours</button>
+      <button type="button" data-d="90">90 jours</button>
+      <button type="button" data-d="365">1 an</button>
+    </div>
+
+    <div class="panel">
+      <h2>Visites par jour</h2>
+      <div class="legend"><span><i style="background:#16130f"></i>Visiteurs</span><span><i style="background:#e3cf9a"></i>Pages vues</span></div>
+      <div class="scroll" id="chart"></div>
+      <p class="note">Un <b>visiteur</b> = un appareil (compté une seule fois par jour). Une <b>page vue</b> = une page ouverte.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Détail jour par jour</h2>
+      <div class="scroll" style="max-height:380px;overflow-y:auto;"><table id="daily"></table></div>
+    </div>
+
+    <div class="two">
+      <div class="panel"><h2>Pages les plus vues</h2><div id="pages"></div></div>
+      <div class="panel"><h2>D'où viennent les visiteurs</h2><div id="sources"></div></div>
+      <div class="panel"><h2>Appareils</h2><div id="devices"></div></div>
+      <div class="panel"><h2>Nouveaux et fidèles</h2><div id="loyalty"></div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Heures de visite (heure de Kinshasa)</h2>
+      <div class="scroll" id="hours"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Membres</h2>
+      <div class="cards" id="member-cards" style="margin-bottom:0;"></div>
+    </div>
+
+    <p class="note" id="foot"></p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const me = userRaw ? JSON.parse(userRaw) : null;
+const TZ = 'Africa/Kinshasa';
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const nf = (n) => Number(n || 0).toLocaleString('fr-FR');
+
+const PAGE_NAMES = {
+  '/': 'Accueil', '/bible.html': 'Bible', '/catalogue.html': 'Catalogue', '/espace-etude.html': "Espace d'étude",
+  '/audio.html': 'Livres audio', '/actualites.html': 'Actualités', '/actualite.html': 'Une actualité',
+  '/assistant.html': 'Assistant biblique', '/a-propos.html': 'À propos', '/login.html': 'Connexion / compte',
+  '/lecture.html': 'Lecture d\'un livre', '/verification.html': 'Vérification de brevet',
+};
+const SOURCE_NAMES = { direct: 'Accès direct (lien, application installée)' };
+
+if (!token || !me || me.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  document.querySelectorAll('#periods button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#periods button').forEach((x) => x.classList.toggle('active', x === b));
+    load(Number(b.dataset.d));
+  }));
+  load(30);
+}
+
+async function load(days) {
+  $('err').innerHTML = '';
+  try {
+    const r = await fetch('/api/admin/stats?days=' + days, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || 'Erreur ' + r.status);
+    render(data);
+  } catch (err) {
+    $('err').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+  }
+}
+
+function card(label, t, sub) {
+  return `<div class="card"><div class="label">${label}</div><div class="big">${nf(t.visitors)}</div>
+    <div class="sub">visiteur${t.visitors > 1 ? 's' : ''} · ${nf(t.views)} page${t.views > 1 ? 's' : ''} vue${t.views > 1 ? 's' : ''}${sub || ''}</div></div>`;
+}
+
+function hbars(items, labelOf, valueOf, extraOf) {
+  if (!items.length) return '<p style="color:var(--ink-soft);">Pas encore de données.</p>';
+  const max = Math.max(...items.map(valueOf), 1);
+  return items.map((it) => `
+    <div class="hbar">
+      <div class="row"><span>${labelOf(it)}</span><span><b>${nf(valueOf(it))}</b>${extraOf ? ' <span style="color:var(--ink-soft);font-size:12.5px;">' + extraOf(it) + '</span>' : ''}</span></div>
+      <div class="track"><i style="width:${Math.max(2, Math.round(valueOf(it) / max * 100))}%"></i></div>
+    </div>`).join('');
+}
+
+function render(d) {
+  $('live').innerHTML = `<span class="live"><i></i>${nf(d.online_30min)} visiteur${d.online_30min > 1 ? 's' : ''} actif${d.online_30min > 1 ? 's' : ''} ces 30 dernières minutes</span>`;
+
+  const t = d.totals;
+  $('cards').innerHTML =
+    card("Aujourd'hui", t.today) + card('Hier', t.yesterday) + card('7 derniers jours', t.week) + card('30 derniers jours', t.month);
+
+  // Graphique : barres par jour (SVG), défilement horizontal si beaucoup de jours
+  const s = d.series;
+  const max = Math.max(...s.map((x) => x.views), 1);
+  const barW = d.days <= 7 ? 40 : d.days <= 30 ? 20 : d.days <= 90 ? 10 : 4;
+  const gap = d.days <= 30 ? 6 : 2;
+  const H = 190, top = 14, bottom = 30, plotH = H - top - bottom;
+  const W = s.length * (barW + gap) + 40;
+  let svg = `<svg width="${Math.max(W, 300)}" height="${H}" role="img" aria-label="Visites par jour">`;
+  svg += `<text x="0" y="${top - 3}" font-size="11" fill="#888">${nf(max)}</text>`;
+  svg += `<line x1="36" y1="${top}" x2="${W}" y2="${top}" stroke="#eee"/><line x1="36" y1="${top + plotH}" x2="${W}" y2="${top + plotH}" stroke="#ddd"/>`;
+  s.forEach((x, i) => {
+    const px = 40 + i * (barW + gap);
+    const hv = Math.round(x.views / max * plotH), hu = Math.round(x.visitors / max * plotH);
+    svg += `<rect x="${px}" y="${top + plotH - hv}" width="${barW}" height="${hv}" fill="#e3cf9a" rx="2"><title>${x.day} : ${x.views} pages vues</title></rect>`;
+    svg += `<rect x="${px}" y="${top + plotH - hu}" width="${barW}" height="${hu}" fill="#16130f" rx="2"><title>${x.day} : ${x.visitors} visiteurs</title></rect>`;
+    const showLabel = d.days <= 7 || (d.days <= 30 && i % 3 === 0) || (d.days <= 90 && i % 10 === 0) || (d.days > 90 && i % 30 === 0);
+    if (showLabel) svg += `<text x="${px}" y="${H - 10}" font-size="10.5" fill="#777">${x.day.slice(8)}/${x.day.slice(5, 7)}</text>`;
+  });
+  $('chart').innerHTML = svg + '</svg>';
+
+  // Tableau jour par jour (le plus récent en haut)
+  $('daily').innerHTML = `<thead><tr><th>Jour</th><th>Visiteurs</th><th>Pages vues</th><th>Visites</th><th>Inscrits</th></tr></thead><tbody>` +
+    s.slice().reverse().map((x) => {
+      const dt = new Date(x.day + 'T12:00:00Z').toLocaleDateString('fr-FR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short' });
+      return `<tr><td>${dt}</td><td>${nf(x.visitors)}</td><td>${nf(x.views)}</td><td>${nf(x.sessions)}</td><td>${nf(x.signups)}</td></tr>`;
+    }).join('') + '</tbody>';
+
+  $('pages').innerHTML = hbars(d.pages, (p) => esc(PAGE_NAMES[p.path] || p.path), (p) => p.views, (p) => nf(p.visitors) + ' visiteur' + (p.visitors > 1 ? 's' : ''));
+  $('sources').innerHTML = hbars(d.referrers, (r) => esc(SOURCE_NAMES[r.source] || r.source), (r) => r.visitors, () => 'visiteurs');
+
+  const instTotal = d.devices.reduce((a, x) => a + x.installed_visitors, 0);
+  $('devices').innerHTML = hbars(d.devices, (x) => esc(x.device.charAt(0).toUpperCase() + x.device.slice(1)), (x) => x.visitors, () => 'visiteurs') +
+    `<p class="note">${nf(instTotal)} visiteur${instTotal > 1 ? 's' : ''} utilis${instTotal > 1 ? 'ent' : 'e'} l'application installée sur le téléphone.</p>`;
+
+  const v = d.visitors;
+  $('loyalty').innerHTML = hbars(
+    [{ l: 'Nouveaux visiteurs', n: v.new }, { l: 'Visiteurs déjà venus', n: v.returning }],
+    (x) => x.l, (x) => x.n
+  ) + `<p class="note">${nf(v.total)} visiteur${v.total > 1 ? 's' : ''} différent${v.total > 1 ? 's' : ''} sur la période.</p>`;
+
+  // Heures
+  const hmax = Math.max(...d.hours.map((h) => h.views), 1);
+  let hs = `<svg width="${24 * 26 + 10}" height="130">`;
+  d.hours.forEach((h, i) => {
+    const bh = Math.round(h.views / hmax * 80);
+    hs += `<rect x="${5 + i * 26}" y="${90 - bh}" width="20" height="${bh}" fill="#b8860b" rx="2"><title>${h.hour} h : ${h.views} pages vues</title></rect>`;
+    hs += `<text x="${5 + i * 26 + 10}" y="108" font-size="10.5" fill="#777" text-anchor="middle">${h.hour}h</text>`;
+  });
+  $('hours').innerHTML = hs + '</svg>';
+
+  const m = d.members;
+  $('member-cards').innerHTML = `
+    <div class="card"><div class="label">Inscrits au total</div><div class="big">${nf(m.total)}</div></div>
+    <div class="card"><div class="label">Nouveaux aujourd'hui</div><div class="big">${nf(m.today)}</div></div>
+    <div class="card"><div class="label">Nouveaux (7 jours)</div><div class="big">${nf(m.week)}</div></div>
+    <div class="card"><div class="label">Membres actifs</div><div class="big">${nf(m.active_in_period)}</div><div class="sub">connectés et venus sur la période</div></div>`;
+
+  const since = d.tracking.since ? new Date(d.tracking.since).toLocaleDateString('fr-FR', { timeZone: TZ, day: '2-digit', month: 'long', year: 'numeric' }) : null;
+  $('foot').innerHTML = since
+    ? `Le comptage a commencé le ${since} (${nf(d.tracking.total_views)} pages vues au total). Vos propres visites en tant qu'administrateur ne sont pas comptées. Jours découpés à l'heure de Kinshasa.`
+    : `Le comptage vient d'être activé : les chiffres apparaîtront dès les premières visites. Vos propres visites en tant qu'administrateur ne sont pas comptées.`;
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
