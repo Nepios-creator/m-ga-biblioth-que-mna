@@ -1,0 +1,86 @@
+/* =====================================================================
+   AJOUTS (fichier nouveau, rien d'existant n'est modifié)
+   1. Boutons ronds : mode sombre et économie de données (à côté du globe)
+   2. Mode sombre
+   3. Chargement fluide
+   4. Économie de données
+   5. Accueil : section « Pour vous »
+   ===================================================================== */
+
+:root { --mna-card: #fff; }
+
+/* ---------- 1. Boutons ronds ---------- */
+.mna-tr { gap: 10px; }
+.mna-tx {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0;
+  border-radius: 50%; cursor: pointer; background: var(--mna-card); color: var(--blue, #2f6fb0);
+  border: 1px solid var(--line, #e7ded0); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.mna-tx svg { width: 17px; height: 17px; display: block; }
+.mna-tx[aria-pressed="true"] { background: var(--blue, #2f6fb0); color: #fff; border-color: var(--blue, #2f6fb0); }
+
+/* ---------- 2. Mode sombre ---------- */
+html.mna-dark {
+  color-scheme: dark;
+  --mna-card: #1f1b15;
+  --paper: #14110d; --ink: #eee5d2; --ink-soft: #b9ae98; --line: #372f24;
+  --lsm-linen: #1b1711; --lsm-linen-edge: #2c261c; --lsm-offwhite: #17140f;
+  --blue: #4a8fd1; --blue-deep: #93c3f0; --gold-deep: #d6aa3c;
+}
+html.mna-dark body { background: var(--paper); color: var(--ink); }
+html.mna-dark header .brand, html.mna-dark .lsm-account, html.mna-dark .mna-tr,
+html.mna-dark .panel, html.mna-dark .book-card, html.mna-dark .card, html.mna-dark .btn-ghost,
+html.mna-dark section.section.alt, html.mna-dark .admin-box ul, html.mna-dark .mna-me-pop,
+html.mna-dark .chat-layout, html.mna-dark .sel-bar, html.mna-dark .toc-item, html.mna-dark .free-list,
+html.mna-dark .lsm-conv-search, html.mna-dark .mna-c { background: var(--mna-card) !important; color: var(--ink); }
+html.mna-dark .toc-group, html.mna-dark .part-nav, html.mna-dark .sidebar { background: #25201a !important; }
+html.mna-dark input, html.mna-dark select, html.mna-dark textarea { background: #25201a; color: var(--ink); border-color: var(--line); }
+html.mna-dark .btn-primary:hover { background: #3b7fc0; }
+html.mna-dark .ebook-text, html.mna-dark .ebook-text h2, html.mna-dark .ebook-text h3, html.mna-dark .ebook-text h4 { color: var(--ink) !important; }
+html.mna-dark .mna-bible-reading { color: #d6aa3c; }
+html.mna-dark .mna-bible-reading strong { color: var(--ink); }
+html.mna-dark footer { background: #0c0a07; }
+html.mna-dark h1, html.mna-dark h2, html.mna-dark h3, html.mna-dark .brand { color: var(--ink); }
+html.mna-dark .hero h1, html.mna-dark .hero p { color: var(--ink); }
+html.mna-dark .hero .actions .btn-ghost { background: var(--mna-card) !important; }
+html.mna-dark .lsm-c-item:hover, html.mna-dark .lsm-c-item.active { background: #2a241c; }
+html.mna-dark .msg.error { background: #3a1d1d; color: #f0a8a8; }
+html.mna-dark .msg.success { background: #1b3323; color: #a8e0b8; }
+
+/* ---------- 3. Chargement fluide : un rectangle qui brille à la place des textes « Chargement… » ---------- */
+.mna-skel {
+  color: transparent !important; position: relative; min-height: 84px; border-radius: 12px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.05) 25%, rgba(0, 0, 0, 0.12) 37%, rgba(0, 0, 0, 0.05) 63%);
+  background-size: 400% 100%; animation: mnaShim 1.3s ease infinite;
+}
+html.mna-dark .mna-skel {
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.11) 37%, rgba(255, 255, 255, 0.05) 63%);
+}
+@keyframes mnaShim { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .mna-skel { animation: none; } }
+
+/* ---------- 4. Économie de données ---------- */
+/* Accueil : on garde la première affiche seule (les autres images ne sont jamais téléchargées) */
+html.mna-saver .lsm-carousel .lsm-slide:not(:first-child),
+html.mna-saver .lsm-carousel .lsm-arrow,
+html.mna-saver .lsm-dots { display: none !important; }
+html.mna-saver .lsm-carousel .lsm-slide:first-child { opacity: 1 !important; }
+html.mna-saver .lsm-slide { --bg: none !important; }
+html.mna-saver *, html.mna-saver *::before, html.mna-saver *::after { animation-duration: 0.001s !important; animation-iteration-count: 1 !important; }
+html.mna-saver .mna-skel { animation: none !important; }
+
+/* ---------- 5. Accueil : « Pour vous » ---------- */
+.mna-sec { background: var(--lsm-offwhite, #fbf9f4); }
+.mna-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 760px; margin: 18px auto 0; }
+@media (min-width: 700px) { .mna-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.mna-c {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 10px 16px; text-align: center;
+  background: var(--mna-card); border: 1px solid var(--line, #e7ded0); border-radius: 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07); color: var(--ink, #241e16);
+}
+.mna-c:active { transform: scale(0.98); }
+.mna-c .mna-ic { font-size: 30px; line-height: 1; }
+.mna-c b { font: 500 17px/1.25 'Fraunces', Georgia, serif; color: var(--gold-deep, #a67f2e); }
+.mna-c i { font-style: normal; font-size: 13px; line-height: 1.35; color: var(--ink-soft, #6b5f4d); }
+.mna-c.wide { grid-column: 1 / -1; background: var(--blue, #2f6fb0) !important; border-color: var(--blue, #2f6fb0); }
+.mna-c.wide b, .mna-c.wide i { color: #fff; }
