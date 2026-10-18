@@ -1,0 +1,107 @@
+/* =====================================================================
+   AJOUTS DU SITE (fichier nouveau : aucun autre style n'est modifié)
+   1. Ordinateur : la partie supérieure remplit tout l'écran
+      (tout est dans @media (min-width: 821px) : le téléphone ne change pas)
+   2. Onglet « Connexion » retiré des barres de menu
+   3. Bandeau « Traduire »
+   4. Carte de profil sur l'accueil
+   5. Œil « voir le mot de passe »
+   ===================================================================== */
+
+/* ---------- 1. ORDINATEUR UNIQUEMENT (écran de plus de 820 px) ---------- */
+@media (min-width: 821px) {
+
+  /* Titre du ministère : plus grand, sur toute la largeur */
+  body header .brand { padding: 26px 24px 10px; font-size: clamp(24px, 2.4vw, 38px); }
+  body header .brand img { width: 74px !important; height: 74px !important; }
+
+  /* Rangée de compte et menu sombre : un peu plus larges */
+  body .lsm-account { padding: 10px 24px 22px; }
+  body nav a { min-width: 130px; padding: 14px 22px 11px; font-size: 16px; }
+  body nav a::before { font-size: 28px; }
+
+  /* Accueil : le diaporama d'affiches va d'un bord à l'autre de l'écran */
+  body:has(#quote-poster) .hero { padding-top: 0; }
+  body:has(#quote-poster) .lsm-carousel,
+  body:has(#quote-poster) .hero:has(.actions)::before {
+    width: calc(100% + 40px);
+    max-width: none;
+    margin: 0 -20px 18px;
+    aspect-ratio: auto;
+    height: clamp(340px, calc(100vh - 420px), 780px);
+    border-radius: 0;
+  }
+  body:has(#quote-poster) .lsm-dots { margin: 0 0 22px; }
+  body:has(#quote-poster) .lsm-arrow { width: 56px; height: 80px; font-size: 44px; }
+}
+
+/* ---------- 2. Onglet « Connexion » / « Mon compte » retiré des barres de menu ----------
+   (le bouton « Se connecter » / « Mon compte » de la rangée du haut reste).
+   Pour remettre l'onglet : supprimer ce bloc. */
+header nav a[href="/login.html"],
+#mna-appbar a[href="/login.html"] { display: none !important; }
+
+/* ---------- 3. Bandeau « Traduire » ---------- */
+.mna-tr {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
+  padding: 0 14px 16px; background: #fff;
+  font: 600 15px/1.2 'Inter', system-ui, sans-serif; color: var(--ink-soft, #6b5f4d);
+}
+.mna-tr label { display: inline-flex; align-items: center; gap: 8px; }
+.mna-tr svg { width: 22px; height: 22px; flex: none; color: var(--blue, #2f6fb0); }
+.mna-tr select {
+  max-width: min(72vw, 320px); padding: 9px 12px; border-radius: 8px;
+  border: 2px solid var(--blue, #2f6fb0); background: #fff; color: var(--blue-deep, #1f5386);
+  font: 600 15px 'Inter', system-ui, sans-serif; cursor: pointer;
+}
+.mna-tr select:focus-visible { outline: 3px solid rgba(201, 162, 75, 0.55); outline-offset: 1px; }
+
+/* On cache les éléments que Google ajoute (barre du haut, bulles) */
+body { top: 0 !important; }
+body > .skiptranslate, iframe.goog-te-banner-frame, iframe.skiptranslate { display: none !important; }
+#goog-gt-tt, .goog-te-balloon-frame, .goog-tooltip { display: none !important; }
+.goog-text-highlight { background: none !important; box-shadow: none !important; }
+
+/* ---------- 4. Carte de profil (accueil, personne connectée) ---------- */
+.mna-profile { padding: 22px 18px 0; background: var(--lsm-offwhite, #fbf9f4); }
+.mna-profile-card {
+  max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 18px;
+  background: #fff; border: 1px solid var(--line, #e7ded0); border-left: 6px solid var(--gold, #c9a24b);
+  border-radius: 12px; padding: 16px 20px;
+}
+.mna-avatar {
+  flex: none; width: 88px; height: 88px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--blue, #2f6fb0); color: #fff; border: 3px solid var(--gold, #c9a24b);
+  font: 500 34px 'Fraunces', Georgia, serif;
+}
+.mna-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mna-p-info { flex: 1; min-width: 0; }
+.mna-p-name { font: 500 23px/1.25 'Fraunces', Georgia, serif; color: var(--ink, #241e16); overflow-wrap: anywhere; }
+.mna-p-mail { margin-top: 2px; font-size: 16px; color: var(--ink-soft, #6b5f4d); overflow-wrap: anywhere; }
+.mna-p-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mna-p-btn {
+  min-height: 42px; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  border: 2px solid var(--blue, #2f6fb0); background: #fff; color: var(--blue-deep, #1f5386);
+  font: 600 14.5px 'Inter', system-ui, sans-serif;
+}
+.mna-p-btn:hover { background: #eef5fb; }
+.mna-p-btn.plain { border-color: var(--line, #e7ded0); color: var(--ink-soft, #6b5f4d); }
+.mna-p-note { margin-top: 8px; font-size: 13px; color: var(--ink-soft, #6b5f4d); }
+.mna-p-err { margin-top: 8px; font-size: 14px; color: #a33; }
+@media (max-width: 520px) {
+  .mna-profile-card { flex-direction: column; text-align: center; }
+  .mna-p-actions { justify-content: center; }
+}
+
+/* ---------- 5. Œil « voir le mot de passe » ---------- */
+.mna-pw { position: relative; display: block; }
+.mna-pw > input { padding-right: 48px !important; }
+.mna-pw-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent;
+  color: var(--ink-soft, #6b5f4d); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mna-pw-btn:hover { background: #f1ebdd; }
+.mna-pw-btn svg { width: 22px; height: 22px; display: block; }
