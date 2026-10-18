@@ -441,9 +441,10 @@ html body .quote-poster .quote-text.q-long {
 .quote-poster .quote-share { justify-content: flex-start !important; margin-top: 14px !important; gap: 8px !important; }
 .quote-poster .quote-share .btn { padding: 6px 12px !important; font-size: 12.5px !important; min-height: 0 !important; border-radius: 8px; }
 
-/* ---------- 12. Catalogue et Actualités : bandeau bleu simple, le titre seul qui surgit du fond ---------- */
+/* ---------- 12. Catalogue, Actualités, Espace d'étude, Livres audio : bandeau bleu animé ---------- */
 body:has(#books-grid) > section.hero,
-body:has(.nw-wrap) > section.hero {
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner {
   position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
   min-height: 170px; padding: 46px 20px !important; border: 0; text-align: center;
   background-color: #1f5386;
@@ -455,23 +456,28 @@ body:has(.nw-wrap) > section.hero {
 }
 /* deux lueurs douces qui dérivent lentement derrière le titre */
 body:has(#books-grid) > section.hero::before,
-body:has(.nw-wrap) > section.hero::before,
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::before,
 body:has(#books-grid) > section.hero::after,
-body:has(.nw-wrap) > section.hero::after {
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::after {
   content: ""; display: block; position: absolute; border-radius: 50%; pointer-events: none;
   width: 280px; height: 280px; filter: blur(34px); opacity: 1; font-size: 0;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
 }
 body:has(#books-grid) > section.hero::before,
-body:has(.nw-wrap) > section.hero::before { left: -70px; top: -110px; animation: lsmDriftA 11s ease-in-out infinite alternate; }
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::before { left: -70px; top: -110px; animation: lsmDriftA 11s ease-in-out infinite alternate; }
 body:has(#books-grid) > section.hero::after,
-body:has(.nw-wrap) > section.hero::after  { right: -80px; bottom: -130px; background: radial-gradient(circle, rgba(201, 162, 75, 0.30), transparent 70%); animation: lsmDriftB 13s ease-in-out infinite alternate; }
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::after  { right: -80px; bottom: -130px; background: radial-gradient(circle, rgba(201, 162, 75, 0.30), transparent 70%); animation: lsmDriftB 13s ease-in-out infinite alternate; }
 
 body:has(#books-grid) > section.hero p,
 body:has(.nw-wrap) > section.hero p { display: none; }
 
 body:has(#books-grid) > section.hero h1,
-body:has(.nw-wrap) > section.hero h1 {
+body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner h1 {
   position: relative; z-index: 1; margin: 0; max-width: 100%;
   color: #fff !important; font-size: clamp(28px, 7.6vw, 50px) !important; font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.14em; line-height: 1.2;
@@ -490,7 +496,73 @@ body:has(.nw-wrap) > section.hero h1 {
 @keyframes lsmDriftA { to { transform: translate(90px, 60px); } }
 @keyframes lsmDriftB { to { transform: translate(-80px, -50px); } }
 @media (prefers-reduced-motion: reduce) {
-  body:has(#books-grid) > section.hero h1, body:has(.nw-wrap) > section.hero h1,
-  body:has(#books-grid) > section.hero::before, body:has(.nw-wrap) > section.hero::before,
-  body:has(#books-grid) > section.hero::after,  body:has(.nw-wrap) > section.hero::after { animation: none; }
+  body:has(#books-grid) > section.hero h1, body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner h1,
+  body:has(#books-grid) > section.hero::before, body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::before,
+  body:has(#books-grid) > section.hero::after,  body:has(.nw-wrap) > section.hero,
+section.hero.lsm-banner::after { animation: none; }
 }
+
+/* Espace d'étude et Livres audio : le texte d'accompagnement reste, et bouge de la même façon */
+section.hero.lsm-banner { flex-direction: column; min-height: 200px; }
+section.hero.lsm-banner h1 { margin: 0 0 12px !important; }
+section.hero.lsm-banner p {
+  display: block !important; position: relative; z-index: 1;
+  margin: 0 auto !important; max-width: 560px;
+  font-family: 'Inter', sans-serif; font-style: normal; font-weight: 400;
+  font-size: clamp(15px, 4vw, 18px); line-height: 1.55; color: #e3eefa !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.25);
+  animation: lsmEmergeP 1.6s 0.3s cubic-bezier(0.18, 0.7, 0.2, 1) both, lsmFloat 5.5s ease-in-out 1.9s infinite;
+}
+@keyframes lsmEmergeP {
+  0%   { opacity: 0; transform: scale(0.7); filter: blur(10px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) { section.hero.lsm-banner p { animation: none; } }
+/* le bandeau s'efface quand on ouvre un livre ou une piste */
+body:has(#view-list.hidden) section.hero.lsm-banner { display: none; }
+
+/* ---------- 13. Assistant IA : discussions classées par date, dans un panneau soigné ---------- */
+body:has(.chat-layout) .chat-layout {
+  grid-template-columns: 310px 1fr; max-width: 1080px; margin: 18px auto;
+  height: calc(100dvh - 330px); min-height: 520px;
+  background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+}
+body:has(.chat-layout) .sidebar {
+  display: flex; flex-direction: column; padding: 0; overflow: hidden;
+  background: #fbf8f1; border-right: 1px solid var(--line);
+}
+body:has(.chat-layout) .sidebar > #new-convo-btn,
+body:has(.chat-layout) .sidebar > #convo-list { display: none !important; }
+
+.lsm-conv { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.lsm-conv-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 4px; }
+.lsm-conv-title { font-family: 'Fraunces', Georgia, serif; font-size: 21px; font-weight: 500; color: var(--gold-deep); }
+.lsm-conv-close { display: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #efe8d8; color: var(--ink); font-size: 18px; cursor: pointer; }
+.lsm-conv-new {
+  margin: 10px 14px; padding: 13px 14px; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--blue); color: #fff; font: 600 15.5px 'Inter', sans-serif;
+}
+.lsm-conv-new:hover { background: var(--blue-deep); }
+.lsm-conv-search {
+  margin: 0 14px 6px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px;
+  font: inherit; font-size: 15px; background: #fff; width: auto;
+}
+.lsm-conv-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 18px; overscroll-behavior: contain; }
+.lsm-grp { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-deep); padding: 16px 10px 6px; }
+.lsm-c-item {
+  display: flex; align-items: center; gap: 8px; padding: 10px 6px 10px 12px; margin-bottom: 3px;
+  border-radius: 12px; border-left: 3px solid transparent; cursor: pointer;
+}
+.lsm-c-item:hover { background: #f1ebdd; }
+.lsm-c-item.active { background: #e8f1fa; border-left-color: var(--blue); }
+.lsm-c-main { flex: 1; min-width: 0; }
+.lsm-c-title { font-size: 15px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lsm-c-time { font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
+.lsm-c-del { flex: none; border: 0; background: transparent; color: var(--ink-soft); opacity: 0.5; font-size: 15px; padding: 8px; border-radius: 8px; cursor: pointer; }
+.lsm-c-del:hover { opacity: 1; background: #fdeaea; color: #a33; }
+.lsm-conv-empty { padding: 26px 14px; text-align: center; color: var(--ink-soft); font-size: 14.5px; }
+.lsm-chat-top { display: none; }
+.lsm-overlay { position: fixed; inset: 0; z-index: 75; background: rgba(0, 0, 0, 0.45); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+html.lsm-drawer .lsm-overlay { opacity: 1; pointer-events: auto; }

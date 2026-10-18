@@ -184,17 +184,30 @@
   html.mna-on.lsm-kbd body:has(.chat-layout) #mna-appbar { display: none; }
   html.mna-on.lsm-kbd body:has(.chat-layout) .chat-layout { top: var(--lsm-top, 0px); height: var(--lsm-vh, 100dvh); }
 
-  /* Les discussions passent en bandeau horizontal compact */
+  /* Les discussions s'ouvrent dans un panneau qui glisse depuis la gauche */
+  html.mna-on body:has(.chat-layout) .chat-layout { border: 0; border-radius: 0; margin: 0; }
   html.mna-on body:has(.chat-layout) .sidebar {
-    flex: none; display: flex; flex-direction: row; align-items: center; gap: 8px;
-    max-height: none; padding: 8px 10px; overflow-x: auto; overflow-y: hidden;
-    border-right: 0; border-bottom: 1px solid var(--line); scrollbar-width: none;
+    position: fixed; top: 0; bottom: 0; left: 0; width: min(88vw, 340px); max-height: none; z-index: 80;
+    background: #fff; border-right: 1px solid var(--line); box-shadow: 8px 0 30px rgba(0, 0, 0, 0.28);
+    transform: translateX(-105%); transition: transform 0.25s ease; visibility: hidden;
   }
-  html.mna-on body:has(.chat-layout) .sidebar::-webkit-scrollbar { display: none; }
-  html.mna-on body:has(.chat-layout) .sidebar .btn { width: auto; flex: none; margin: 0; min-height: 40px; padding: 8px 14px; font-size: 14.5px; white-space: nowrap; }
-  html.mna-on body:has(.chat-layout) #convo-list { display: flex; gap: 6px; }
-  html.mna-on body:has(.chat-layout) #convo-list p { white-space: nowrap; margin: 0; }
-  html.mna-on body:has(.chat-layout) .convo-item { flex: none; max-width: 190px; margin: 0; background: #fff; border: 1px solid var(--line); }
+  html.mna-on.lsm-drawer body:has(.chat-layout) .sidebar { transform: none; visibility: visible; }
+  html.mna-on .lsm-conv-close { display: inline-flex; align-items: center; justify-content: center; }
+  html.mna-on .lsm-conv-head { padding-top: calc(16px + env(safe-area-inset-top)); }
+  html.mna-on .lsm-conv-search { font-size: 16px; }
+  html.mna-on .lsm-c-item { padding: 12px 6px 12px 12px; }
+  html.mna-on .lsm-c-title { font-size: 16px; }
+
+  /* Barre du haut de la discussion : menu des discussions, titre, nouvelle discussion */
+  html.mna-on .lsm-chat-top { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; flex: none; }
+  html.mna-on .lsm-chat-top button {
+    flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%;
+    background: #fff; color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  html.mna-on .lsm-chat-top .lsm-top-title {
+    flex: 1; min-width: 0; text-align: center; font-family: 'Fraunces', Georgia, serif; font-size: 18px; font-weight: 500;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   html.mna-on body:has(.chat-layout) .chat-main { flex: 1; min-height: 0; padding: 8px 10px calc(6px + env(safe-area-inset-bottom)); }
   html.mna-on body:has(.chat-layout) .chat-box { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
