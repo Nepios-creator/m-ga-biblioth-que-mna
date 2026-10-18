@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { hashPassword, verifyPassword } = require('../lib/password');
-const { signToken, requireAuth } = require('../lib/auth-middleware');
+const { signToken, requireAuth, clientUser, permsReady } = require('../lib/auth-middleware');
 
 const router = express.Router();
 
@@ -38,6 +38,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ message: 'Email et mot de passe requis' });
   }
   try {
+    await permsReady;
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
     const user = result.rows[0];
     if (!user || !verifyPassword(password, user.password_hash)) {
@@ -45,7 +46,7 @@ router.post('/login', async (req, res) => {
     }
     res.json({
       token: signToken(user),
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
+      user: clientUser(user),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -53,8 +54,15 @@ router.post('/login', async (req, res) => {
 });
 
 // Retourne les infos de l'utilisateur connecté (utile pour vérifier un jeton stocké côté client)
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    await permsReady;
+    const result = await pool.query('SELECT id, email, full_name, role, admin_permissions FROM users WHERE id = $1', [req.user.id]);
+    if (!result.rows.length) return res.status(401).json({ message: 'Compte introuvable' });
+    res.json({ user: clientUser(result.rows[0]) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 module.exports = router;
