@@ -75,6 +75,25 @@
 
     // ---------- Accueil : section « Pour vous » ----------
     if (home) {
+
+      // Boutons en double : un bouton de l'accueil qui fait déjà ce que fait le menu (ou la rangée du haut) est masqué
+      var MENU = ['/', '/bible.html', '/catalogue.html', '/espace-etude.html', '/actualites.html', '/assistant.html', '/a-propos.html', '/audio.html', '/login.html'];
+      var dn = 0;
+      var dv = setInterval(function () {
+        var btns = document.querySelectorAll('.hero a.btn, .hero .actions a');
+        for (var i = 0; i < btns.length; i++) {
+          var p = '';
+          try { p = new URL(btns[i].getAttribute('href') || '', location.origin).pathname; } catch (e) {}
+          if (p && p !== '/index.html' && MENU.indexOf(p) !== -1 && !btns[i].closest('.lsm-account, .mna-cards')) btns[i].classList.add('mna-hide');
+        }
+        // « Installer » : déjà présent dans la barre d'onglets du téléphone
+        if (document.querySelector('#mna-appbar .mna-tab-install')) {
+          var ib = document.getElementById('install-btn'), ih = document.getElementById('ios-install-hint');
+          if (ib) ib.classList.add('mna-hide');
+          if (ih) ih.classList.add('mna-hide');
+        }
+        if (++dn > 30) clearInterval(dv);
+      }, 400);
       var tries = 0;
       (function mount() {
         var hero = document.querySelector('.hero');
@@ -90,10 +109,6 @@
         sec.innerHTML = '<div class="container"><h2>Pour vous</h2><div class="mna-cards">' +
           (last && last.book && last.chapter ? card('/bible.html?livre=' + last.book + '&chapitre=' + last.chapter, '▶️', 'Reprendre ma lecture', 'Là où vous vous êtes arrêté dans la Bible', 'wide') : '') +
           card('/plan-90-jours.html', '📅', 'La Bible en 90 jours', 'Un plan simple, jour après jour') +
-          card('/bible.html', '📖', 'La Bible', 'Version « Parole pure »') +
-          card('/catalogue.html', '📚', 'Les livres', 'À lire gratuitement ou à acquérir') +
-          card('/audio.html', '🎧', 'Livres audio', 'À écouter, écran éteint') +
-          card('/actualites.html', '📰', 'Actualités', 'Les nouvelles du ministère') +
           card('/soutien.html', '🤝', 'Soutenir et agenda', 'Dons et événements à venir') +
           '</div></div>';
         hero.parentNode.insertBefore(sec, hero.nextSibling);
