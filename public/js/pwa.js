@@ -44,6 +44,15 @@ if ('serviceWorker' in navigator) {
   plus.src = '/js/mna-plus.js';
   document.body.appendChild(plus);
 
+  // Ajouts : mode sombre, économie de données, chargement fluide, section « Pour vous » de l'accueil
+  const exCss = document.createElement('link');
+  exCss.rel = 'stylesheet';
+  exCss.href = '/css/mna-extras.css';
+  document.head.appendChild(exCss);
+  const ex = document.createElement('script');
+  ex.src = '/js/mna-extras.js';
+  document.body.appendChild(ex);
+
   // Comptage anonyme des visites (statistiques de l'administration)
   const track = document.createElement('script');
   track.src = '/js/track.js';
