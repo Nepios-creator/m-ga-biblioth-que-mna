@@ -289,7 +289,7 @@
 
       var overlay = document.createElement('div');
       overlay.className = 'lsm-overlay';
-      document.body.appendChild(overlay);
+      (document.querySelector('.chat-layout') || document.body).appendChild(overlay);   // même plan que le panneau : il reste cliquable
 
       var topBar = null, topTitle = null;
       if (chatMain) {
