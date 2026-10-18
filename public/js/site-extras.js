@@ -27,8 +27,10 @@
       panel.className = 'panel';
       panel.innerHTML = `
         <h2 style="margin-bottom:6px;">Espaces spéciaux</h2>
-        <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Gérez ici la Bible « Parole pure » et les livres audio.</p>
+        <p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Gérez ici la Bible « Parole pure », les livres audio, les membres et les statistiques.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="/admin-membres.html" class="btn btn-primary">👥 Membres et messages</a>
+          <a href="/admin-statistiques.html" class="btn btn-primary">📊 Statistiques des visites</a>
           <a href="/admin-bible.html" class="btn btn-primary">📖 Administration de la Bible</a>
           <a href="/admin-audio.html" class="btn btn-primary" id="link-admin-audio" style="display:none;">🎧 Administration des livres audio</a>
         </div>`;
