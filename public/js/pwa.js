@@ -35,6 +35,11 @@ if ('serviceWorker' in navigator) {
   lsm.src = '/js/lsm-layout.js';
   document.body.appendChild(lsm);
 
+  // Comptage anonyme des visites (statistiques de l'administration)
+  const track = document.createElement('script');
+  track.src = '/js/track.js';
+  document.body.appendChild(track);
+
   // Page d'accueil : cadres interactifs, section Bible et ajustement des citations
   if (location.pathname === '/' || location.pathname === '/index.html') {
     const home = document.createElement('script');
