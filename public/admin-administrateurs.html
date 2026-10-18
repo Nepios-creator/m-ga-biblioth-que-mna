@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administrateurs — Administration MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; padding: 30px 16px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 22px; }
+  .panel h2 { font-size: 18px; margin-bottom: 6px; }
+  .hidden { display: none !important; }
+  .back { display: inline-block; margin-bottom: 14px; font-size: 14px; }
+  .sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 14px; line-height: 1.5; }
+  .field input[type=search] { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
+  .btn-light { border: 1px solid var(--line); background: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-danger { border: 1px solid #e3b3b3; background: #fff; color: #a33; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .person { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .person:last-child { border-bottom: none; }
+  .person strong { display: block; word-break: break-word; }
+  .person .mail { font-size: 13.5px; color: #444; word-break: break-all; margin-bottom: 8px; }
+  .perm { display: flex; gap: 10px; align-items: flex-start; padding: 8px 2px; cursor: pointer; }
+  .perm input { width: 22px; height: 22px; flex: none; margin-top: 1px; }
+  .perm b { display: block; font-size: 14.5px; }
+  .perm span { font-size: 12.5px; color: var(--ink-soft); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .result { padding: 12px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .result:active { background: var(--paper); }
+  .result small { display: block; color: #444; word-break: break-all; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .badge { display: inline-block; font-size: 11px; background: #16130f; color: #e8c872; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel">
+      <h2>Accès refusé</h2>
+      <p>Cette page est réservée à l'administrateur principal. <a href="/login.html">Se connecter</a></p>
+    </div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a class="back" href="/admin.html">← Panneau administrateur</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Administrateurs</h1>
+    <p class="sub">Choisissez un membre et cochez exactement ce qu'il peut faire. Il ne verra et ne pourra modifier que ces sections. Lui seul n'a pas le droit de nommer d'autres administrateurs : cette page vous est réservée.</p>
+
+    <div id="msg"></div>
+
+    <div class="panel">
+      <h2>Nommer un administrateur</h2>
+      <p class="sub">Cherchez le membre par son nom ou son e-mail (il doit déjà avoir un compte).</p>
+      <div class="field"><input type="search" id="q" placeholder="Nom ou e-mail du membre…"></div>
+      <div id="results"></div>
+      <div id="new-box" class="hidden" style="margin-top:14px;">
+        <div class="person" style="border:none;">
+          <strong id="new-name"></strong>
+          <div class="mail" id="new-mail"></div>
+          <div id="new-perms"></div>
+          <div class="actions">
+            <button type="button" class="btn btn-primary" id="new-save">Donner l'accès</button>
+            <button type="button" class="btn-light" id="new-cancel">Annuler</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Administrateurs avec droits limités</h2>
+      <div id="delegated"><p class="sub">Chargement…</p></div>
+    </div>
+
+    <div class="panel">
+      <h2>Administrateurs principaux</h2>
+      <p class="sub">Accès complet. Ils ne se modifient pas depuis cette page.</p>
+      <div id="main"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const me = userRaw ? JSON.parse(userRaw) : null;
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+async function api(path, opts = {}) {
+  const headers = { Authorization: 'Bearer ' + token };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const r = await fetch('/api/admin/admins' + path, { ...opts, headers });
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((data && data.message) || ('Erreur ' + r.status));
+  return data;
+}
+function flash(text, type) {
+  $('msg').innerHTML = `<div class="msg ${type}">${esc(text)}</div>`;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+let catalog = [];
+let candidate = null;
+
+if (!token || !me || me.role !== 'admin' || me.admin_scope === 'limited') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  init();
+}
+
+function permBoxes(prefix, selected) {
+  return catalog.map((p) => `
+    <label class="perm">
+      <input type="checkbox" data-perm="${p.key}" ${selected.includes(p.key) ? 'checked' : ''}>
+      <div><b>${esc(p.label)}</b><span>${esc(p.description)}</span></div>
+    </label>`).join('');
+}
+const checked = (container) => Array.from(container.querySelectorAll('input[data-perm]:checked')).map((c) => c.dataset.perm);
+
+async function init() {
+  let timer = null;
+  $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 300); });
+  $('new-cancel').addEventListener('click', () => { candidate = null; $('new-box').classList.add('hidden'); });
+  $('new-save').addEventListener('click', saveNew);
+  await load();
+}
+
+async function load() {
+  try {
+    const d = await api('/');
+    catalog = d.permissions;
+    $('main').innerHTML = d.main.map((u) => `<div class="person"><strong>${esc(u.full_name || 'Sans nom')}<span class="badge">principal</span></strong><div class="mail" style="margin:0;">${esc(u.email)}</div></div>`).join('');
+    if (!d.delegated.length) {
+      $('delegated').innerHTML = '<p class="sub">Aucun pour le moment.</p>';
+      return;
+    }
+    $('delegated').innerHTML = d.delegated.map((u) => `
+      <div class="person" data-id="${u.id}">
+        <strong>${esc(u.full_name || 'Sans nom')}</strong>
+        <div class="mail">${esc(u.email)}</div>
+        ${permBoxes('d' + u.id, u.permissions)}
+        <div class="actions">
+          <button type="button" class="btn btn-primary" data-save="${u.id}">Enregistrer</button>
+          <button type="button" class="btn-danger" data-revoke="${u.id}">Retirer l'accès administrateur</button>
+        </div>
+      </div>`).join('');
+    document.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', () => saveExisting(b.dataset.save)));
+    document.querySelectorAll('[data-revoke]').forEach((b) => b.addEventListener('click', () => revoke(b.dataset.revoke)));
+  } catch (err) {
+    $('delegated').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+  }
+}
+
+async function search() {
+  const q = $('q').value.trim();
+  if (q.length < 2) { $('results').innerHTML = ''; return; }
+  try {
+    const list = await api('/candidates?q=' + encodeURIComponent(q));
+    $('results').innerHTML = list.length
+      ? list.map((u) => `<div class="result" data-id="${u.id}" data-name="${esc(u.full_name || '')}" data-mail="${esc(u.email)}"><strong>${esc(u.full_name || 'Sans nom')}</strong><small>${esc(u.email)}</small></div>`).join('')
+      : '<p class="sub">Aucun membre trouvé (ou déjà administrateur).</p>';
+    document.querySelectorAll('.result').forEach((r) => r.addEventListener('click', () => pick(r)));
+  } catch (err) {
+    $('results').innerHTML = `<div class="msg error">${esc(err.message)}</div>`;
+  }
+}
+
+function pick(el) {
+  candidate = Number(el.dataset.id);
+  $('new-name').textContent = el.dataset.name || 'Sans nom';
+  $('new-mail').textContent = el.dataset.mail;
+  $('new-perms').innerHTML = permBoxes('new', []);
+  $('new-box').classList.remove('hidden');
+  $('results').innerHTML = '';
+  $('q').value = '';
+  $('new-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveNew() {
+  const perms = checked($('new-perms'));
+  if (!candidate) return;
+  if (!perms.length) { flash('Cochez au moins un droit.', 'error'); return; }
+  try {
+    await api('/' + candidate, { method: 'PUT', body: JSON.stringify({ permissions: perms }) });
+    candidate = null;
+    $('new-box').classList.add('hidden');
+    flash('Accès accordé. La personne doit se déconnecter puis se reconnecter pour voir l\'espace administrateur.', 'success');
+    load();
+  } catch (err) { flash(err.message, 'error'); }
+}
+
+async function saveExisting(id) {
+  const box = document.querySelector(`.person[data-id="${id}"]`);
+  const perms = checked(box);
+  if (!perms.length) { flash('Cochez au moins un droit, ou utilisez « Retirer l\'accès administrateur ».', 'error'); return; }
+  try {
+    await api('/' + id, { method: 'PUT', body: JSON.stringify({ permissions: perms }) });
+    flash('Droits enregistrés.', 'success');
+  } catch (err) { flash(err.message, 'error'); }
+}
+
+async function revoke(id) {
+  if (!confirm('Retirer tout accès administrateur à ce membre ? Son compte de membre reste en place.')) return;
+  try {
+    await api('/' + id, { method: 'DELETE' });
+    flash('Accès administrateur retiré.', 'success');
+    load();
+  } catch (err) { flash(err.message, 'error'); }
+}
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
