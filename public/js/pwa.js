@@ -35,6 +35,15 @@ if ('serviceWorker' in navigator) {
   lsm.src = '/js/lsm-layout.js';
   document.body.appendChild(lsm);
 
+  // Ajouts : haut de page plein écran sur ordinateur, bandeau « Traduire », carte de profil, œil du mot de passe
+  const plusCss = document.createElement('link');
+  plusCss.rel = 'stylesheet';
+  plusCss.href = '/css/mna-plus.css';
+  document.head.appendChild(plusCss);
+  const plus = document.createElement('script');
+  plus.src = '/js/mna-plus.js';
+  document.body.appendChild(plus);
+
   // Comptage anonyme des visites (statistiques de l'administration)
   const track = document.createElement('script');
   track.src = '/js/track.js';
