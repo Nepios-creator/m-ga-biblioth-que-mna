@@ -12,6 +12,8 @@ const assistantRoutes = require('./routes/assistant');
 const readerRoutes = require('./routes/reader');
 const bibleRoutes = require('./routes/bible');
 const audioRoutes = require('./routes/audio');
+const statsRoutes = require('./routes/stats');
+const membersRoutes = require('./routes/members');
 const { router: quotesRoutes, autoGenerateMissingQuotes } = require('./routes/quotes');
 const { fillMissingPartContent, autoSplitStudyBooks } = require('./lib/fill-part-content');
 const { autoGenerateQuizzes } = require('./lib/generate-quizzes');
@@ -129,6 +131,12 @@ app.get('/api/books/:id/download', flexAuth, async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+// Comptage anonyme des visites (public) — doit rester avant les routes d'administration
+app.use('/api/track', statsRoutes.trackRouter);
+// Administration : liste des membres + messages, et statistiques (réservées aux administrateurs)
+// — placées avant /api/admin pour être prises en compte en premier
+app.use('/api/admin/members', membersRoutes);
+app.use('/api/admin/stats', statsRoutes.adminRouter);
 app.use('/api/admin', adminRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/messages', messagesRoutes);
