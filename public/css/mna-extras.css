@@ -84,3 +84,42 @@ html.mna-saver .mna-skel { animation: none !important; }
 .mna-c i { font-style: normal; font-size: 13px; line-height: 1.35; color: var(--ink-soft, #6b5f4d); }
 .mna-c.wide { grid-column: 1 / -1; background: var(--blue, #2f6fb0) !important; border-color: var(--blue, #2f6fb0); }
 .mna-c.wide b, .mna-c.wide i { color: #fff; }
+
+.mna-hide { display: none !important; }
+
+/* ---------- 6. Actualités : même bandeau bleu animé que le Catalogue et l'Espace d'étude ----------
+   (corrige les anciennes règles qui s'appliquaient par erreur au bandeau lui-même) */
+html body:has(.nw-wrap) > section.hero {
+  position: relative !important; left: auto !important; right: auto !important; top: auto !important; bottom: auto !important;
+  width: auto !important; height: auto !important; max-width: none !important; border-radius: 0 !important; filter: none !important;
+  display: flex !important; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  min-height: 200px; padding: 46px 20px !important; overflow: hidden; border: 0;
+  font-size: 16px !important; letter-spacing: normal; text-transform: none; text-shadow: none; animation: none !important;
+  background-color: #1f5386 !important;
+  background-image: radial-gradient(ellipse at 50% 130%, rgba(255, 255, 255, 0.18), transparent 62%),
+                    linear-gradient(160deg, #173f69 0%, #1f5386 45%, #2f6fb0 100%) !important;
+}
+html body:has(.nw-wrap) > section.hero::before,
+html body:has(.nw-wrap) > section.hero::after {
+  content: ""; display: block; position: absolute; border-radius: 50%; pointer-events: none;
+  width: 280px; height: 280px; filter: blur(34px); opacity: 1; font-size: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
+}
+html body:has(.nw-wrap) > section.hero::before { left: -70px; top: -110px; right: auto; bottom: auto; animation: lsmDriftA 11s ease-in-out infinite alternate; }
+html body:has(.nw-wrap) > section.hero::after { right: -80px; bottom: -130px; left: auto; top: auto; background: radial-gradient(circle, rgba(201, 162, 75, 0.30), transparent 70%); animation: lsmDriftB 13s ease-in-out infinite alternate; }
+html body:has(.nw-wrap) > section.hero h1 {
+  position: relative; z-index: 1; margin: 0 0 12px !important; max-width: 100%;
+  color: #fff !important; font-size: clamp(28px, 7.6vw, 50px) !important; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.14em; line-height: 1.2; text-shadow: 0 4px 22px rgba(0, 0, 0, 0.25);
+  animation: lsmEmerge 1.6s cubic-bezier(0.18, 0.7, 0.2, 1) both, lsmFloat 5.5s ease-in-out 1.6s infinite;
+}
+html body:has(.nw-wrap) > section.hero p {
+  display: block !important; position: relative; z-index: 1; margin: 0 auto !important; max-width: 560px;
+  font-family: 'Inter', sans-serif; font-style: normal; font-weight: 400; font-size: clamp(15px, 4vw, 18px) !important;
+  line-height: 1.55; color: #e3eefa !important; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.25);
+  animation: lsmEmergeP 1.6s 0.3s cubic-bezier(0.18, 0.7, 0.2, 1) both, lsmFloat 5.5s ease-in-out 1.9s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html body:has(.nw-wrap) > section.hero::before, html body:has(.nw-wrap) > section.hero::after,
+  html body:has(.nw-wrap) > section.hero h1, html body:has(.nw-wrap) > section.hero p { animation: none !important; }
+}
