@@ -157,10 +157,17 @@ async function api(path, opts = {}) {
   return data;
 }
 
-if (!token || !me || me.role !== 'admin') {
+// Administrateur délégué : seuls ses droits sont proposés (le serveur vérifie de toute façon)
+const can = (p) => !me || me.admin_scope !== 'limited' || (me.permissions || []).includes(p);
+
+if (!token || !me || me.role !== 'admin' || !(can('membres') || can('emails'))) {
   $('not-admin').classList.remove('hidden');
 } else {
   $('admin-area').classList.remove('hidden');
+  if (!can('emails')) {
+    document.querySelector('[data-tab="ecrire"]').classList.add('hidden');
+    document.querySelector('[data-tab="histo"]').classList.add('hidden');
+  }
   init();
 }
 
@@ -250,7 +257,7 @@ function updateSelection() {
   const n = selected.size;
   const allOn = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
   $('toggle-all').textContent = allOn ? 'Tout désélectionner' : `Tout sélectionner (${filtered.length})`;
-  $('selbar').classList.toggle('hidden', n === 0 || !$('tab-membres') || $('tab-membres').classList.contains('hidden'));
+  $('selbar').classList.toggle('hidden', n === 0 || !can('emails') || !$('tab-membres') || $('tab-membres').classList.contains('hidden'));
   $('selbar-text').textContent = `${n} sélectionné${n > 1 ? 's' : ''}`;
   const everyone = members.length > 0 && n === members.length;
   $('recipients-summary').innerHTML = n === 0
