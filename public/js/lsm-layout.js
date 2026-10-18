@@ -250,5 +250,149 @@
       window.addEventListener('orientationchange', function () { maxH = 0; setTimeout(syncVv, 300); });
       syncVv();
     }
+
+    // 8. Espace d'étude et Livres audio : titre et texte regroupés dans le bandeau bleu animé
+    if (path === '/audio.html' || path === '/espace-etude.html') {
+      var vl = document.getElementById('view-list');
+      var bh = vl ? vl.querySelector(':scope > h1') : null;
+      var wrapEl = document.querySelector('.wrap');
+      if (bh && wrapEl && !document.querySelector('.lsm-banner')) {
+        var bp = bh.nextElementSibling && bh.nextElementSibling.tagName === 'P' ? bh.nextElementSibling : null;
+        var ban = document.createElement('section');
+        ban.className = 'hero lsm-banner';
+        ban.appendChild(bh);
+        if (bp) ban.appendChild(bp);
+        wrapEl.parentNode.insertBefore(ban, wrapEl);
+      }
+    }
+
+    // 9. Assistant IA : discussions classées par date, rangées dans un panneau (tiroir sur téléphone)
+    var sideEl = document.querySelector('.chat-layout .sidebar');
+    var origList = document.getElementById('convo-list');
+    var origNew = document.getElementById('new-convo-btn');
+    var chatMain = document.querySelector('.chat-layout .chat-main');
+    if (sideEl && origList && origNew && !sideEl.querySelector('.lsm-conv')) {
+      var tokenVal = ''; try { tokenVal = localStorage.getItem('mna_token') || ''; } catch (e) {}
+      var esc = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+      var panel = document.createElement('div');
+      panel.className = 'lsm-conv';
+      panel.innerHTML =
+        '<div class="lsm-conv-head"><div class="lsm-conv-title">Mes discussions</div>' +
+        '<button type="button" class="lsm-conv-close" aria-label="Fermer">&#10005;</button></div>' +
+        '<button type="button" class="lsm-conv-new">&#65291; Nouvelle discussion</button>' +
+        '<input type="search" class="lsm-conv-search" placeholder="Rechercher une discussion…" autocomplete="off" aria-label="Rechercher une discussion">' +
+        '<div class="lsm-conv-list"></div>';
+      sideEl.insertBefore(panel, sideEl.firstChild);
+      var listEl = panel.querySelector('.lsm-conv-list');
+      var searchEl = panel.querySelector('.lsm-conv-search');
+
+      var overlay = document.createElement('div');
+      overlay.className = 'lsm-overlay';
+      document.body.appendChild(overlay);
+
+      var topBar = null, topTitle = null;
+      if (chatMain) {
+        topBar = document.createElement('div');
+        topBar.className = 'lsm-chat-top';
+        topBar.innerHTML =
+          '<button type="button" class="lsm-top-menu" aria-label="Mes discussions">&#9776;</button>' +
+          '<div class="lsm-top-title">Assistant IA</div>' +
+          '<button type="button" class="lsm-top-new" aria-label="Nouvelle discussion">&#65291;</button>';
+        chatMain.insertBefore(topBar, chatMain.firstChild);
+        topTitle = topBar.querySelector('.lsm-top-title');
+      }
+
+      var openDrawer = function () { doc.classList.add('lsm-drawer'); };
+      var closeDrawer = function () { doc.classList.remove('lsm-drawer'); };
+      overlay.addEventListener('click', closeDrawer);
+      panel.querySelector('.lsm-conv-close').addEventListener('click', closeDrawer);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
+      if (topBar) {
+        topBar.querySelector('.lsm-top-menu').addEventListener('click', openDrawer);
+        topBar.querySelector('.lsm-top-new').addEventListener('click', function () { origNew.click(); });
+      }
+      panel.querySelector('.lsm-conv-new').addEventListener('click', function () { origNew.click(); closeDrawer(); });
+
+      var convos = [];
+      var norm = function (t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+      var dayStart = function (d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+      var bucketOf = function (d) {
+        var sod = dayStart(new Date()), t = d.getTime();
+        if (t >= sod) return 'Aujourd’hui';
+        if (t >= sod - 864e5) return 'Hier';
+        if (t >= sod - 6 * 864e5) return '7 derniers jours';
+        if (t >= sod - 29 * 864e5) return '30 derniers jours';
+        return 'Plus anciennes';
+      };
+      var timeOf = function (d) {
+        var sod = dayStart(new Date()), t = d.getTime();
+        if (t >= sod) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        if (t >= sod - 864e5) return 'Hier';
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      };
+      var activeId = function () {
+        var a = origList.querySelector('.convo-item.active, .convo-item.on, .convo-item[aria-current]');
+        return a ? String(a.getAttribute('data-id')) : '';
+      };
+
+      var render = function () {
+        var q = norm(searchEl.value.trim());
+        var act = activeId();
+        var shown = convos.filter(function (c) { return !q || norm(c.title).indexOf(q) !== -1; });
+        if (!shown.length) {
+          listEl.innerHTML = '<div class="lsm-conv-empty">' + (convos.length ? 'Aucune discussion ne correspond.' : 'Aucune discussion pour le moment.<br>Posez votre première question !') + '</div>';
+        } else {
+          var html = '', last = '';
+          shown.forEach(function (c) {
+            var d = new Date(c.updated_at);
+            var ok = !isNaN(d.getTime());
+            var g = ok ? bucketOf(d) : 'Récentes';
+            if (g !== last) { html += '<div class="lsm-grp">' + g + '</div>'; last = g; }
+            html += '<div class="lsm-c-item' + (String(c.id) === act ? ' active' : '') + '" data-id="' + c.id + '" role="button" tabindex="0">' +
+              '<div class="lsm-c-main"><div class="lsm-c-title">' + esc(c.title || 'Nouvelle discussion') + '</div>' +
+              (ok ? '<div class="lsm-c-time">' + timeOf(d) + '</div>' : '') + '</div>' +
+              '<button type="button" class="lsm-c-del" data-id="' + c.id + '" aria-label="Supprimer cette discussion">&#128465;</button></div>';
+          });
+          listEl.innerHTML = html;
+        }
+        if (topTitle) {
+          var cur = convos.filter(function (c) { return String(c.id) === act; })[0];
+          topTitle.textContent = cur ? (cur.title || 'Nouvelle discussion') : 'Assistant IA';
+        }
+      };
+
+      listEl.addEventListener('click', function (e) {
+        var del = e.target.closest ? e.target.closest('.lsm-c-del') : null;
+        if (del) {
+          e.stopPropagation();
+          var od = origList.querySelector('.del[data-id="' + del.getAttribute('data-id') + '"]');
+          if (od) od.click();
+          return;
+        }
+        var it = e.target.closest ? e.target.closest('.lsm-c-item') : null;
+        if (!it) return;
+        var oi = origList.querySelector('.convo-item[data-id="' + it.getAttribute('data-id') + '"]');
+        if (oi) oi.click();
+        closeDrawer();
+      });
+      listEl.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('lsm-c-item')) { e.preventDefault(); e.target.click(); }
+      });
+      searchEl.addEventListener('input', render);
+
+      var timer = null;
+      var refresh = function () {
+        if (!tokenVal) return;
+        fetch('/api/assistant/conversations', { headers: { Authorization: 'Bearer ' + tokenVal } })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (rows) { if (Array.isArray(rows)) { convos = rows; render(); } })
+          .catch(function () {});
+      };
+      // La liste d'origine (cachée) se met à jour à chaque envoi, ouverture ou suppression : on suit ses changements
+      new MutationObserver(function () { clearTimeout(timer); timer = setTimeout(refresh, 250); })
+        .observe(origList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      refresh();
+    }
   } catch (e) { /* ne jamais empêcher le site de fonctionner */ }
 })();
