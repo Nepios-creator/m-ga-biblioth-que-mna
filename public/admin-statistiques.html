@@ -126,7 +126,7 @@ const PAGE_NAMES = {
 };
 const SOURCE_NAMES = { direct: 'Accès direct (lien, application installée)' };
 
-if (!token || !me || me.role !== 'admin') {
+if (!token || !me || me.role !== 'admin' || (me.admin_scope === 'limited' && !(me.permissions || []).includes('statistiques'))) {
   $('not-admin').classList.remove('hidden');
 } else {
   $('admin-area').classList.remove('hidden');
