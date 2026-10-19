@@ -1,7 +1,7 @@
 'use strict';
 // Lecture d'un chapitre au format « Les Saintes Écritures — Parole pure » (fichier Word, un chapitre par fichier).
 // Ce lecteur comprend : la numérotation AUTOMATIQUE de Word (listes qui repartent d'une valeur de départ : 7, 11, 19…),
-// les numéros de versets glissés au milieu d'un paragraphe, les lettres de renvoi en exposant (a, b, … aa, ab),
+// les numéros de versets glissés au milieu d'un paragraphe, les lettres de renvoi en exposant (a, b, … aa, ab, … jusqu'à 4 lettres),
 // les intertitres ❧ … ❧, le titre « CHAPITRE I » (chiffres romains) avec son sous-titre, et les notes « · v.N … » à lettres.
 // Il renvoie null si le fichier n'est pas de ce format : l'ancien lecteur (bible-parse.js) prend alors le relais.
 const JSZip = require('jszip');
@@ -16,8 +16,13 @@ function toNumber(s) {
 }
 // Lettre automatique de Word pour le n-ième élément : a…z, puis aa, bb, cc…
 const letterFor = (n) => String.fromCharCode(97 + ((n - 1) % 26)).repeat(Math.floor((n - 1) / 26) + 1);
-// Écriture usuelle après « z » dans les versets : aa, ab, ac…
-const altLetterFor = (n) => (n > 26 ? 'a' + String.fromCharCode(97 + ((n - 27) % 26)) : null);
+// Écriture usuelle après « z » dans les versets : aa, ab, ac… az, ba, bb… (jusqu'à 4 lettres et plus)
+const altLetterFor = (n) => {
+  if (n <= 26) return null;
+  let k = n, s = '';
+  while (k > 0) { k--; s = String.fromCharCode(97 + (k % 26)) + s; k = Math.floor(k / 26); }
+  return s;
+};
 
 function readNumbering(xml) {
   const abs = {};
@@ -70,7 +75,7 @@ function readParagraphs(xml, nums) {
 
 const CHAPTER = /^(?:chapitre|chap\.?|psaumes?|ps\.?)\s*([IVXLCDM]+|\d{1,3})\b\s*[:.\-–—]?\s*(.*)$/i;
 const NOTES_HEAD = /^(?:notes?|commentaires?|remarques?)\b/i;
-const NOTE = /^(?:([a-z]{1,2})\s*)?[·•]?\s*v(?:ers(?:et)?s?)?\.?\s*(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?\s*([\s\S]*)$/i;
+const NOTE = /^(?:([a-z]{1,4})\s*)?[·•]?\s*v(?:ers(?:et)?s?)?\.?\s*(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?\s*([\s\S]*)$/i;
 const BOOK_TITLE = /^(?:évangile|evangile|livre|épître|epitre|lettre|actes|apocalypse|premier|second)\b/i;
 // Texte d'un paragraphe de note, avec les mots en italique entourés de *…* (le lecteur du site les met en italique)
 const marked = (runs) => runs.map((r) => (r.italic && r.text.trim() ? r.text.replace(/^(\s*)([\s\S]*?)(\s*)$/, '$1*$2*$3') : r.text)).join('').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
@@ -115,7 +120,7 @@ async function parseBibleDocx(buffer) {
     cur.text += s;
   };
   const isNumberRun = (r) => /^\s*\d{1,3}\s*$/.test(r.text) && (r.sup || (r.bold && r.size && bodySize && r.size <= bodySize * 0.8));
-  const isLetterRun = (r) => r.sup && /^\s*[a-z]{1,2}\s*$/i.test(r.text);
+  const isLetterRun = (r) => r.sup && /^\s*[a-z]{1,4}\s*$/i.test(r.text);
   const feed = (runs) => {
     for (const r of runs) {
       if (isNumberRun(r)) startVerse(parseInt(r.text, 10));

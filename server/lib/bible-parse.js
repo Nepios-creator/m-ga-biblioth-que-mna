@@ -139,7 +139,7 @@ async function docxToBlocks(buffer) {
       }
       // Petite lettre de renvoi (a, b, c…) collée à un mot : exposant, texte plus petit, ou style de renvoi.
       // Elle est marquée ⟦#a⟧ pour ne jamais se mélanger au texte du verset (« 1er », « 2e » sont exclus).
-      const lm = runText.trim().match(/^\(?([a-zA-Z])\)?$/);
+      const lm = runText.trim().match(/^\(?([a-zA-Z]{1,4})\)?$/);
       if (lm && !sup && out.length > 0 && !/[\d\n]$/.test(out)) {
         const sz1 = parseInt((rPr.match(/<w:sz w:val="(\d+)"/) || [])[1] || 0, 10);
         const smallRun = sz1 && docBody && sz1 <= docBody * 0.8;
@@ -286,8 +286,8 @@ function parseBible(rawLines) {
   function appendText(t) {
     if (!current) return;
     let afterToken = false;
-    for (const part of String(t || '').split(/(⟦#[^⟧]{1,3}⟧)/)) {
-      const mm = part.match(/^⟦#([^⟧]{1,3})⟧$/);
+    for (const part of String(t || '').split(/(⟦#[^⟧]{1,4}⟧)/)) {
+      const mm = part.match(/^⟦#([^⟧]{1,4})⟧$/);
       if (mm) { current.notes.push({ letter: mm[1], offset: current.text.length }); afterToken = true; continue; }
       const tt = part.trim();
       if (!tt) continue;
@@ -488,9 +488,9 @@ function parseBibleDocument(blocks, natives, noteDefs) {
 
   // Lettres de renvoi (a, b, c…) présentes dans les versets
   const letters = new Set();
-  blocks.forEach((b) => { for (const m of b.text.matchAll(/⟦#([^⟧]{1,3})⟧/g)) letters.add(m[1]); });
+  blocks.forEach((b) => { for (const m of b.text.matchAll(/⟦#([^⟧]{1,4})⟧/g)) letters.add(m[1]); });
   (noteDefs || []).forEach((n) => letters.add(n.letter));
-  const NOTE_LABEL_RE = /^\(?\[?(?:(?:v\.?\s*)?(\d{1,3})\s*)?([a-zA-Z])\s*[)\].:—–\-]\s*(\S[\s\S]*)$/;
+  const NOTE_LABEL_RE = /^\(?\[?(?:(?:v\.?\s*)?(\d{1,3})\s*)?([a-zA-Z]{1,4})\s*[)\].:—–\-]\s*(\S[\s\S]*)$/;
 
   // Si presque tout le document a la même mise en forme (tout en italique, tout encadré…), elle ne distingue plus rien
   const total = Math.max(1, blocks.length);
@@ -526,7 +526,7 @@ function parseBibleDocument(blocks, natives, noteDefs) {
       const nm = plain.match(NOTE_LABEL_RE);
       if (nm && letters.has(nm[2].toLowerCase())) noteLabel = { letter: nm[2].toLowerCase(), verseHint: nm[1] ? Number(nm[1]) : null, body: nm[3] };
       else if (inSection || inRun || b.italic) {
-        const pm = plain.match(/^([a-z])\s+(\S[\s\S]*)$/);
+        const pm = plain.match(/^([a-z]{1,4})\s+(\S[\s\S]*)$/);
         if (pm && letters.has(pm[1])) noteLabel = { letter: pm[1], verseHint: null, body: pm[2] };
       }
     }

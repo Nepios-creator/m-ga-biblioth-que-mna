@@ -5,9 +5,9 @@
 // et transforme chaque note « a · v.1 « mot » : explication… » en note reliée à sa lettre dans les versets.
 // Elle ne fait rien quand le fichier a déjà été lu correctement.
 
-const HEAD = /\s+(?:notes?|commentaires?|remarques?)\s*[·•:\-–—]\s*chapitre\s+(?:[IVXLCDM]+|\d{1,3})\s+(?=[a-z]{1,2}\s*[·•]\s*v)/i;
-const SPLIT = /\s+(?=[a-z]{1,2}\s*[·•]\s*v(?:ers(?:et)?s?)?\.?\s*\d{1,3})/;
-const NOTE = /^([a-z]{1,2})\s*[·•]\s*v(?:ers(?:et)?s?)?\.?\s*(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?\s*([\s\S]*)$/;
+const HEAD = /\s+(?:notes?|commentaires?|remarques?)\s*[·•:\-–—]\s*chapitre\s+(?:[IVXLCDM]+|\d{1,3})\s+(?=[a-z]{1,4}\s*[·•]\s*v)/i;
+const SPLIT = /\s+(?=[a-z]{1,4}\s*[·•]\s*v(?:ers(?:et)?s?)?\.?\s*\d{1,3})/;
+const NOTE = /^([a-z]{1,4})\s*[·•]\s*v(?:ers(?:et)?s?)?\.?\s*(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?\s*([\s\S]*)$/;
 
 function rescueGluedNotes(parsed) {
   let rescued = 0;
@@ -43,7 +43,7 @@ function rescueGluedNotes(parsed) {
   }
   if (rescued && Array.isArray(parsed.warnings)) {
     parsed.warnings = parsed.warnings.filter((w) => {
-      const mm = /La lettre « ([a-z]{1,2}) » du verset \d+ n'a pas de (?:commentaire|note) correspondant/.exec(w);
+      const mm = /La lettre « ([a-z]{1,4}) » du verset \d+ n'a pas de (?:commentaire|note) correspondant/.exec(w);
       return !(mm && letters.has(mm[1]));
     });
   }
