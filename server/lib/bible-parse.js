@@ -1,7 +1,7 @@
 const JSZip = require('jszip');
 
 function decodeXmlEntities(s) {
-  return s
+  return String(s == null ? '' : s)
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
@@ -132,7 +132,8 @@ async function docxToBlocks(buffer) {
       const wt = /<w:t[^>]*>([^<]*)<\/w:t>|<w:br[^>]*\/>|<w:tab\s*\/>/g;
       let t;
       while ((t = wt.exec(run))) {
-        if (t[0].startsWith('<w:t')) runText += decodeXmlEntities(t[1]);
+        // t[1] n'existe que pour une vraie balise de texte <w:t> ; une tabulation <w:tab/> ou un retour <w:br/> n'en a pas
+        if (t[1] !== undefined) runText += decodeXmlEntities(t[1]);
         else if (t[0].startsWith('<w:br')) runText += '\n';
         else runText += ' ';
       }
