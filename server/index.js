@@ -11,6 +11,7 @@ const messagesRoutes = require('./routes/messages');
 const assistantRoutes = require('./routes/assistant');
 const readerRoutes = require('./routes/reader');
 const bibleRoutes = require('./routes/bible');
+const biblePrefaceRoutes = require('./routes/bible-preface');
 const audioRoutes = require('./routes/audio');
 const statsRoutes = require('./routes/stats');
 const membersRoutes = require('./routes/members');
@@ -145,6 +146,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/reader', readerRoutes);
 app.use('/api/bible', bibleRoutes);
+app.use('/api/bible-preface', biblePrefaceRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/quotes', quotesRoutes);
 
