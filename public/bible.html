@@ -116,9 +116,17 @@
   mark.q { background: #ffe9a8; color: #241e16; border-radius: 2px; }
 
   /* ---------- Préface de la Bible ---------- */
-  .pf-text { font-family: 'Fraunces', Georgia, serif; font-size: 22px; line-height: 1.8; overflow-wrap: anywhere; margin: 6px 0 28px; }
-  .pf-text h2 { font-size: 1.15em; margin: 1.5em 0 .5em; text-align: center; }
+  /* Les titres du site ont une couleur fixe : on impose celle du thème (sinon invisibles en mode sombre) */
+  .overlay h1, .overlay h2, .overlay h3, .overlay h4 { color: var(--b-fg); }
+  .pf-text { font-family: 'Fraunces', Georgia, serif; font-size: 22px; line-height: 1.8; overflow-wrap: anywhere; margin: 6px 0 28px; color: var(--b-fg); }
   .pf-text p { margin: 0 0 1.1em; }
+  .pf-text strong { font-weight: 800; }
+  .pf-text .pf-h1 { font-size: 1.5em; line-height: 1.25; text-align: center; margin: 1.6em 0 .7em; padding-bottom: .5em; border-bottom: 1px solid var(--b-line); }
+  .overlay .pf-text .pf-h2 { font-size: 1.12em; line-height: 1.35; margin: 1.7em 0 .5em; color: var(--b-accent); }
+  .pf-text .pf-h3 { font-size: .95em; margin: 1.4em 0 .4em; font-style: italic; }
+  .pf-text ul { margin: 0 0 1.1em; padding-left: 1.3em; }
+  .pf-text li { margin-bottom: .4em; }
+  .pf-text > :first-child { margin-top: .3em; }
   .pf-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .pf-actions .tb-btn.main { background: var(--b-accent); color: var(--b-onacc); border-color: var(--b-accent); padding: 12px 22px; font-size: 15px; }
   .pf-admin { display: block; text-align: center; margin-top: 18px; font-size: 13px; color: var(--b-soft); }
@@ -273,10 +281,17 @@ async function loadPreface() {
     return d && d.exists ? d : null;
   } catch (e) { return null; }
 }
+function inlineHtml(s) {
+  return esc(s).replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+}
 function prefaceHtml(body) {
-  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
-    .map((b) => b.startsWith('# ') ? `<h2>${esc(b.slice(2).trim())}</h2>`
-      : '<p>' + esc(b).replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\n/g, '<br>') + '</p>').join('');
+  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean).map((b) => {
+    const h = b.match(/^(#{1,3})\s+([\s\S]+)$/);
+    if (h) return `<h${h[1].length + 1} class="pf-h${h[1].length}">${inlineHtml(h[2].replace(/\n/g, ' ').trim())}</h${h[1].length + 1}>`;
+    const lines = b.split('\n');
+    if (lines.every((l) => /^[-•]\s+/.test(l))) return '<ul>' + lines.map((l) => '<li>' + inlineHtml(l.replace(/^[-•]\s+/, '')) + '</li>').join('') + '</ul>';
+    return '<p>' + inlineHtml(b).replace(/\n/g, '<br>') + '</p>';
+  }).join('');
 }
 // first = true : ouverture automatique à la première visite ; sinon, ouverture à la demande (bouton 📖 ou liste des livres)
 function showPreface(first) {

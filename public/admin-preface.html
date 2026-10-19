@@ -17,8 +17,12 @@
   .msg.success { background: #e8f6ec; color: #2a7a44; }
   .hidden { display: none; }
   .preview { background: var(--paper); border-radius: 12px; padding: 18px 20px; font-family: 'Fraunces', Georgia, serif; font-size: 17px; line-height: 1.75; max-height: 460px; overflow-y: auto; }
-  .preview h2 { font-size: 1.15em; margin: 1.2em 0 .5em; }
   .preview p { margin: 0 0 1em; }
+  .preview strong { font-weight: 800; }
+  .preview .pf-h1 { font-size: 1.5em; text-align: center; margin: 1.2em 0 .6em; padding-bottom: .4em; border-bottom: 1px solid var(--line); }
+  .preview .pf-h2 { font-size: 1.12em; margin: 1.5em 0 .4em; color: #8a6420; }
+  .preview .pf-h3 { font-size: .95em; margin: 1.3em 0 .4em; font-style: italic; }
+  .preview ul { margin: 0 0 1em; padding-left: 1.3em; }
 </style>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -50,7 +54,7 @@
         <label>Texte de la préface</label>
         <textarea id="f-body" rows="16" placeholder="Choisissez un fichier ci-dessus, ou collez le texte ici.&#10;&#10;Séparez les paragraphes par une ligne vide. Pour un titre, écrivez # devant la ligne (ex. : # Avant-propos)."></textarea>
       </div>
-      <p style="font-size:13px;color:var(--ink-soft);margin:-4px 0 16px;">Le texte du fichier apparaît dans la case ci-dessus : relisez-le, corrigez-le si besoin, puis enregistrez. Les titres sont repérés automatiquement (style « Titre » de Word ou ligne courte en gras) et marqués par un # au début ; mettez *astérisques* autour d'un mot pour l'écrire en italique.</p>
+      <p style="font-size:13px;color:var(--ink-soft);margin:-4px 0 16px;">Le texte du fichier apparaît dans la case ci-dessus : relisez-le, corrigez-le si besoin, puis enregistrez. Les titres sont repérés automatiquement (styles « Titre 1, 2, 3 » de Word, ou ligne courte entièrement en gras) et marqués par #, ## ou ### au début. Le gras est marqué **ainsi**, l'italique *ainsi*, et les puces par un tiret au début de la ligne.</p>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button type="button" class="btn btn-ghost" id="btn-preview">Voir l'aperçu</button>
@@ -76,10 +80,17 @@ async function readJson(r) {
   try { return JSON.parse(raw); } catch (e) { return { message: `Le serveur a répondu une erreur (code ${r.status}). Réessayez dans quelques secondes.` }; }
 }
 
+function inlineHtml(s) {
+  return esc(s).replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+}
 function prefaceHtml(body) {
-  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
-    .map((b) => b.startsWith('# ') ? `<h2>${esc(b.slice(2).trim())}</h2>`
-      : '<p>' + esc(b).replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\n/g, '<br>') + '</p>').join('');
+  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean).map((b) => {
+    const h = b.match(/^(#{1,3})\s+([\s\S]+)$/);
+    if (h) return `<h${h[1].length + 1} class="pf-h${h[1].length}">${inlineHtml(h[2].replace(/\n/g, ' ').trim())}</h${h[1].length + 1}>`;
+    const lines = b.split('\n');
+    if (lines.every((l) => /^[-•]\s+/.test(l))) return '<ul>' + lines.map((l) => '<li>' + inlineHtml(l.replace(/^[-•]\s+/, '')) + '</li>').join('') + '</ul>';
+    return '<p>' + inlineHtml(b).replace(/\n/g, '<br>') + '</p>';
+  }).join('');
 }
 
 function renderPreview() {
