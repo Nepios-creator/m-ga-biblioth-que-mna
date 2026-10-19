@@ -47,17 +47,26 @@ const unesc = (s) => String(s == null ? '' : s)
 
 const WORD_HELP = 'Ouvrez-le dans Word puis faites « Enregistrer sous » au format Word (.docx), ou collez le texte directement.';
 
-// Lit un .docx : un paragraphe Word = un paragraphe ; titres (style Titre/Heading, ou ligne courte tout en gras) marqués « # »
+// Lit un .docx : un paragraphe Word = un paragraphe.
+// Titres : style Titre/Heading (niveaux 1 à 3 → #, ##, ###) ou ligne courte entièrement en gras (→ ##).
+// Gras → **texte**, italique → *texte*, puces/listes → « - ». Ces marques sont reprises à l'affichage.
 async function docxToText(buffer) {
   let zip;
   try { zip = await JSZip.loadAsync(buffer); } catch (e) { throw new Error('Fichier Word endommagé ou illisible. ' + WORD_HELP); }
   const file = zip.file('word/document.xml');
   if (!file) throw new Error('Fichier Word illisible (document.xml absent). ' + WORD_HELP);
   const xml = await file.async('string');
-  const out = [];
+  const isOn = (rPr, tag) => new RegExp('<w:' + tag + '(?:\\s*\\/>|\\s+w:val="(?:1|true|on)"\\s*\\/?>)').test(rPr);
+  const wrap = (t, bold, italic) => {
+    const m = t.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    if (!m[2]) return t;
+    const core = m[2].replace(/\*/g, '');
+    return m[1] + (bold ? '**' + core + '**' : italic ? '*' + core + '*' : core) + m[3];
+  };
+  const items = []; // { text, list }
   for (const pm of xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)) {
     const p = pm[0];
-    let text = '', allBold = true, any = false;
+    const parts = []; // { t, b, i }
     for (const rm of p.matchAll(/<w:r[ >][\s\S]*?<\/w:r>/g)) {
       const r = rm[0];
       const rPr = (r.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/) || [])[1] || '';
@@ -68,19 +77,34 @@ async function docxToText(buffer) {
         else t += ' ';
       }
       if (!t) continue;
-      text += t;
-      if (t.trim()) {
-        any = true;
-        if (!/<w:b(?:\s*\/>|\s+w:val="(?:1|true|on)"\s*\/>)/.test(rPr)) allBold = false;
-      }
+      const b = isOn(rPr, 'b') || /<w:rStyle w:val="(?:Strong|Accentuationforte|Accentuation forte)"/i.test(rPr);
+      const i = isOn(rPr, 'i');
+      const last = parts[parts.length - 1];
+      if (last && last.b === b && last.i === i) last.t += t; else parts.push({ t, b, i });
     }
-    const clean = text.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
-    if (!clean) continue;
+    const plain = parts.map((x) => x.t).join('').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+    if (!plain) continue;
+    const real = parts.filter((x) => x.t.trim());
+    const allBold = real.length > 0 && real.every((x) => x.b);
     const style = (p.match(/<w:pStyle w:val="([^"]+)"/) || [])[1] || '';
-    const isHeading = /^(?:Heading|Titre|Title)\d*$/i.test(style) || (any && allBold && clean.length < 80 && !/[.!?;,]$/.test(clean) && !clean.includes('\n'));
-    out.push(isHeading ? '# ' + clean : clean);
+    const hm = style.match(/^(?:Heading|Titre)(\d)$/i);
+    const isTitleStyle = /^(?:Title|Titre|Subtitle|Sous-titre)$/i.test(style);
+    const numPr = p.match(/<w:numPr>([\s\S]*?)<\/w:numPr>/);
+    const numId = numPr ? (numPr[1].match(/<w:numId w:val="(\d+)"/) || [])[1] : null;
+    const inList = !!numId && numId !== '0' && !hm && !isTitleStyle;
+    const short = plain.length < 90 && !plain.includes('\n') && !/[.!?;,]$/.test(plain);
+    if (hm) { items.push({ text: '#'.repeat(Math.min(3, Math.max(1, Number(hm[1])))) + ' ' + plain.replace(/\*/g, '') }); continue; }
+    if (isTitleStyle) { items.push({ text: (/^(?:Title|Titre)$/i.test(style) ? '# ' : '## ') + plain.replace(/\*/g, '') }); continue; }
+    if (allBold && short && !inList) { items.push({ text: '## ' + plain.replace(/\*/g, '') }); continue; }
+    let text = parts.map((x) => wrap(x.t, x.b, x.i)).join('').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+    text = text.replace(/\*\*\s*\*\*/g, ''); // marques vides
+    if (inList) items.push({ text: '- ' + text, list: true });
+    else items.push({ text });
   }
-  return out.join('\n\n');
+  // Les éléments de liste qui se suivent restent groupés (un seul retour à la ligne) ; le reste est séparé par une ligne vide
+  let out = '';
+  items.forEach((it, k) => { out += (k === 0 ? '' : (it.list && items[k - 1].list ? '\n' : '\n\n')) + it.text; });
+  return out;
 }
 
 async function extractText(file) {
