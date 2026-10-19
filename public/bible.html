@@ -114,6 +114,14 @@
   .pref-row .seg { display: flex; gap: 6px; }
   .pref-row .seg button.on { background: var(--b-accent); color: #fff; border-color: var(--b-accent); }
   mark.q { background: #ffe9a8; color: #241e16; border-radius: 2px; }
+
+  /* ---------- Préface de la Bible ---------- */
+  .pf-text { font-family: 'Fraunces', Georgia, serif; font-size: 22px; line-height: 1.8; overflow-wrap: anywhere; margin: 6px 0 28px; }
+  .pf-text h2 { font-size: 1.15em; margin: 1.5em 0 .5em; text-align: center; }
+  .pf-text p { margin: 0 0 1.1em; }
+  .pf-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .pf-actions .tb-btn.main { background: var(--b-accent); color: var(--b-onacc); border-color: var(--b-accent); padding: 12px 22px; font-size: 15px; }
+  .pf-admin { display: block; text-align: center; margin-top: 18px; font-size: 13px; color: var(--b-soft); }
   footer { padding-bottom: 80px; }
 </style>
   <link rel="manifest" href="/manifest.json">
@@ -134,6 +142,7 @@
 
 <div class="toolbar"><div class="toolbar-in">
   <button class="tb-btn tb-title" id="btn-picker">Choisir un livre ▾</button>
+  <button class="tb-btn tb-icon" id="btn-preface" aria-label="Préface de la Bible" title="Préface" style="display:none;">📖</button>
   <button class="tb-btn tb-icon" id="btn-search" aria-label="Rechercher">🔍</button>
   <button class="tb-btn tb-icon" id="btn-marks" aria-label="Mes favoris">⭐</button>
   <button class="tb-btn tb-icon" id="btn-prefs" aria-label="Affichage">Aa</button>
@@ -202,6 +211,14 @@
     <span class="seg" id="seg-layout"><button class="tb-btn" data-l="flow">Continue</button><button class="tb-btn" data-l="line">Un verset par ligne</button></span></div>
 </div></div>
 
+<!-- Préface de la Bible -->
+<div class="overlay" id="ov-preface"><div class="ov-in">
+  <div class="ov-head"><h2 id="pf-title">Préface</h2><button class="tb-btn" data-close="ov-preface">Fermer</button></div>
+  <div class="pf-text" id="pf-body"></div>
+  <div class="pf-actions"><button class="tb-btn main" id="pf-go">Commencer la lecture ›</button></div>
+  <a class="pf-admin" id="pf-admin" href="/admin-preface.html" style="display:none;">✏️ Modifier la préface (administrateur)</a>
+</div></div>
+
 <footer>Bible — version « Parole pure » · Ministère de la Nouvelle Alliance</footer>
 
 <script>
@@ -211,8 +228,12 @@ if (!token) { window.location.href = '/login.html'; }
 const H = { Authorization: `Bearer ${token}` };
 const HJ = { 'Content-Type': 'application/json', ...H };
 const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const me = (() => { try { return JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) { return null; } })();
+const isAdmin = !!(me && me.role === 'admin');
+// La préface s'affiche d'office la première fois que ce lecteur ouvre la Bible (sur cet appareil)
+const PREFACE_KEY = 'bible_preface_seen_' + ((me && (me.id || me.email)) || 'lecteur');
 
-const state = { books: [], data: null, marks: new Map(), selected: new Set(), prefs: { size: 28, theme: 'light', layout: 'flow' }, noteMap: new Map(), noteVerse: new Map() };
+const state = { books: [], data: null, marks: new Map(), selected: new Set(), prefs: { size: 28, theme: 'light', layout: 'flow' }, noteMap: new Map(), noteVerse: new Map(), preface: null };
 
 // ---------- Préférences d'affichage ----------
 try { Object.assign(state.prefs, JSON.parse(localStorage.getItem('bible_prefs') || '{}')); } catch (e) {}
@@ -221,6 +242,7 @@ function applyPrefs() {
   document.body.dataset.btheme = state.prefs.theme;
   const bt = document.querySelector('.bible-text');
   if (bt) { bt.style.fontSize = state.prefs.size + 'px'; bt.classList.toggle('per-line', state.prefs.layout === 'line'); }
+  $('pf-body').style.fontSize = Math.min(state.prefs.size, 30) + 'px';
   $('fs-val').textContent = state.prefs.size;
   document.querySelectorAll('#seg-theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === state.prefs.theme));
   document.querySelectorAll('#seg-layout button').forEach((b) => b.classList.toggle('on', b.dataset.l === state.prefs.layout));
@@ -242,8 +264,46 @@ async function api(path, opts) {
   return r;
 }
 
+// ---------- Préface ----------
+async function loadPreface() {
+  try {
+    const r = await api('/api/bible-preface');
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d && d.exists ? d : null;
+  } catch (e) { return null; }
+}
+function prefaceHtml(body) {
+  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
+    .map((b) => b.startsWith('# ') ? `<h2>${esc(b.slice(2).trim())}</h2>`
+      : '<p>' + esc(b).replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\n/g, '<br>') + '</p>').join('');
+}
+// first = true : ouverture automatique à la première visite ; sinon, ouverture à la demande (bouton 📖 ou liste des livres)
+function showPreface(first) {
+  const d = state.preface;
+  $('pf-title').textContent = (d && d.title) || 'Préface';
+  $('pf-body').innerHTML = d ? prefaceHtml(d.body) : '<div class="empty">La préface n\'a pas encore été mise en ligne.</div>';
+  $('pf-go').textContent = first ? 'Commencer la lecture ›' : 'Reprendre la lecture ›';
+  $('pf-go').style.display = d ? '' : 'none';
+  $('pf-admin').style.display = isAdmin ? 'block' : 'none';
+  if (first) { try { localStorage.setItem(PREFACE_KEY, '1'); } catch (e) {} }
+  applyPrefs();
+  openOv('ov-preface');
+  $('ov-preface').scrollTop = 0;
+}
+$('pf-go').onclick = () => closeOv('ov-preface');
+$('btn-preface').onclick = () => showPreface(false);
+
 async function init() {
   applyPrefs();
+  const p = new URLSearchParams(location.search);
+  const direct = !!(p.get('livre') && p.get('chapitre')); // lien partagé vers un verset : on va droit au verset
+  state.preface = await loadPreface();
+  $('btn-preface').style.display = (state.preface || isAdmin) ? '' : 'none';
+  let seen = true;
+  try { seen = !!localStorage.getItem(PREFACE_KEY); } catch (e) {}
+  if (state.preface && !seen && !direct) showPreface(true);
+
   const r = await api('/api/bible/books');
   state.books = r.ok ? await r.json() : [];
   if (!state.books.length) {
@@ -251,9 +311,9 @@ async function init() {
     $('btn-picker').disabled = true;
     return;
   }
-  const p = new URLSearchParams(location.search);
   let target = null;
-  if (p.get('livre') && p.get('chapitre')) target = { book: Number(p.get('livre')), chapter: Number(p.get('chapitre')), verse: Number(p.get('verset')) || null };
+  if (direct) target = { book: Number(p.get('livre')), chapter: Number(p.get('chapitre')), verse: Number(p.get('verset')) || null };
+  // Sinon : le dernier chapitre lu (à la prochaine visite, la Bible s'ouvre là où le lecteur s'était arrêté)
   if (!target) { try { const l = JSON.parse(localStorage.getItem('bible_last') || 'null'); if (l) target = { book: l.book, chapter: l.chapter, verse: null }; } catch (e) {} }
   const ok = target && state.books.some((b) => b.id === target.book && b.chapters.includes(target.chapter));
   if (!ok) { const b = state.books[0]; target = { book: b.id, chapter: b.chapters[0], verse: null }; }
@@ -532,12 +592,15 @@ function showBooks() {
   if (!has(pickerTestament)) pickerTestament = has('ancien') ? 'ancien' : 'nouveau';
   const list = state.books.filter((b) => b.testament === pickerTestament);
   $('picker-body').innerHTML = `
+    ${state.preface || isAdmin ? '<button class="tb-btn" id="pick-preface" style="width:100%;margin-bottom:14px;">📖 Préface de la Bible</button>' : ''}
     <div class="tabs">
       <button class="tb-btn ${pickerTestament === 'ancien' ? 'on' : ''}" data-t="ancien">Ancien Testament</button>
       <button class="tb-btn ${pickerTestament === 'nouveau' ? 'on' : ''}" data-t="nouveau">Nouveau Testament</button>
     </div>
     ${list.length ? `<div class="book-grid">${list.map((b) => `<button class="book-btn" data-id="${b.id}">${esc(b.name)}</button>`).join('')}</div>`
       : '<div class="empty">Les livres de cette partie seront mis en ligne progressivement.</div>'}`;
+  const pp = $('pick-preface');
+  if (pp) pp.onclick = () => { closeOv('ov-picker'); showPreface(false); };
   $('picker-body').querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { pickerTestament = b.dataset.t; showBooks(); });
   $('picker-body').querySelectorAll('.book-btn').forEach((b) => b.onclick = () => showChapters(Number(b.dataset.id)));
 }
