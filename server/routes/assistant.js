@@ -331,6 +331,44 @@ async function buildContext(question, previousUserQuestion) {
   return { text: parts.join('\n\n'), sources };
 }
 
+// Demande la réponse à l'IA et la poursuit automatiquement tant qu'elle est coupée par la limite de longueur :
+// la réponse arrive toujours jusqu'au bout, quelle que soit sa longueur.
+async function callMistral(msgs) {
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}` },
+    body: JSON.stringify({ model: 'mistral-small-latest', max_tokens: 4000, temperature: 0.2, messages: msgs }),
+  });
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok, data };
+}
+
+async function generateFull(messages) {
+  let text = '';
+  for (let round = 0; round < 6; round++) {
+    let r;
+    if (round === 0) {
+      r = await callMistral(messages);
+    } else {
+      // Poursuite : l'IA reprend exactement là où elle s'est arrêtée
+      r = await callMistral([...messages, { role: 'assistant', content: text, prefix: true }]);
+      if (!r.ok) {
+        r = await callMistral([...messages, { role: 'assistant', content: text },
+          { role: 'user', content: 'Ta réponse a été interrompue. Continue exactement là où tu t\'es arrêté, sans rien répéter ni reformuler de ce qui précède, jusqu\'à la fin de ta réponse.' }]);
+        if (r.ok) { const p = r.data.choices?.[0]?.message?.content || ''; text += (/\s$/.test(text) || /^[\s.,;:!?)]/.test(p) ? '' : ' ') + p; if (r.data.choices?.[0]?.finish_reason !== 'length') break; continue; }
+      }
+    }
+    if (!r.ok) {
+      if (text) break; // on garde ce qui a déjà été écrit
+      throw new Error(r.data.message || r.data.error?.message || 'Erreur de l\'assistant');
+    }
+    const choice = r.data.choices?.[0];
+    text += choice?.message?.content || '';
+    if (!choice || choice.finish_reason !== 'length') break;
+  }
+  return text;
+}
+
 // Liste des conversations du lecteur
 router.get('/conversations', async (req, res) => {
   try {
@@ -405,16 +443,13 @@ router.post('/conversations/:id/ask', async (req, res) => {
       { role: 'user', content: `Éléments disponibles pour cette question :\n\n${context.text}\n\nQuestion du lecteur : ${question}` },
     ];
 
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}` },
-      body: JSON.stringify({ model: 'mistral-small-latest', max_tokens: 900, temperature: 0.2, messages }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(502).json({ message: data.message || data.error?.message || 'Erreur de l\'assistant' });
+    let generated;
+    try {
+      generated = await generateFull(messages);
+    } catch (e) {
+      return res.status(502).json({ message: e.message || 'Erreur de l\'assistant' });
     }
-    const answer = cleanAnswer(data.choices?.[0]?.message?.content) || 'Désolé, je n\'ai pas pu répondre.';
+    const answer = cleanAnswer(generated) || 'Désolé, je n\'ai pas pu répondre.';
 
     await pool.query('INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1,$2,$3)', [convo.id, 'assistant', answer]);
 
