@@ -73,6 +73,65 @@
     new MutationObserver(queue).observe(document.body, { childList: true, subtree: true, characterData: true });
     scan();
 
+
+    // ---------- Bible : lecture selon le plan de 90 jours (page ouverte depuis le plan : ?plan=1) ----------
+    // « Suivant » avance dans les chapitres du jour ; au dernier chapitre, « Jour terminé ✓ » valide le jour et revient au plan.
+    if (path === '/bible.html' && /[?&]plan=1/.test(location.search)) {
+      var PK = 'mna_plan90', flat = [], days = [], dayOf = [];
+      var todayStr = function () { var t = new Date(); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); };
+      var readPlan = function () { try { return Object.assign({ start: null, done: [] }, JSON.parse(get(PK) || '{}')); } catch (e) { return { start: null, done: [] }; } };
+      var buildPlan = function () {
+        flat = []; days = []; dayOf = [];
+        state.books.forEach(function (b) { b.chapters.forEach(function (c) { flat.push({ b: b.id, c: c }); }); });
+        var N = flat.length;
+        for (var d = 1; d <= 90; d++) {
+          var s = Math.floor((d - 1) * N / 90), e = Math.floor(d * N / 90);
+          days.push([s, e]);
+          for (var k = s; k < e; k++) dayOf[k] = d;
+        }
+      };
+      var planUi = function () {
+        var dt = state.data; if (!dt) return;
+        var idx = -1;
+        for (var i = 0; i < flat.length; i++) if (flat[i].b === dt.book.id && flat[i].c === dt.chapter) { idx = i; break; }
+        var bar = document.getElementById('mna-planbar');
+        if (!bar) {
+          bar = document.createElement('div'); bar.id = 'mna-planbar';
+          var tb = document.querySelector('.toolbar');
+          tb.parentNode.insertBefore(bar, tb.nextSibling);
+        }
+        var day = idx >= 0 ? dayOf[idx] : 0;
+        if (!day) { bar.innerHTML = '<span>Ce chapitre n\u2019est pas dans le plan.</span><a href="/plan-90-jours.html">Le plan</a>'; return; }
+        var r = days[day - 1], pos = idx - r[0] + 1, tot = r[1] - r[0];
+        bar.innerHTML = '<span>\uD83D\uDCC5 Jour <b>' + day + '</b> sur 90 \u00b7 chapitre ' + pos + ' sur ' + tot + '</span><a href="/plan-90-jours.html">Le plan</a>';
+        var nx = document.getElementById('btn-next'), pv = document.getElementById('btn-prev');
+        pv.disabled = pos <= 1; pv.textContent = '\u2039 Pr\u00e9c\u00e9dent';
+        pv.onclick = function () { if (pos > 1) loadChapter(flat[idx - 1].b, flat[idx - 1].c); };
+        nx.disabled = false;
+        if (pos < tot) {
+          nx.textContent = 'Suivant \u203a';
+          nx.onclick = function () { loadChapter(flat[idx + 1].b, flat[idx + 1].c); };
+        } else {
+          nx.textContent = 'Jour termin\u00e9 \u2713';
+          nx.onclick = function () {
+            var p = readPlan();
+            if (!p.start) p.start = todayStr();
+            if (p.done.indexOf(day) < 0) p.done.push(day);
+            put(PK, JSON.stringify(p));
+            location.href = '/plan-90-jours.html';
+          };
+        }
+      };
+      var pt = 0, pw = setInterval(function () {
+        if (typeof state !== 'undefined' && state.books && state.books.length && state.data) {
+          clearInterval(pw); buildPlan();
+          var orig = window.loadChapter;
+          window.loadChapter = function () { var r = orig.apply(this, arguments); return Promise.resolve(r).then(planUi); };
+          planUi();
+        } else if (++pt > 80) clearInterval(pw);
+      }, 250);
+    }
+
     // ---------- Accueil : section « Pour vous » ----------
     if (home) {
 
