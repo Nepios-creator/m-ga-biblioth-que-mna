@@ -6,6 +6,7 @@
     var path = location.pathname.replace(/\/+$/, '') || '/';
     var home = path === '/' || path === '/index.html';
     var root = document.documentElement;
+    if (/[?&]embed=1/.test(location.search)) root.classList.add('mna-embed');
     function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
@@ -74,84 +75,16 @@
     scan();
 
 
-    // ---------- Bible : lecture selon le plan de 90 jours (page ouverte depuis le plan : ?plan=1) ----------
-    // « Suivant » avance dans les chapitres du jour ; au dernier chapitre, « Jour terminé ✓ » valide le jour et revient au plan.
-    if (path === '/bible.html' && /[?&]plan=1/.test(location.search)) {
-      var PK = 'mna_plan90', flat = [], days = [], dayOf = [];
-      var todayStr = function () { var t = new Date(); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); };
-      var readPlan = function () { try { return Object.assign({ start: null, done: [] }, JSON.parse(get(PK) || '{}')); } catch (e) { return { start: null, done: [] }; } };
-      var buildPlan = function () {
-        flat = []; days = []; dayOf = [];
-        state.books.forEach(function (b) { b.chapters.forEach(function (c) { flat.push({ b: b.id, c: c }); }); });
-        var N = flat.length;
-        for (var d = 1; d <= 90; d++) {
-          var s = Math.floor((d - 1) * N / 90), e = Math.floor(d * N / 90);
-          days.push([s, e]);
-          for (var k = s; k < e; k++) dayOf[k] = d;
-        }
-      };
-      var planUi = function () {
-        var dt = state.data; if (!dt) return;
-        var idx = -1;
-        for (var i = 0; i < flat.length; i++) if (flat[i].b === dt.book.id && flat[i].c === dt.chapter) { idx = i; break; }
-        var bar = document.getElementById('mna-planbar');
-        if (!bar) {
-          bar = document.createElement('div'); bar.id = 'mna-planbar';
-          var tb = document.querySelector('.toolbar');
-          tb.parentNode.insertBefore(bar, tb.nextSibling);
-        }
-        var day = idx >= 0 ? dayOf[idx] : 0;
-        if (!day) { bar.innerHTML = '<span>Ce chapitre n\u2019est pas dans le plan.</span><a href="/plan-90-jours.html">Le plan</a>'; return; }
-        var r = days[day - 1], pos = idx - r[0] + 1, tot = r[1] - r[0];
-        bar.innerHTML = '<span>\uD83D\uDCC5 Jour <b>' + day + '</b> sur 90 \u00b7 chapitre ' + pos + ' sur ' + tot + '</span><a href="/plan-90-jours.html">Le plan</a>';
-        var nx = document.getElementById('btn-next'), pv = document.getElementById('btn-prev');
-        pv.disabled = pos <= 1; pv.textContent = '\u2039 Pr\u00e9c\u00e9dent';
-        pv.onclick = function () { if (pos > 1) loadChapter(flat[idx - 1].b, flat[idx - 1].c); };
-        nx.disabled = false;
-        if (pos < tot) {
-          nx.textContent = 'Suivant \u203a';
-          nx.onclick = function () { loadChapter(flat[idx + 1].b, flat[idx + 1].c); };
-        } else {
-          nx.textContent = 'Jour termin\u00e9 \u2713';
-          nx.onclick = function () {
-            var p = readPlan();
-            if (!p.start) p.start = todayStr();
-            if (p.done.indexOf(day) < 0) p.done.push(day);
-            put(PK, JSON.stringify(p));
-            location.href = '/plan-90-jours.html';
-          };
-        }
-      };
-      var pt = 0, pw = setInterval(function () {
-        if (typeof state !== 'undefined' && state.books && state.books.length && state.data) {
-          clearInterval(pw); buildPlan();
-          var orig = window.loadChapter;
-          window.loadChapter = function () { var r = orig.apply(this, arguments); return Promise.resolve(r).then(planUi); };
-          var qs = new URLSearchParams(location.search);
-          if (!(qs.get('livre') && qs.get('chapitre'))) {
-            var p0 = readPlan();
-            if (!p0.start) { p0.start = todayStr(); put(PK, JSON.stringify(p0)); }
-            var n0 = 1;
-            while (n0 < 90 && (p0.done.indexOf(n0) >= 0 || days[n0 - 1][1] <= days[n0 - 1][0])) n0++;
-            var r0 = days[n0 - 1];
-            if (r0 && r0[1] > r0[0]) { window.loadChapter(flat[r0[0]].b, flat[r0[0]].c); return; }
-          }
-          planUi();
-        } else if (++pt > 80) clearInterval(pw);
-      }, 250);
-    }
-
-
     // ---------- Bible : bouton « 📅 » pour entrer dans le plan de 90 jours ----------
-    if (path === '/bible.html' && !/[?&]plan=1/.test(location.search)) {
+    if (path === '/bible.html' && !/[?&]embed=1/.test(location.search)) {
       var bt = 0, bw = setInterval(function () {
         var row = document.querySelector('.toolbar-in'), s = document.getElementById('btn-search');
         if (row && s) {
           clearInterval(bw);
           var pb = document.createElement('button');
           pb.type = 'button'; pb.className = 'tb-btn tb-icon'; pb.textContent = '\uD83D\uDCC5';
-          pb.title = 'La Bible en 90 jours'; pb.setAttribute('aria-label', 'La Bible en 90 jours');
-          pb.onclick = function () { location.href = '/bible.html?plan=1'; };
+          pb.title = 'Plans de lecture'; pb.setAttribute('aria-label', 'Plans de lecture');
+          pb.onclick = function () { location.href = '/plan-90-jours.html'; };
           row.insertBefore(pb, s);
         } else if (++bt > 40) clearInterval(bw);
       }, 250);
@@ -192,7 +125,7 @@
         sec.className = 'section mna-sec'; sec.id = 'mna-sec';
         sec.innerHTML = '<div class="container"><h2>Pour vous</h2><div class="mna-cards">' +
           (last && last.book && last.chapter ? card('/bible.html?livre=' + last.book + '&chapitre=' + last.chapter, '▶️', 'Reprendre ma lecture', 'Là où vous vous êtes arrêté dans la Bible', 'wide') : '') +
-          card('/bible.html?plan=1', '📅', 'La Bible en 90 jours', 'Lisez la Bible jour après jour') +
+          card('/plan-90-jours.html', '📅', 'Plans de lecture', '14, 30, 90 jours ou un livre précis') +
           card('/soutien.html', '🤝', 'Soutenir et agenda', 'Dons et événements à venir') +
           '</div></div>';
         hero.parentNode.insertBefore(sec, hero.nextSibling);
