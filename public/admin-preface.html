@@ -16,14 +16,14 @@
   .msg.error { background: #fdeaea; color: #a33; }
   .msg.success { background: #e8f6ec; color: #2a7a44; }
   .hidden { display: none; }
-  .preview { background: var(--paper); border-radius: 12px; padding: 18px 20px; font-family: 'Fraunces', Georgia, serif; font-size: 17px; line-height: 1.75; max-height: 460px; overflow-y: auto; }
-  .preview p { margin: 0 0 1em; }
-  .preview strong { font-weight: 800; }
-  .preview .pf-h1 { font-size: 1.5em; text-align: center; margin: 1.2em 0 .6em; padding-bottom: .4em; border-bottom: 1px solid var(--line); }
-  .preview .pf-h2 { font-size: 1.12em; margin: 1.5em 0 .4em; color: #8a6420; }
-  .preview .pf-h3 { font-size: .95em; margin: 1.3em 0 .4em; font-style: italic; }
-  .preview ul { margin: 0 0 1em; padding-left: 1.3em; }
+  .preview { background: #faf6ee; color: #241e16; border: 1px solid #e6dcc7; border-radius: 12px; padding: 22px 24px; font-family: 'Fraunces', Georgia, serif; font-size: 18px; line-height: 1.7; max-height: 560px; overflow-y: auto; }
+  .preview .pf-doc p { margin: 0; }
+  .preview .pf-pb { height: 1px; background: #e6dcc7; margin: 2.4em 12%; }
+  .preview .pf-m { display: inline-block; min-width: 1.2em; }
+  .preview h2 { font-size: 1.3em; text-align: center; } .preview h3 { font-size: 1.1em; color: #8a6420; } .preview p { margin: 0 0 1em; } .preview ul { padding-left: 1.3em; }
 </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#16130f">
@@ -48,16 +48,16 @@
     <div class="panel">
       <div id="msg-box"></div>
 
-      <div class="field"><label>Titre</label><input type="text" id="f-title" placeholder="Préface"></div>
       <div class="field"><label>Fichier de la préface (Word .docx ou .txt)</label><input type="file" id="f-file" accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
-      <div class="field">
+      <p style="font-size:13px;color:var(--ink-soft);margin:-4px 0 16px;">Un fichier Word est reproduit fidèlement : centrage, tailles, couleurs, gras, italique, espacements, listes et sauts de page. L'aperçu ci-dessous montre ce que verront les lecteurs.</p>
+
+      <div id="text-area" class="field hidden">
         <label>Texte de la préface</label>
-        <textarea id="f-body" rows="16" placeholder="Choisissez un fichier ci-dessus, ou collez le texte ici.&#10;&#10;Séparez les paragraphes par une ligne vide. Pour un titre, écrivez # devant la ligne (ex. : # Avant-propos)."></textarea>
+        <textarea id="f-body" rows="14" placeholder="Collez le texte ici. Séparez les paragraphes par une ligne vide ; pour un titre, écrivez # devant la ligne."></textarea>
       </div>
-      <p style="font-size:13px;color:var(--ink-soft);margin:-4px 0 16px;">Le texte du fichier apparaît dans la case ci-dessus : relisez-le, corrigez-le si besoin, puis enregistrez. Les titres sont repérés automatiquement (styles « Titre 1, 2, 3 » de Word, ou ligne courte entièrement en gras) et marqués par #, ## ou ### au début. Le gras est marqué **ainsi**, l'italique *ainsi*, et les puces par un tiret au début de la ligne.</p>
+      <p id="paste-link" style="font-size:13px;margin:-4px 0 16px;"><a href="#" id="btn-paste">Ou coller le texte à la main</a></p>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button type="button" class="btn btn-ghost" id="btn-preview">Voir l'aperçu</button>
         <button type="button" class="btn btn-primary" id="btn-save">Enregistrer la préface</button>
         <button type="button" class="btn btn-ghost" id="btn-delete" style="color:#a33;">Retirer la préface</button>
       </div>
@@ -66,44 +66,34 @@
   </div>
 </div>
 
+<script src="/js/preface-render.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const token = localStorage.getItem('mna_token');
 const user = (() => { try { return JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) { return null; } })();
 const H = { Authorization: `Bearer ${token}` };
 const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+let docJson = ''; // document Word converti (mise en forme fidèle), prioritaire sur le texte collé
 
 function showMsg(text, type) { $('msg-box').innerHTML = `<div class="msg ${type}">${text}</div>`; window.scrollTo({ top: $('msg-box').offsetTop - 80, behavior: 'smooth' }); }
-
 async function readJson(r) {
   const raw = await r.text();
   try { return JSON.parse(raw); } catch (e) { return { message: `Le serveur a répondu une erreur (code ${r.status}). Réessayez dans quelques secondes.` }; }
 }
-
-function inlineHtml(s) {
-  return esc(s).replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+?)\*/g, '<em>$1</em>');
-}
-function prefaceHtml(body) {
-  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean).map((b) => {
-    const h = b.match(/^(#{1,3})\s+([\s\S]+)$/);
-    if (h) return `<h${h[1].length + 1} class="pf-h${h[1].length}">${inlineHtml(h[2].replace(/\n/g, ' ').trim())}</h${h[1].length + 1}>`;
-    const lines = b.split('\n');
-    if (lines.every((l) => /^[-•]\s+/.test(l))) return '<ul>' + lines.map((l) => '<li>' + inlineHtml(l.replace(/^[-•]\s+/, '')) + '</li>').join('') + '</ul>';
-    return '<p>' + inlineHtml(b).replace(/\n/g, '<br>') + '</p>';
-  }).join('');
-}
-
+function showText() { $('text-area').classList.remove('hidden'); $('paste-link').classList.add('hidden'); }
 function renderPreview() {
-  const body = $('f-body').value;
-  if (!body.trim()) { $('preview-box').innerHTML = '<div class="msg error">Le texte est vide.</div>'; return; }
-  $('preview-box').innerHTML = `<h3 style="font-family:'Fraunces',serif;margin:0 0 10px;">${esc($('f-title').value.trim() || 'Préface')}</h3><div class="preview">${prefaceHtml(body)}</div>`;
+  const body = docJson || $('f-body').value;
+  if (!body.trim()) { $('preview-box').innerHTML = ''; return; }
+  $('preview-box').innerHTML = `<h3 style="font-family:'Fraunces',serif;margin:0 0 10px;">Aperçu</h3><div class="preview">${window.renderPreface(body, 'light')}</div>`;
 }
-
 async function load() {
   try {
     const r = await fetch('/api/bible-preface', { headers: H });
     const d = r.ok ? await readJson(r) : null;
-    if (d && d.exists) { $('f-title').value = d.title || ''; $('f-body').value = d.body || ''; }
+    if (d && d.exists) {
+      if (String(d.body).trim().startsWith('{')) docJson = d.body; else { $('f-body').value = d.body || ''; showText(); }
+      renderPreview();
+    }
   } catch (e) {}
 }
 
@@ -113,6 +103,9 @@ if (!token || !user || user.role !== 'admin') {
   $('admin-area').classList.remove('hidden');
   load();
 }
+
+$('btn-paste').addEventListener('click', (e) => { e.preventDefault(); showText(); });
+$('f-body').addEventListener('input', () => { docJson = ''; renderPreview(); });
 
 $('f-file').addEventListener('change', async () => {
   const f = $('f-file').files[0];
@@ -125,24 +118,26 @@ $('f-file').addEventListener('change', async () => {
     const r = await fetch('/api/bible-preface/admin/extract', { method: 'POST', headers: H, body: fd });
     const d = await readJson(r);
     if (!r.ok) { showMsg(esc(d.message || 'Erreur'), 'error'); return; }
-    $('f-body').value = d.text;
-    if (!$('f-title').value.trim()) {
-      const first = d.text.split('\n\n')[0] || '';
-      if (first.startsWith('# ')) $('f-title').value = first.slice(2).trim();
+    if (d.kind === 'doc') {
+      docJson = JSON.stringify(d.doc);
+      $('f-body').value = '';
+      const imgs = d.info && d.info.images ? ` ${d.info.images} image(s) du fichier ne sont pas reprises (le texte seul est conservé).` : '';
+      showMsg('Fichier lu : vérifiez l\'aperçu ci-dessous, puis enregistrez la préface.' + imgs, 'success');
+    } else {
+      docJson = ''; $('f-body').value = d.text; showText();
+      showMsg('Texte lu : relisez-le, puis enregistrez la préface.', 'success');
     }
-    showMsg('Fichier lu : relisez le texte ci-dessous, puis enregistrez la préface.', 'success');
     renderPreview();
   } catch (e) { showMsg('Le serveur ne répond pas. Patientez quelques secondes, puis réessayez.', 'error'); }
 });
 
-$('btn-preview').addEventListener('click', renderPreview);
-
 $('btn-save').addEventListener('click', async () => {
-  if (!$('f-body').value.trim()) return showMsg('Le texte de la préface est vide : choisissez un fichier ou collez le texte.', 'error');
+  const body = docJson || $('f-body').value;
+  if (!body.trim()) return showMsg('La préface est vide : choisissez un fichier ou collez le texte.', 'error');
   $('btn-save').disabled = true;
   const fd = new FormData();
-  fd.append('title', $('f-title').value.trim());
-  fd.append('body', $('f-body').value);
+  fd.append('title', 'Préface');
+  fd.append('body', body);
   try {
     const r = await fetch('/api/bible-preface/admin', { method: 'PUT', headers: H, body: fd });
     const d = await readJson(r);
@@ -155,7 +150,7 @@ $('btn-delete').addEventListener('click', async () => {
   if (!confirm('Retirer la préface ? Elle ne s\'affichera plus dans la Bible.')) return;
   try {
     const r = await fetch('/api/bible-preface/admin', { method: 'DELETE', headers: H });
-    if (r.ok) { $('f-body').value = ''; $('f-title').value = ''; $('preview-box').innerHTML = ''; showMsg('Préface retirée.', 'success'); }
+    if (r.ok) { docJson = ''; $('f-body').value = ''; $('preview-box').innerHTML = ''; showMsg('Préface retirée.', 'success'); }
     else showMsg('Impossible de retirer la préface.', 'error');
   } catch (e) { showMsg('Le serveur ne répond pas.', 'error'); }
 });

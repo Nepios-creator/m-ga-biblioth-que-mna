@@ -124,6 +124,9 @@
   .pf-text .pf-h1 { font-size: 1.5em; line-height: 1.25; text-align: center; margin: 1.6em 0 .7em; padding-bottom: .5em; border-bottom: 1px solid var(--b-line); }
   .overlay .pf-text .pf-h2 { font-size: 1.12em; line-height: 1.35; margin: 1.7em 0 .5em; color: var(--b-accent); }
   .pf-text .pf-h3 { font-size: .95em; margin: 1.4em 0 .4em; font-style: italic; }
+  .pf-doc p { margin: 0; }
+  .pf-doc .pf-m { display: inline-block; min-width: 1.2em; }
+  .pf-doc .pf-pb { height: 1px; background: var(--b-line); margin: 2.4em 12%; }
   .pf-text ul { margin: 0 0 1.1em; padding-left: 1.3em; }
   .pf-text li { margin-bottom: .4em; }
   .pf-text > :first-child { margin-top: .3em; }
@@ -132,6 +135,8 @@
   .pf-admin { display: block; text-align: center; margin-top: 18px; font-size: 13px; color: var(--b-soft); }
   footer { padding-bottom: 80px; }
 </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#16130f">
@@ -229,6 +234,7 @@
 
 <footer>Bible — version « Parole pure » · Ministère de la Nouvelle Alliance</footer>
 
+<script src="/js/preface-render.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const token = localStorage.getItem('mna_token');
@@ -281,22 +287,11 @@ async function loadPreface() {
     return d && d.exists ? d : null;
   } catch (e) { return null; }
 }
-function inlineHtml(s) {
-  return esc(s).replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+?)\*/g, '<em>$1</em>');
-}
-function prefaceHtml(body) {
-  return String(body || '').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean).map((b) => {
-    const h = b.match(/^(#{1,3})\s+([\s\S]+)$/);
-    if (h) return `<h${h[1].length + 1} class="pf-h${h[1].length}">${inlineHtml(h[2].replace(/\n/g, ' ').trim())}</h${h[1].length + 1}>`;
-    const lines = b.split('\n');
-    if (lines.every((l) => /^[-•]\s+/.test(l))) return '<ul>' + lines.map((l) => '<li>' + inlineHtml(l.replace(/^[-•]\s+/, '')) + '</li>').join('') + '</ul>';
-    return '<p>' + inlineHtml(b).replace(/\n/g, '<br>') + '</p>';
-  }).join('');
-}
+function prefaceHtml(body) { return window.renderPreface ? window.renderPreface(body, state.prefs.theme) : ''; }
 // first = true : ouverture automatique à la première visite ; sinon, ouverture à la demande (bouton 📖 ou liste des livres)
 function showPreface(first) {
   const d = state.preface;
-  $('pf-title').textContent = (d && d.title) || 'Préface';
+  $('pf-title').textContent = 'Préface';
   $('pf-body').innerHTML = d ? prefaceHtml(d.body) : '<div class="empty">La préface n\'a pas encore été mise en ligne.</div>';
   $('pf-go').textContent = first ? 'Commencer la lecture ›' : 'Reprendre la lecture ›';
   $('pf-go').style.display = d ? '' : 'none';
