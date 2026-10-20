@@ -99,8 +99,9 @@ function render() {
   } else {
     const chs = days[shown - 1];
     html += `<div class="box"><div class="day-n">Jour ${shown} sur 90</div>
-      <div class="read-list">${chs.length ? chs.map((x) => `<a href="/bible.html?livre=${x.b}&chapitre=${x.c}"><span>${esc(x.name)} ${x.c}</span><span>Lire ›</span></a>`).join('') : '<p class="small">Jour de repos ou de rattrapage.</p>'}</div>
-      <button class="btn btn-primary" id="done">J'ai lu ce jour ✓</button>
+      <div class="read-list">${chs.length ? chs.map((x) => `<a href="/bible.html?livre=${x.b}&chapitre=${x.c}&plan=1"><span>${esc(x.name)} ${x.c}</span><span>Lire ›</span></a>`).join('') : '<p class="small">Jour de repos ou de rattrapage.</p>'}</div>
+      ${chs.length ? `<a class="btn btn-primary" style="display:block;" href="/bible.html?livre=${chs[0].b}&chapitre=${chs[0].c}&plan=1">Lire maintenant ›</a>` : ''}
+      <button class="btn btn-ghost" id="done" style="margin-top:10px;">J'ai déjà lu ce jour ✓</button>
       ${late ? `<p class="small" style="margin:12px 0 0;">Vous avez ${late} jour${late > 1 ? 's' : ''} de retard : lisez à votre rythme, le plan vous attend.</p>` : ''}
       ${bar}</div>`;
   }
