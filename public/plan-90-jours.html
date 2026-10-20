@@ -3,32 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>La Bible en 90 jours — Ministère de la Nouvelle Alliance</title>
-<meta name="description" content="Lisez la Bible « Parole pure » en 90 jours, un petit passage chaque jour.">
+<title>Plans de lecture de la Bible — Ministère de la Nouvelle Alliance</title>
+<meta name="description" content="Choisissez un plan de lecture de la Bible : 14, 30, 90 jours ou plus, ou un livre précis.">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#16130f">
 <style>
-  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 80px; }
-  .wrap h1 { font-size: clamp(26px, 6.5vw, 36px); font-weight: 500; text-align: center; color: var(--gold-deep); margin-bottom: 8px; }
-  .intro { text-align: center; color: var(--ink-soft); margin: 0 auto 22px; max-width: 520px; }
-  .box { background: var(--mna-card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
-  .day-n { font: 500 15px 'Inter', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--gold-deep); text-align: center; }
-  .read-list { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 18px; }
-  .read-list a { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 2px solid var(--blue); border-radius: 12px; font: 600 17px 'Inter', sans-serif; color: var(--blue-deep); }
-  .bar { height: 12px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 10px 0 6px; }
-  .bar > i { display: block; height: 100%; background: var(--gold-deep); border-radius: 999px; transition: width .4s; }
-  .small { font-size: 14px; color: var(--ink-soft); text-align: center; }
-  .btn { width: 100%; text-align: center; border: 0; cursor: pointer; font-family: inherit; }
-  .btn-ghost { border: 2px solid var(--blue); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 70px; }
+  .wrap h1 { font-size: clamp(26px, 6.5vw, 36px); font-weight: 500; text-align: center; color: var(--gold-deep); margin: 0 0 8px; }
+  .wrap h2 { font-size: 20px; font-weight: 500; margin: 0 0 4px; color: var(--ink); }
+  .intro, .small { text-align: center; color: var(--ink-soft); font-size: 15px; margin: 0 0 16px; }
+  .small { font-size: 13.5px; margin: 8px 0 0; }
+  .box { background: var(--mna-card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chips button { border: 2px solid var(--blue); background: transparent; color: var(--blue-deep); border-radius: 999px; padding: 9px 15px; font: 600 15px 'Inter', sans-serif; cursor: pointer; }
+  .chips button.on, .chips button:active { background: var(--blue); color: #fff; }
+  select { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid var(--line); font: 16px 'Inter', sans-serif; margin-top: 10px; }
+  .btn { display: block; width: 100%; text-align: center; border: 0; cursor: pointer; font-family: inherit; margin-top: 12px; }
   .link { background: none; border: 0; color: var(--ink-soft); text-decoration: underline; cursor: pointer; font: 14px 'Inter', sans-serif; display: block; margin: 14px auto 0; }
-  details.all summary { cursor: pointer; font-weight: 600; color: var(--blue-deep); text-align: center; list-style: none; }
-  .row { display: flex; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
-  .row:last-child { border-bottom: 0; }
-  .row .d { flex: none; width: 64px; font-weight: 700; color: var(--gold-deep); }
-  .row.ok .t { text-decoration: line-through; opacity: .6; }
-  .row .ck { margin-left: auto; color: #2a7a44; font-weight: 700; }
-  .row.now { background: rgba(201,162,75,.15); border-radius: 8px; padding-left: 8px; }
+  .back { background: none; border: 0; color: var(--blue-deep); font: 600 15px 'Inter', sans-serif; cursor: pointer; padding: 4px 0 10px; }
+  .bar { height: 12px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 12px 0 4px; }
+  .bar > i { display: block; height: 100%; background: var(--gold-deep); border-radius: 999px; }
+  .mine { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; font-family: inherit; color: var(--ink); }
+  .mine:last-child { border-bottom: 0; }
+  .mine b { display: block; font-size: 16px; } .mine span { font-size: 13px; color: var(--ink-soft); }
+  .mine .go { margin-left: auto; color: var(--blue-deep); font-weight: 700; }
+  .day { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 14px 4px; cursor: pointer; font: 15px 'Inter', sans-serif; color: var(--ink); }
+  .day:last-of-type { border-bottom: 0; }
+  .day .d { flex: none; width: 64px; font-weight: 700; color: var(--gold-deep); }
+  .day .t { flex: 1; }
+  .day .ck { color: #2a7a44; font-weight: 700; }
+  .day.ok .t { opacity: .55; text-decoration: line-through; }
+  .day.now { background: rgba(201,162,75,.16); border-radius: 10px; }
+  .day .go { color: var(--blue-deep); font-weight: 700; }
+  .rbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .rbar b { flex: 1; text-align: center; color: var(--gold-deep); font-size: 16px; }
+  .rbar button { border: 1.5px solid var(--line); background: var(--mna-card, #fff); color: var(--blue-deep); border-radius: 10px; padding: 8px 12px; font: 600 15px 'Inter', sans-serif; cursor: pointer; }
+  .rbar button:disabled { opacity: .35; }
+  .reader { width: 100%; height: calc(100vh - 250px); min-height: 420px; border: 1px solid var(--line); border-radius: 14px; background: #fff; display: block; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -42,89 +54,128 @@
   </nav>
 </header>
 
-<main class="wrap">
-  <h1>La Bible en 90 jours</h1>
-  <p class="intro">Un petit passage de la Bible « Parole pure » chaque jour. Votre progression est gardée sur cet appareil.</p>
-  <div id="app"><div class="box">Chargement du plan…</div></div>
-</main>
-
+<main class="wrap" id="app"><div class="box small">Chargement des plans…</div></main>
 <footer>Ministère de la Nouvelle Alliance — © 2026</footer>
 
 <script>
 const token = localStorage.getItem('mna_token');
 if (!token) location.href = '/login.html';
-const KEY = 'mna_plan90';
+const SK = 'mna_plans2';
 const $ = (id) => document.getElementById(id);
-const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-let plan = { start: null, done: [] };
-try { Object.assign(plan, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
-const save = () => localStorage.setItem(KEY, JSON.stringify(plan));
-let flat = [], days = [];
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+let st = { plans: {} };
+try { Object.assign(st, JSON.parse(localStorage.getItem(SK) || '{}')); } catch (e) {}
+const save = () => localStorage.setItem(SK, JSON.stringify(st));
+let books = [];
+const app = $('app');
+let timer = null;
 
-// Le jour 1 est celui où l'on commence ; les jours s'écoulent à minuit
-const dayStamp = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
-const todayStr = () => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
-const currentDay = () => Math.min(90, Math.max(1, Math.round((dayStamp(todayStr()) - dayStamp(plan.start)) / 864e5) + 1));
-
-// Regroupe « Genèse 1, 2, 3 » en « Genèse 1–3 »
-function label(chs) {
+// Découpe un plan en jours : chaque jour a au moins un chapitre
+const daysOf = (p) => { const N = p.ch.length, out = []; for (let d = 1; d <= p.days; d++) out.push(p.ch.slice(Math.floor((d - 1) * N / p.days), Math.floor(d * N / p.days))); return out; };
+const idxOf = (p, b, c) => p.ch.findIndex((x) => String(x[0]) === String(b) && x[1] === Number(c));
+const dayOfIdx = (p, i) => { const N = p.ch.length; for (let d = 1; d <= p.days; d++) if (i < Math.floor(d * N / p.days)) return d; return p.days; };
+function label(p, chs) {
   const out = []; let i = 0;
   while (i < chs.length) {
     let j = i;
-    while (j + 1 < chs.length && chs[j + 1].b === chs[i].b && chs[j + 1].c === chs[j].c + 1) j++;
-    out.push(esc(chs[i].name) + ' ' + chs[i].c + (j > i ? '–' + chs[j].c : ''));
+    while (j + 1 < chs.length && chs[j + 1][0] === chs[i][0] && chs[j + 1][1] === chs[j][1] + 1) j++;
+    out.push(esc(p.names[chs[i][0]] || '') + ' ' + chs[i][1] + (j > i ? '–' + chs[j][1] : ''));
     i = j + 1;
   }
-  return out.join(' · ') || 'Repos / rattrapage';
+  return out.join(' · ');
+}
+const nextUndone = (p) => { for (let d = 1; d <= p.days; d++) if (!p.done.includes(d)) return d; return 0; };
+const pct = (p) => Math.round(p.done.length / p.days * 100);
+const lu = (n) => n + ' jour' + (n > 1 ? 's' : '') + ' lu' + (n > 1 ? 's' : '');
+
+/* ---------- 1. Menu : choisir un plan ---------- */
+function viewMenu() {
+  clearInterval(timer);
+  const N = books.reduce((s, b) => s + b.chapters.length, 0);
+  const mine = Object.values(st.plans).sort((a, b) => b.created - a.created);
+  app.innerHTML = `<h1>Plans de lecture</h1><p class="intro">Choisissez un plan : chaque jour a son programme, et la Bible s'ouvre ici même pour le lire.</p>
+    ${mine.length ? `<div class="box"><h2>Mes plans</h2>${mine.map((p) => `<button class="mine" data-open="${p.id}"><div><b>${esc(p.title)} · ${p.days} jours</b><span>${lu(p.done.length)} sur ${p.days}</span></div><span class="go">Continuer ›</span></button>`).join('')}</div>` : ''}
+    <div class="box"><h2>Toute la Bible</h2><div class="small" style="text-align:left;margin:0;">${N} chapitres actuellement en ligne</div>
+      <div class="chips">${[14, 30, 90, 180, 365].map((d) => `<button data-all="${d}">${d} jours</button>`).join('')}</div></div>
+    <div class="box"><h2>Un livre précis</h2>
+      <select id="bk">${books.map((b) => `<option value="${esc(b.id)}">${esc(b.name)} (${b.chapters.length} chapitre${b.chapters.length > 1 ? 's' : ''})</option>`).join('')}</select>
+      <div class="chips">${[7, 14, 30].map((d) => `<button data-bk="${d}">${d} jours</button>`).join('')}<button data-bk="chap">1 chapitre par jour</button></div></div>
+    <p class="small">La Bible est publiée progressivement : un plan ne compte jamais plus de jours que de chapitres disponibles.</p>`;
+  app.querySelectorAll('[data-open]').forEach((b) => b.onclick = () => viewPlan(b.dataset.open));
+  app.querySelectorAll('[data-all]').forEach((b) => b.onclick = () => create('all', Number(b.dataset.all)));
+  app.querySelectorAll('[data-bk]').forEach((b) => b.onclick = () => create('bk', b.dataset.bk === 'chap' ? 'chap' : Number(b.dataset.bk), $('bk').value));
+}
+function create(kind, days, bookId) {
+  const list = []; let title = 'Toute la Bible';
+  if (kind === 'all') books.forEach((b) => b.chapters.forEach((c) => list.push([b.id, c])));
+  else { const b = books.find((x) => String(x.id) === String(bookId)); if (!b) return; title = b.name; b.chapters.forEach((c) => list.push([b.id, c])); }
+  if (!list.length) { alert('Aucun chapitre n\'est encore en ligne.'); return; }
+  const names = {}; books.forEach((b) => { names[b.id] = b.name; });
+  const id = Date.now().toString(36);
+  st.plans[id] = { id, title, days: days === 'chap' ? list.length : Math.min(days, list.length), ch: list, names, done: [], pos: null, created: Date.now() };
+  save(); viewPlan(id);
 }
 
-function render() {
-  if (!flat.length) { $('app').innerHTML = '<div class="box small">La Bible sera mise en ligne progressivement. Le plan apparaîtra dès qu\'un premier livre sera publié.</div>'; return; }
-  const doneN = plan.done.length;
-  const bar = `<div class="bar"><i style="width:${Math.round(doneN / 90 * 100)}%"></i></div><div class="small">${doneN} jour${doneN > 1 ? 's' : ''} lu${doneN > 1 ? 's' : ''} sur 90</div>`;
-  if (!plan.start) {
-    $('app').innerHTML = `<div class="box"><p class="small" style="margin:0 0 14px;">${flat.length} chapitres actuellement en ligne, répartis sur 90 jours. Si de nouveaux livres sont publiés, le plan se met à jour.</p>
-      <button class="btn btn-primary" id="go">Commencer aujourd'hui</button></div>`;
-    $('go').onclick = () => { plan.start = todayStr(); plan.done = []; save(); render(); };
-    return;
-  }
-  const cur = currentDay();
-  let next = 1; while (next <= 90 && plan.done.includes(next)) next++;
-  const shown = Math.min(next, 90);
-  const late = Math.max(0, cur - next);
-  const finished = next > 90;
-  let html = '';
-  if (finished) {
-    html += `<div class="box"><div class="day-n">Félicitations</div><p style="text-align:center;font-size:18px;">Vous avez terminé la Bible en 90 jours.</p>${bar}</div>`;
-  } else {
-    const chs = days[shown - 1];
-    html += `<div class="box"><div class="day-n">Jour ${shown} sur 90</div>
-      <div class="read-list">${chs.length ? chs.map((x) => `<a href="/bible.html?livre=${x.b}&chapitre=${x.c}&plan=1"><span>${esc(x.name)} ${x.c}</span><span>Lire ›</span></a>`).join('') : '<p class="small">Jour de repos ou de rattrapage.</p>'}</div>
-      ${chs.length ? `<a class="btn btn-primary" style="display:block;" href="/bible.html?livre=${chs[0].b}&chapitre=${chs[0].c}&plan=1">Lire maintenant ›</a>` : ''}
-      <button class="btn btn-ghost" id="done" style="margin-top:10px;">J'ai déjà lu ce jour ✓</button>
-      ${late ? `<p class="small" style="margin:12px 0 0;">Vous avez ${late} jour${late > 1 ? 's' : ''} de retard : lisez à votre rythme, le plan vous attend.</p>` : ''}
-      ${bar}</div>`;
-  }
-  html += `<div class="box"><details class="all"><summary>Voir les 90 jours</summary><div style="margin-top:10px;">${days.map((chs, k) => {
-    const d = k + 1, ok = plan.done.includes(d);
-    return `<div class="row${ok ? ' ok' : ''}${d === shown && !finished ? ' now' : ''}"><span class="d">Jour ${d}</span><span class="t">${label(chs)}</span>${ok ? '<span class="ck">✓</span>' : ''}</div>`;
-  }).join('')}</div></details><button class="link" id="reset">Recommencer le plan</button></div>`;
-  $('app').innerHTML = html;
-  const dn = $('done');
-  if (dn) dn.onclick = () => { if (!plan.done.includes(shown)) plan.done.push(shown); save(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  $('reset').onclick = () => { if (confirm('Recommencer le plan à zéro ?')) { plan = { start: null, done: [] }; save(); render(); } };
+/* ---------- 2. Programme du plan, du premier au dernier jour ---------- */
+function viewPlan(id) {
+  clearInterval(timer);
+  const p = st.plans[id]; if (!p) return viewMenu();
+  const D = daysOf(p), nx = nextUndone(p);
+  app.innerHTML = `<button class="back" id="all">‹ Tous les plans</button>
+    <div class="box"><h2>${esc(p.title)} · ${p.days} jours</h2>
+      <div class="bar"><i style="width:${pct(p)}%"></i></div><div class="small" style="margin:0;text-align:left;">${lu(p.done.length)} sur ${p.days}</div>
+      ${nx ? `<button class="btn btn-primary" id="cont">${p.pos != null ? 'Continuer ma lecture ›' : 'Commencer le jour 1 ›'}</button>` : '<p style="text-align:center;font-size:18px;margin:14px 0 0;">Félicitations, plan terminé !</p>'}</div>
+    <div class="box">${D.map((chs, k) => { const d = k + 1, ok = p.done.includes(d); return `<button class="day${ok ? ' ok' : ''}${d === nx ? ' now' : ''}" data-d="${d}"><span class="d">Jour ${d}</span><span class="t">${label(p, chs)}</span>${ok ? '<span class="ck">✓</span>' : '<span class="go">›</span>'}</button>`; }).join('')}
+      <button class="link" id="del">Supprimer ce plan</button></div>`;
+  $('all').onclick = viewMenu;
+  app.querySelectorAll('[data-d]').forEach((b) => b.onclick = () => viewRead(id, Number(b.dataset.d)));
+  const c = $('cont');
+  if (c) c.onclick = () => { if (p.pos != null && p.pos < p.ch.length) viewRead(id, dayOfIdx(p, p.pos), p.pos); else viewRead(id, nx); };
+  $('del').onclick = () => { if (confirm('Supprimer ce plan et sa progression ?')) { delete st.plans[id]; save(); viewMenu(); } };
+  window.scrollTo(0, 0);
+}
+
+/* ---------- 3. Lecture : la Bible s'ouvre dans la page, au chapitre du jour ---------- */
+function viewRead(id, d, startIdx) {
+  clearInterval(timer);
+  const p = st.plans[id], D = daysOf(p), chs = D[d - 1];
+  const first = p.ch.indexOf(chs[0]);
+  const cur = startIdx != null && startIdx >= first && startIdx < first + chs.length ? startIdx : first;
+  const ch = p.ch[cur];
+  app.innerHTML = `<div class="rbar"><button id="back">‹ Plan</button><b>Jour ${d} sur ${p.days}</b><button id="pd" ${d <= 1 ? 'disabled' : ''}>‹</button><button id="nd" ${d >= p.days ? 'disabled' : ''}>›</button></div>
+    <div class="chips" id="chs" style="margin:0;">${chs.map((c, i) => `<button data-i="${first + i}" class="${first + i === cur ? 'on' : ''}">${esc(p.names[c[0]] || '')} ${c[1]}</button>`).join('')}</div>
+    <iframe class="reader" id="fr" title="Bible" src="/bible.html?livre=${encodeURIComponent(ch[0])}&chapitre=${ch[1]}&embed=1"></iframe>
+    <button class="btn btn-primary" id="fin">${p.done.includes(d) ? 'Jour déjà lu ✓ — continuer ›' : 'J\'ai terminé le jour ' + d + ' ✓'}</button>`;
+  p.pos = cur; save();
+  const fr = $('fr');
+  $('back').onclick = () => viewPlan(id);
+  $('pd').onclick = () => viewRead(id, d - 1);
+  $('nd').onclick = () => viewRead(id, d + 1);
+  $('chs').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => viewRead(id, d, Number(b.dataset.i)));
+  $('fin').onclick = () => { if (!p.done.includes(d)) p.done.push(d); p.pos = d < p.days ? p.ch.indexOf(D[d][0]) : null; save(); if (d < p.days) viewRead(id, d + 1); else viewPlan(id); };
+  // On retient où le lecteur s'arrête (chapitre affiché dans la Bible)
+  timer = setInterval(() => {
+    let b = null, c = null;
+    try { const r = fr.contentWindow.eval('state.data ? [state.data.book.id, state.data.chapter] : null'); if (r) { b = r[0]; c = r[1]; } } catch (e) {}
+    if (b == null) { try { const l = JSON.parse(localStorage.getItem('bible_last') || 'null'); if (l) { b = l.book; c = l.chapter; } } catch (e) {} }
+    if (b == null) return;
+    const i = idxOf(p, b, c);
+    if (i >= 0 && i !== p.pos) {
+      p.pos = i; save();
+      const bt = $('chs') && $('chs').querySelector('[data-i="' + i + '"]');
+      if (bt) { $('chs').querySelectorAll('button').forEach((x) => x.classList.remove('on')); bt.classList.add('on'); }
+    }
+  }, 2000);
+  window.scrollTo(0, 0);
 }
 
 (async function () {
   try {
     const r = await fetch('/api/bible/books', { headers: { Authorization: 'Bearer ' + token } });
     if (r.status === 401) { location.href = '/login.html'; return; }
-    const books = r.ok ? await r.json() : [];
-    books.forEach((b) => b.chapters.forEach((c) => flat.push({ b: b.id, name: b.name, c })));
-    const N = flat.length;
-    for (let d = 1; d <= 90; d++) days.push(flat.slice(Math.floor((d - 1) * N / 90), Math.floor(d * N / 90)));
-  } catch (e) { $('app').innerHTML = '<div class="box small">Impossible de charger le plan pour le moment.</div>'; return; }
-  render();
+    books = r.ok ? await r.json() : [];
+  } catch (e) { app.innerHTML = '<div class="box small">Impossible de charger les plans pour le moment.</div>'; return; }
+  viewMenu();
 })();
 </script>
 <script src="/js/pwa.js"></script>
