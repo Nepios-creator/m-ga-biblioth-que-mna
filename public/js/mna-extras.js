@@ -127,8 +127,33 @@
           clearInterval(pw); buildPlan();
           var orig = window.loadChapter;
           window.loadChapter = function () { var r = orig.apply(this, arguments); return Promise.resolve(r).then(planUi); };
+          var qs = new URLSearchParams(location.search);
+          if (!(qs.get('livre') && qs.get('chapitre'))) {
+            var p0 = readPlan();
+            if (!p0.start) { p0.start = todayStr(); put(PK, JSON.stringify(p0)); }
+            var n0 = 1;
+            while (n0 < 90 && (p0.done.indexOf(n0) >= 0 || days[n0 - 1][1] <= days[n0 - 1][0])) n0++;
+            var r0 = days[n0 - 1];
+            if (r0 && r0[1] > r0[0]) { window.loadChapter(flat[r0[0]].b, flat[r0[0]].c); return; }
+          }
           planUi();
         } else if (++pt > 80) clearInterval(pw);
+      }, 250);
+    }
+
+
+    // ---------- Bible : bouton « 📅 » pour entrer dans le plan de 90 jours ----------
+    if (path === '/bible.html' && !/[?&]plan=1/.test(location.search)) {
+      var bt = 0, bw = setInterval(function () {
+        var row = document.querySelector('.toolbar-in'), s = document.getElementById('btn-search');
+        if (row && s) {
+          clearInterval(bw);
+          var pb = document.createElement('button');
+          pb.type = 'button'; pb.className = 'tb-btn tb-icon'; pb.textContent = '\uD83D\uDCC5';
+          pb.title = 'La Bible en 90 jours'; pb.setAttribute('aria-label', 'La Bible en 90 jours');
+          pb.onclick = function () { location.href = '/bible.html?plan=1'; };
+          row.insertBefore(pb, s);
+        } else if (++bt > 40) clearInterval(bw);
       }, 250);
     }
 
@@ -167,7 +192,7 @@
         sec.className = 'section mna-sec'; sec.id = 'mna-sec';
         sec.innerHTML = '<div class="container"><h2>Pour vous</h2><div class="mna-cards">' +
           (last && last.book && last.chapter ? card('/bible.html?livre=' + last.book + '&chapitre=' + last.chapter, '▶️', 'Reprendre ma lecture', 'Là où vous vous êtes arrêté dans la Bible', 'wide') : '') +
-          card('/plan-90-jours.html', '📅', 'La Bible en 90 jours', 'Un plan simple, jour après jour') +
+          card('/bible.html?plan=1', '📅', 'La Bible en 90 jours', 'Lisez la Bible jour après jour') +
           card('/soutien.html', '🤝', 'Soutenir et agenda', 'Dons et événements à venir') +
           '</div></div>';
         hero.parentNode.insertBefore(sec, hero.nextSibling);
