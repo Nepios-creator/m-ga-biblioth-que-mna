@@ -53,7 +53,12 @@
 
   <div id="admin-area" class="hidden">
     <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Panneau administrateur</h1>
-    <p style="color:var(--ink-soft);margin-bottom:28px;">Ajoutez, modifiez ou supprimez les livres de la bibliothèque.</p>
+    <p style="color:var(--ink-soft);margin-bottom:18px;">Ajoutez, modifiez ou supprimez les livres de la bibliothèque.</p>
+
+    <div class="panel" style="padding:18px 22px;">
+      <a href="/admin-edition.html" class="btn btn-primary" style="display:block;text-align:center;">✏️ Modifier le texte des livres et de la Bible</a>
+      <p style="color:var(--ink-soft);font-size:13px;margin-top:8px;">Ouvrez un livre ou un chapitre déjà publié, corrigez une phrase ou une note : la correction est visible tout de suite par les lecteurs.</p>
+    </div>
 
     <div class="panel">
       <h2 style="margin-bottom:16px;">Ajouter un livre</h2>
@@ -157,6 +162,7 @@ async function loadBooks() {
         <label style="font-size:11px;color:var(--ink-soft);">Word (texte structuré)<br>
           <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-id="${b.id}" class="docx-input" style="width:auto;font-size:12px;">
         </label>
+        ${(b.docx_filename || b.is_study_book) ? `<a href="/admin-edition.html?book=${b.id}" class="btn btn-ghost" style="font-size:13px;padding:7px 12px;">✏️ Modifier le texte</a>` : ''}
         ${b.is_study_book ? `
           <button type="button" data-id="${b.id}" class="lock-btn" style="background:${b.admin_locked ? '#fdeaea' : '#e8f6ec'};color:${b.admin_locked ? '#a33' : '#2a7a44'};font-size:13px;padding:8px 14px;border:2px solid ${b.admin_locked ? '#a33' : '#2a7a44'};border-radius:8px;font-weight:700;cursor:pointer;">
             ${b.admin_locked ? '🔒 Verrouillé — cliquer pour déverrouiller' : '🔓 Déverrouillé — cliquer pour verrouiller'}
@@ -207,6 +213,7 @@ async function loadBooks() {
     input.addEventListener('change', async () => {
       const file = input.files[0];
       if (!file) return;
+      if (!confirm('Attention : ce nouveau fichier Word remplacera le texte du livre, y compris les corrections faites à la main dans « Modifier le texte ». Continuer ?')) { input.value = ''; return; }
       const formData = new FormData();
       formData.append('docx', file);
       showMsg('Téléversement du Word en cours…', 'success');

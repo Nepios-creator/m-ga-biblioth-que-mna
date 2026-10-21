@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modifier les textes — Administration MNA</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 820px; margin: 0 auto; padding: 14px 14px 100px; }
+  .hidden { display: none; }
+  .muted { color: var(--ink-soft); font-size: 14px; }
+  .hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.5; margin: 0 0 14px; }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+
+  .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 8px; margin: 0 -14px 14px; padding: 10px 14px; background: #fffdf8; border-bottom: 1px solid var(--line); }
+  .top .crumb { flex: 1; min-width: 0; font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ib { border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 18px; padding: 8px 12px; cursor: pointer; line-height: 1; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 12px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer; }
+  .tab.on { background: var(--blue-deep, #1f5386); color: #fff; border-color: transparent; }
+
+  .list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 16px; }
+  .item { display: block; width: 100%; text-align: left; padding: 14px 16px; background: #fff; border: none; border-bottom: 1px solid var(--line); font: inherit; cursor: pointer; }
+  .item:last-child { border-bottom: none; }
+  .item b { display: block; font-size: 15.5px; color: var(--blue-deep, #1f5386); line-height: 1.35; }
+  .item span { display: block; margin-top: 3px; font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; }
+  .item .sn { font-weight: 400; color: var(--ink); font-size: 14px; margin-top: 4px; }
+  .tag { font-style: normal; font-weight: 700; color: #8a5a00; }
+  mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  .sf { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sf input { flex: 1; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; font-family: inherit; }
+
+  /* Paragraphes */
+  .pc { padding: 12px 14px; margin-bottom: 8px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 17px; line-height: 1.65; overflow-wrap: anywhere; cursor: pointer; }
+  .pc.h1 { font-weight: 800; font-size: 19px; background: #f7f1e3; }
+  .pc.h2 { font-weight: 700; background: #f7f1e3; }
+  .pc.h3 { font-weight: 700; font-style: italic; }
+  .pc.orn { text-align: center; color: var(--ink-soft); }
+  .pc.flash { outline: 3px solid #c9a24b; }
+  .pc.saved { border-color: #2a7a44; background: #f1faf4; }
+  .pc.editing { cursor: default; border-color: var(--blue-deep, #1f5386); box-shadow: 0 0 0 2px rgba(31,83,134,0.15); }
+  .pc label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin: 8px 0 4px; }
+  .pc input, .pc textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; line-height: 1.55; font-family: inherit; box-sizing: border-box; }
+  .pc textarea { min-height: 110px; resize: vertical; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .acts .btn { padding: 10px 16px; }
+  .msgline { color: #a33; font-size: 13.5px; margin-top: 8px; }
+  .vn { font-weight: 700; color: var(--blue-deep, #1f5386); margin-right: 4px; }
+  .vh { font-style: italic; color: var(--ink-soft); font-size: 14.5px; margin-bottom: 4px; }
+  sup.mk { color: #b0752b; font-weight: 700; font-size: 0.7em; }
+  .ln { display: inline-block; min-width: 20px; text-align: center; background: #f7f1e3; color: #8a5a00; font-weight: 700; border-radius: 6px; padding: 0 6px; margin-right: 6px; }
+  h4 { margin: 22px 0 10px; font-size: 16px; }
+  .sub { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .sub label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; }
+  .sub .row { display: flex; gap: 8px; }
+  .sub input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; font-family: inherit; }
+  .chs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .chs button { padding: 14px 0; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-weight: 700; color: var(--blue-deep, #1f5386); cursor: pointer; }
+  .pn { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0; }
+  .pn span { font-size: 13px; color: var(--ink-soft); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .danger { color: #a33; border-color: #e3b5b5; }
+
+  /* Historique */
+  #sheet { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; justify-content: center; }
+  #sheet.show { display: flex; }
+  #sheet .box { background: #fffdf8; width: 100%; max-width: 820px; max-height: 82vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 16px 16px 28px; }
+  #sheet .hrow { border-bottom: 1px solid var(--line); padding: 12px 0; font-size: 13.5px; line-height: 1.5; }
+  #sheet .hrow q { display: block; color: var(--ink-soft); quotes: none; overflow-wrap: anywhere; }
+  #sheet .hrow .btn { margin-top: 6px; padding: 7px 14px; font-size: 13px; }
+
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); max-width: 90vw; background: #1d4d2c; color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.err { background: #8a2a2a; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/admin.html">Administration</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="denied" class="hidden">
+    <div class="msg error">Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="top">
+      <button class="ib" id="back" aria-label="Retour">←</button>
+      <div class="crumb" id="crumb">Modifier les textes</div>
+      <button class="ib" id="hist" aria-label="Dernières corrections" title="Dernières corrections">🕘</button>
+    </div>
+    <div id="view"></div>
+  </div>
+</div>
+
+<div id="sheet"><div class="box" id="sheet-box"></div></div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const token = localStorage.getItem('mna_token');
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
+  if (!token || !user || user.role !== 'admin') { $('denied').classList.remove('hidden'); return; }
+  $('app').classList.remove('hidden');
+
+  const API = '/api/reader/admin-edition';
+  const S = { tab: 'livres' };
+  let D = null;   // texte ouvert : { kind, id, title, paras, single, edited }
+  const stack = [];
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const marks = (t) => esc(t).replace(/⟦([a-z]{1,4})⟧/gi, '<sup class="mk">$1</sup>');
+  const rich = (t) => esc(t).replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\n\n/g, '<br><br>');
+  const hl = (text, q) => esc(text).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (m) => '<mark>' + m + '</mark>');
+  const LOADING = '<p class="muted">Chargement…</p>';
+
+  let tt;
+  function toast(m, err) {
+    const t = $('toast');
+    t.textContent = m; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(tt); tt = setTimeout(() => { t.className = ''; }, 3800);
+  }
+  function showError(e) { $('view').innerHTML = '<div class="msg error">' + esc(e.message) + '</div>'; }
+
+  async function request(url, o) {
+    o = o || {};
+    const r = await fetch(url, {
+      method: o.method || 'GET',
+      headers: Object.assign({ Authorization: 'Bearer ' + token }, o.body ? { 'Content-Type': 'application/json' } : {}),
+      body: o.body ? JSON.stringify(o.body) : undefined,
+    });
+    let d = null;
+    try { d = await r.json(); } catch (e) {}
+    if (r.status === 401) { location.href = '/login.html'; throw new Error('Session expirée : reconnectez-vous.'); }
+    if (!r.ok) throw new Error((d && d.message) || ('Erreur ' + r.status));
+    return d;
+  }
+  const api = (path, o) => request(API + path, o);
+
+  // ---------- Navigation ----------
+  function go(title, render, scope, isDoc) {
+    stack.push({ title, render, scope, isDoc });
+    if (stack.length > 1) history.pushState({ n: stack.length }, '');
+    draw();
+  }
+  function draw() {
+    const t = stack[stack.length - 1];
+    $('crumb').textContent = t.title;
+    $('back').style.visibility = stack.length > 1 ? 'visible' : 'hidden';
+    $('hist').style.display = t.scope ? '' : 'none';
+    window.scrollTo(0, 0);
+    t.render();
+  }
+  $('back').onclick = () => history.back();
+  window.addEventListener('popstate', () => { if (stack.length > 1) { stack.pop(); draw(); } });
+
+  // ---------- Accueil ----------
+  function viewHome() {
+    $('view').innerHTML = '<div class="tabs"><button class="tab" data-t="livres">📚 Livres</button><button class="tab" data-t="bible">✝ Bible</button></div><div id="hb"></div>';
+    document.querySelectorAll('.tab').forEach((b) => {
+      b.classList.toggle('on', b.dataset.t === S.tab);
+      b.onclick = () => { S.tab = b.dataset.t; viewHome(); };
+    });
+    (S.tab === 'livres' ? homeBooks() : homeBible()).catch((e) => { $('hb').innerHTML = '<div class="msg error">' + esc(e.message) + '</div>'; });
+  }
+
+  async function homeBooks() {
+    $('hb').innerHTML = LOADING;
+    const list = await api('/list');
+    $('hb').innerHTML =
+      '<p class="hint">Ouvrez un livre, touchez un paragraphe, corrigez-le, puis touchez « Enregistrer » : la correction est visible tout de suite par les lecteurs. ' +
+      'Attention : si vous téléversez de nouveau un fichier Word pour un livre, ce nouveau fichier remplace les corrections faites ici.</p>' +
+      '<div class="list">' + list.map((b) =>
+        '<button class="item" data-id="' + b.id + '"><b>' + esc(b.title) + '</b><span>' +
+        (b.is_study_book ? 'Espace d’étude · ' + b.parts + ' partie(s)' : (b.has_docx ? 'Livre au format Word' : 'PDF seulement : texte non modifiable ici')) +
+        (b.edited ? ' · <em class="tag">corrigé à la main</em>' : '') + '</span></button>').join('') + '</div>';
+    document.querySelectorAll('#hb .item').forEach((el) => { el.onclick = () => openBook(list.find((b) => String(b.id) === el.dataset.id)); });
+    const want = new URLSearchParams(location.search).get('book');
+    if (want && !S.deep) { S.deep = 1; const b = list.find((x) => String(x.id) === want); if (b) openBook(b); }
+  }
+
+  function openBook(b) {
+    if (b.is_study_book) {
+      if (!b.parts) return toast('Ce livre n’est pas encore découpé en parties (automatique, quelques minutes).', 1);
+      go(b.title, () => viewParts(b));
+    } else if (!b.has_docx) {
+      toast('Ce livre n’a pas de fichier Word : son texte ne peut pas être modifié ici.', 1);
+    } else {
+      go(b.title, () => viewSections(b), 'livre:' + b.id);
+    }
+  }
+
+  // ---------- Livres : sommaire, recherche, parties ----------
+  function sections(paras) {
+    const idx = [];
+    paras.forEach((p, i) => { if (/^# /.test(p) || /^## (CHAPITRE|CHAP\.|PARTIE)\b/i.test(p)) idx.push(i); });
+    const out = [];
+    if (!idx.length) {
+      for (let s = 0; s < paras.length; s += 40) out.push({ title: 'Passage ' + (out.length + 1), start: s, end: Math.min(paras.length, s + 40) });
+      return out;
+    }
+    if (idx[0] > 0) out.push({ title: 'Début du livre', start: 0, end: idx[0] });
+    idx.forEach((s, k) => out.push({ title: paras[s].replace(/^#+ /, ''), start: s, end: k + 1 < idx.length ? idx[k + 1] : paras.length }));
+    return out;
+  }
+  const secsOf = () => (D.single ? [{ title: D.title, start: 0, end: D.paras.length }] : sections(D.paras));
+
+  function searchBox() {
+    return '<form id="sf" class="sf"><input id="sq" type="search" placeholder="Chercher un mot ou une phrase…" enterkeyhint="search"><button class="btn btn-primary" type="submit">Chercher</button></form><div id="sr"></div>';
+  }
+  function wireSearch(b) {
+    $('sf').onsubmit = async (e) => {
+      e.preventDefault();
+      const q = $('sq').value.trim();
+      if (q.length < 3) return toast('Tapez au moins 3 lettres.', 1);
+      $('sr').innerHTML = '<p class="muted">Recherche…</p>';
+      try {
+        const rs = await api('/search/' + b.id + '?q=' + encodeURIComponent(q));
+        if (!rs.length) { $('sr').innerHTML = '<p class="muted">Aucun résultat pour « ' + esc(q) + ' ».</p>'; return; }
+        $('sr').innerHTML = '<div class="list">' + rs.map((r, k) =>
+          '<button class="item" data-k="' + k + '"><span>' + (r.part_title ? esc(r.part_title) + ' · ' : '') + 'paragraphe ' + (r.index + 1) + '</span><b class="sn">' + hl(r.text, q) + '</b></button>').join('') + '</div>';
+        document.querySelectorAll('#sr .item').forEach((el) => {
+          el.onclick = () => {
+            const r = rs[+el.dataset.k];
+            if (r.kind === 'partie') return go(r.part_title, () => viewPart(r.id, r.index), 'partie:' + r.id, true);
+            const secs = sections(D.paras);
+            const k = Math.max(0, secs.findIndex((s) => r.index >= s.start && r.index < s.end));
+            go(secs[k].title, () => viewDoc(k, r.index), 'livre:' + b.id, true);
+          };
+        });
+      } catch (err) { $('sr').innerHTML = '<div class="msg error">' + esc(err.message) + '</div>'; }
+    };
+  }
+
+  async function viewSections(b) {
+    $('view').innerHTML = '<p class="muted">Ouverture du livre…</p>';
+    try {
+      const d = await api('/doc/livre/' + b.id);
+      D = { kind: 'livre', id: b.id, title: b.title, paras: d.paragraphs, edited: d.edited };
+      const secs = sections(D.paras);
+      $('view').innerHTML = searchBox() +
+        '<div class="list">' + secs.map((s, k) => '<button class="item" data-k="' + k + '"><b>' + esc(s.title) + '</b><span>' + (s.end - s.start) + ' paragraphe(s)</span></button>').join('') + '</div>' +
+        (D.edited ? '<button class="btn btn-ghost danger" id="reset">↺ Revenir au texte d’origine du fichier Word</button>' : '');
+      wireSearch(b);
+      document.querySelectorAll('#view .list .item[data-k]').forEach((el) => {
+        el.onclick = () => { const k = +el.dataset.k; go(secs[k].title, () => viewDoc(k), 'livre:' + b.id, true); };
+      });
+      if ($('reset')) $('reset').onclick = async () => {
+        if (!confirm('Effacer TOUTES les corrections faites à la main dans ce livre et revenir au texte du fichier Word ?')) return;
+        try { await api('/doc/livre/' + b.id + '/reset', { method: 'POST' }); toast('Texte d’origine rétabli.'); viewSections(b); } catch (err) { toast(err.message, 1); }
+      };
+    } catch (e) { showError(e); }
+  }
+
+  async function viewParts(b) {
+    $('view').innerHTML = LOADING;
+    try {
+      const parts = await api('/books/' + b.id + '/parts');
+      $('view').innerHTML = searchBox() + '<div class="list">' + parts.map((p) =>
+        '<button class="item" data-id="' + p.id + '"><b>' + esc(p.title) + '</b><span>Partie ' + p.part_index + (p.content_filled === false ? ' · texte en préparation' : '') + '</span></button>').join('') + '</div>';
+      wireSearch(b);
+      document.querySelectorAll('#view .list .item[data-id]').forEach((el) => {
+        el.onclick = () => { const p = parts.find((x) => String(x.id) === el.dataset.id); go(p.title, () => viewPart(p.id), 'partie:' + p.id, true); };
+      });
+    } catch (e) { showError(e); }
+  }
+
+  async function viewPart(id, focus) {
+    $('view').innerHTML = '<p class="muted">Ouverture…</p>';
+    try {
+      const d = await api('/doc/partie/' + id);
+      D = { kind: 'partie', id, title: d.title, paras: d.paragraphs, single: true };
+      viewDoc(0, focus);
+    } catch (e) { showError(e); }
+  }
+
+  // ---------- Un passage du livre : corriger un paragraphe ----------
+  function cardHtml(i) {
+    const p = D.paras[i];
+    const m = p.match(/^(#{1,3}) /);
+    const cls = m ? 'h' + m[1].length : (/^[✦\s]+$/.test(p) ? 'orn' : '');
+    return '<div class="pc ' + cls + '" data-i="' + i + '">' + esc(m ? p.slice(m[0].length) : p) + '</div>';
+  }
+
+  function viewDoc(k, focus) {
+    const secs = secsOf();
+    k = Math.max(0, Math.min(k || 0, secs.length - 1));
+    const s = secs[k];
+    let h = '<p class="hint">Touchez un paragraphe pour le corriger.</p><div id="paras">';
+    for (let i = s.start; i < s.end; i++) h += cardHtml(i);
+    h += '</div>';
+    if (secs.length > 1) {
+      h += '<div class="pn"><button class="btn btn-ghost" id="pv"' + (k === 0 ? ' disabled' : '') + '>‹ Précédent</button><span>' + (k + 1) + ' / ' + secs.length +
+        '</span><button class="btn btn-ghost" id="nx"' + (k === secs.length - 1 ? ' disabled' : '') + '>Suivant ›</button></div>';
+    }
+    $('view').innerHTML = h;
+    $('paras').onclick = (e) => {
+      const c = e.target.closest('.pc');
+      if (c && !c.classList.contains('editing')) openEditor(c);
+    };
+    if (secs.length > 1) { $('pv').onclick = () => swapTo(k - 1); $('nx').onclick = () => swapTo(k + 1); }
+    if (focus != null) {
+      const c = document.querySelector('.pc[data-i="' + focus + '"]');
+      if (c) { c.classList.add('flash'); setTimeout(() => c.scrollIntoView({ block: 'center' }), 60); }
+    }
+  }
+  function swapTo(k) {
+    const secs = secsOf();
+    const t = stack[stack.length - 1];
+    t.title = secs[k].title;
+    t.render = () => viewDoc(k);
+    draw();
+  }
+
+  function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(110, ta.scrollHeight + 4) + 'px'; }
+
+  function closeEditors() {
+    document.querySelectorAll('.pc.editing').forEach((el) => {
+      const i = +el.dataset.i;
+      if (D && D.kind && !isNaN(i) && el.closest('#paras')) { el.outerHTML = cardHtml(i); }
+    });
+  }
+
+  function openEditor(el) {
+    closeEditors();
+    el = document.querySelector('.pc[data-i="' + el.dataset.i + '"]');
+    const i = +el.dataset.i;
+    const p = D.paras[i];
+    const m = p.match(/^#{1,3} /);
+    const pre = m ? m[0] : '';
+    el.classList.add('editing');
+    el.innerHTML = '<textarea class="ta">' + esc(p.slice(pre.length)) + '</textarea>' +
+      '<div class="acts"><button class="btn btn-primary ok">Enregistrer</button><button class="btn btn-ghost no">Annuler</button></div><div class="msgline"></div>';
+    const ta = el.querySelector('textarea');
+    autosize(ta);
+    ta.addEventListener('input', () => autosize(ta));
+    ta.focus();
+    el.querySelector('.no').onclick = () => { el.outerHTML = cardHtml(i); };
+    el.querySelector('.ok').onclick = async () => {
+      const text = pre + ta.value.replace(/\s*\n\s*/g, ' ').trim();
+      if (text === p) { el.outerHTML = cardHtml(i); return; }
+      const ok = el.querySelector('.ok');
+      ok.disabled = true; ok.textContent = 'Enregistrement…';
+      try {
+        await api('/doc/' + D.kind + '/' + D.id + '/edit', { method: 'POST', body: { index: i, old_text: p, text } });
+        D.paras[i] = text;
+        el.outerHTML = cardHtml(i);
+        const fresh = document.querySelector('.pc[data-i="' + i + '"]');
+        if (fresh) { fresh.classList.add('saved'); setTimeout(() => fresh.classList.remove('saved'), 2500); }
+        toast('✓ Enregistré : les lecteurs voient déjà la nouvelle version.');
+      } catch (err) {
+        ok.disabled = false; ok.textContent = 'Enregistrer';
+        el.querySelector('.msgline').textContent = err.message;
+      }
+    };
+  }
+
+  // ---------- Bible ----------
+  async function homeBible() {
+    $('hb').innerHTML = LOADING;
+    const books = await api('/bible/books');
+    $('hb').innerHTML =
+      '<p class="hint">Corrigez un verset, un intertitre, une note ou le sous-titre d’un chapitre. Attention : si vous publiez de nouveau le fichier Word d’un chapitre, ce fichier remplace les corrections faites ici.</p>' +
+      '<form id="bsf" class="sf"><input id="bsq" type="search" placeholder="Chercher un mot dans la Bible…" enterkeyhint="search"><button class="btn btn-primary" type="submit">Chercher</button></form><div id="bsr"></div>' +
+      '<div class="list">' + books.map((b) =>
+        '<button class="item" data-id="' + b.id + '"><b>' + esc(b.name) + '</b><span>' + b.chapters.length + ' chapitre(s)' + (b.published ? '' : ' · masqué') + '</span></button>').join('') + '</div>';
+    document.querySelectorAll('#hb .list .item').forEach((el) => {
+      el.onclick = () => {
+        const b = books.find((x) => String(x.id) === el.dataset.id);
+        if (!b.chapters.length) return toast('Ce livre n’a pas encore de chapitre publié.', 1);
+        go(b.name, () => viewChapters(b));
+      };
+    });
+    $('bsf').onsubmit = async (e) => {
+      e.preventDefault();
+      const q = $('bsq').value.trim();
+      if (q.length < 3) return toast('Tapez au moins 3 lettres.', 1);
+      $('bsr').innerHTML = '<p class="muted">Recherche…</p>';
+      try {
+        const rs = await request('/api/bible/search?q=' + encodeURIComponent(q));
+        $('bsr').innerHTML = rs.length ? '<div class="list">' + rs.map((r, k) =>
+          '<button class="item" data-k="' + k + '"><span>' + esc(r.book_name) + ' ' + r.chapter + ':' + r.verse + '</span><b class="sn">' + hl(r.text, q) + '</b></button>').join('') + '</div>' : '<p class="muted">Aucun résultat.</p>';
+        document.querySelectorAll('#bsr .item').forEach((el) => {
+          el.onclick = () => {
+            const r = rs[+el.dataset.k];
+            go(r.book_name + ' ' + r.chapter, () => viewChapter({ id: r.book_id, name: r.book_name }, r.chapter, r.verse), 'bible:' + r.book_id + ':' + r.chapter);
+          };
+        });
+      } catch (err) { $('bsr').innerHTML = '<div class="msg error">' + esc(err.message) + '</div>'; }
+    };
+  }
+
+  function viewChapters(b) {
+    $('view').innerHTML = '<p class="hint">Choisissez un chapitre.</p><div class="chs">' + b.chapters.map((n) => '<button data-n="' + n + '">' + n + '</button>').join('') + '</div>';
+    document.querySelectorAll('.chs button').forEach((el) => {
+      el.onclick = () => { const n = +el.dataset.n; go(b.name + ' ' + n, () => viewChapter(b, n), 'bible:' + b.id + ':' + n); };
+    });
+  }
+
+  let C = null; // chapitre ouvert
+  const verseHtml = (x) => '<div class="pc vs" data-id="' + x.id + '">' + (x.heading ? '<div class="vh">' + esc(x.heading) + '</div>' : '') + '<span class="vn">' + x.verse + '</span> ' + marks(x.edit_text) + '</div>';
+  const commentHtml = (c) => '<div class="pc cm" data-id="' + c.id + '"><span class="ln">' + esc(c.letter || '·') + '</span> <span class="muted">v. ' + c.verse_start + (c.verse_end && c.verse_end !== c.verse_start ? '–' + c.verse_end : '') + '</span>' +
+    (c.title ? '<br><b>' + esc(c.title) + '</b>' : '') + '<div style="margin-top:6px;">' + rich(c.body) + '</div></div>';
+
+  async function viewChapter(b, n, focus) {
+    $('view').innerHTML = LOADING;
+    try {
+      const d = await api('/bible/' + b.id + '/' + n);
+      C = { book: b, n, verses: d.verses, comments: d.comments };
+      $('view').innerHTML =
+        '<div class="sub"><label>Sous-titre du chapitre</label><div class="row"><input id="subt" value="' + esc(d.subtitle) + '"><button class="btn btn-ghost" id="subsave">Enregistrer</button></div></div>' +
+        '<p class="hint">Touchez un verset ou une note pour la corriger. Les petites lettres de renvoi (<sup class="mk">a</sup>) apparaissent entre ⟦ ⟧ pendant la correction : gardez-les à leur place, ou déplacez-les dans le texte.</p>' +
+        '<div id="vs">' + d.verses.map(verseHtml).join('') + '</div>' +
+        (d.comments.length ? '<h4>Notes du chapitre</h4><p class="hint">Les mots entre *étoiles* s’affichent en italique.</p><div id="cs">' + d.comments.map(commentHtml).join('') + '</div>' : '');
+      $('subsave').onclick = async () => {
+        try { await api('/bible/chapter', { method: 'PUT', body: { book_id: b.id, chapter: n, subtitle: $('subt').value } }); toast('✓ Sous-titre enregistré.'); } catch (err) { toast(err.message, 1); }
+      };
+      $('vs').onclick = (e) => { const c = e.target.closest('.vs'); if (c && !c.classList.contains('editing')) editVerse(c); };
+      if ($('cs')) $('cs').onclick = (e) => { const c = e.target.closest('.cm'); if (c && !c.classList.contains('editing')) editComment(c); };
+      if (focus != null) {
+        const x = d.verses.find((v) => v.verse === focus);
+        const c = x && document.querySelector('.vs[data-id="' + x.id + '"]');
+        if (c) { c.classList.add('flash'); setTimeout(() => c.scrollIntoView({ block: 'center' }), 60); }
+      }
+    } catch (e) { showError(e); }
+  }
+
+  function endEdit(el, html, id, kind) {
+    el.outerHTML = html;
+    const fresh = document.querySelector('.pc[data-id="' + id + '"]');
+    if (fresh && kind) { fresh.classList.add('saved'); setTimeout(() => fresh.classList.remove('saved'), 2500); }
+  }
+
+  function editVerse(el) {
+    document.querySelectorAll('.pc.editing').forEach((x) => { const v = C.verses.find((y) => String(y.id) === x.dataset.id); if (v) x.outerHTML = verseHtml(v); const c = C.comments.find((y) => String(y.id) === x.dataset.id); if (c && x.classList.contains('cm')) x.outerHTML = commentHtml(c); });
+    el = document.querySelector('.vs[data-id="' + el.dataset.id + '"]');
+    const x = C.verses.find((v) => String(v.id) === el.dataset.id);
+    el.classList.add('editing');
+    el.innerHTML = '<span class="vn">Verset ' + x.verse + '</span><label>Intertitre (facultatif)</label><input class="hd" value="' + esc(x.heading) + '">' +
+      '<label>Texte du verset</label><textarea class="ta">' + esc(x.edit_text) + '</textarea>' +
+      '<div class="acts"><button class="btn btn-primary ok">Enregistrer</button><button class="btn btn-ghost no">Annuler</button><button class="btn btn-ghost lt" type="button">＋ lettre de renvoi</button></div><div class="msgline"></div>';
+    const ta = el.querySelector('textarea');
+    autosize(ta); ta.addEventListener('input', () => autosize(ta));
+    el.querySelector('.no').onclick = () => { el.outerHTML = verseHtml(x); };
+    el.querySelector('.lt').onclick = () => {
+      const l = (prompt('Quelle lettre de renvoi ajouter à l’endroit du curseur ? (a, b, c…)') || '').trim().toLowerCase();
+      if (!/^[a-z]{1,4}$/.test(l)) return;
+      ta.setRangeText('⟦' + l + '⟧', ta.selectionStart, ta.selectionEnd, 'end'); ta.focus(); autosize(ta);
+    };
+    el.querySelector('.ok').onclick = async () => {
+      const ok = el.querySelector('.ok');
+      ok.disabled = true; ok.textContent = 'Enregistrement…';
+      try {
+        const r = await api('/bible/verses/' + x.id, { method: 'PUT', body: { text: ta.value, heading: el.querySelector('.hd').value } });
+        x.edit_text = r.edit_text; x.heading = r.heading;
+        endEdit(el, verseHtml(x), x.id, true);
+        toast('✓ Enregistré : les lecteurs voient déjà la nouvelle version.');
+      } catch (err) { ok.disabled = false; ok.textContent = 'Enregistrer'; el.querySelector('.msgline').textContent = err.message; }
+    };
+    ta.focus();
+  }
+
+  function editComment(el) {
+    document.querySelectorAll('.pc.editing').forEach((x) => { const v = C.verses.find((y) => String(y.id) === x.dataset.id); if (v && x.classList.contains('vs')) x.outerHTML = verseHtml(v); const c = C.comments.find((y) => String(y.id) === x.dataset.id); if (c && x.classList.contains('cm')) x.outerHTML = commentHtml(c); });
+    el = document.querySelector('.cm[data-id="' + el.dataset.id + '"]');
+    const c = C.comments.find((y) => String(y.id) === el.dataset.id);
+    el.classList.add('editing');
+    el.innerHTML = '<span class="ln">' + esc(c.letter || '·') + '</span><label>Titre de la note (facultatif)</label><input class="hd" value="' + esc(c.title || '') + '">' +
+      '<label>Texte de la note (une ligne vide entre deux paragraphes)</label><textarea class="ta">' + esc(c.body) + '</textarea>' +
+      '<div class="acts"><button class="btn btn-primary ok">Enregistrer</button><button class="btn btn-ghost no">Annuler</button></div><div class="msgline"></div>';
+    const ta = el.querySelector('textarea');
+    autosize(ta); ta.addEventListener('input', () => autosize(ta));
+    el.querySelector('.no').onclick = () => { el.outerHTML = commentHtml(c); };
+    el.querySelector('.ok').onclick = async () => {
+      const ok = el.querySelector('.ok');
+      ok.disabled = true; ok.textContent = 'Enregistrement…';
+      try {
+        const r = await api('/bible/comments/' + c.id, { method: 'PUT', body: { title: el.querySelector('.hd').value, body: ta.value } });
+        c.title = r.title; c.body = r.body;
+        endEdit(el, commentHtml(c), c.id, true);
+        toast('✓ Enregistré : les lecteurs voient déjà la nouvelle version.');
+      } catch (err) { ok.disabled = false; ok.textContent = 'Enregistrer'; el.querySelector('.msgline').textContent = err.message; }
+    };
+    ta.focus();
+  }
+
+  // ---------- Dernières corrections et restauration ----------
+  const sheet = $('sheet'), box = $('sheet-box');
+  sheet.onclick = (e) => { if (e.target === sheet) sheet.classList.remove('show'); };
+  const cut = (t) => { t = String(t || ''); return t.length > 130 ? t.slice(0, 130) + '…' : t; };
+  const textOf = (d) => d ? (d.text != null ? d.text : (d.body || '')) : '';
+
+  $('hist').onclick = async () => {
+    const t = stack[stack.length - 1];
+    if (!t.scope) return;
+    box.innerHTML = '<h3 style="margin:0 0 6px;">Dernières corrections</h3><p class="muted">Chargement…</p>';
+    sheet.classList.add('show');
+    try {
+      const rows = await api('/history?scope=' + encodeURIComponent(t.scope));
+      box.innerHTML = '<h3 style="margin:0 0 6px;">Dernières corrections</h3>' +
+        (rows.length ? rows.map((h) =>
+          '<div class="hrow"><b>' + esc(h.label || '') + '</b> <span class="muted">· ' + new Date(h.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (h.op === 'restore' ? ' · restauré' : '') + '</span>' +
+          '<q>Avant : ' + esc(cut(textOf(h.before_data))) + '</q><q>Après : ' + esc(cut(textOf(h.after_data))) + '</q>' +
+          (h.op === 'edit' ? '<button class="btn btn-ghost" data-id="' + h.id + '">↩ Remettre l’ancien texte</button>' : '') + '</div>').join('') : '<p class="muted">Aucune correction pour le moment.</p>') +
+        '<button class="btn btn-ghost" id="hclose" style="margin-top:14px;width:100%;">Fermer</button>';
+      $('hclose').onclick = () => sheet.classList.remove('show');
+      box.querySelectorAll('button[data-id]').forEach((b) => {
+        b.onclick = async () => {
+          b.disabled = true;
+          try {
+            await api('/history/' + b.dataset.id + '/restore', { method: 'POST' });
+            sheet.classList.remove('show');
+            toast('✓ Ancien texte remis en place.');
+            if (t.isDoc && D) { const d = await api('/doc/' + D.kind + '/' + D.id); D.paras = d.paragraphs; }
+            draw();
+          } catch (err) { b.disabled = false; toast(err.message, 1); }
+        };
+      });
+    } catch (err) { box.innerHTML = '<div class="msg error">' + esc(err.message) + '</div><button class="btn btn-ghost" id="hclose">Fermer</button>'; $('hclose').onclick = () => sheet.classList.remove('show'); }
+  };
+
+  go('Modifier les textes', viewHome);
+})();
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
