@@ -2,19 +2,36 @@ const express = require('express');
 const pool = require('../db/pool');
 const { requireAuth } = require('../lib/auth-middleware');
 const { docxToParagraphs } = require('../lib/docx-to-text');
+const edition = require('./edition');
 
 const router = express.Router();
 router.use(requireAuth);
+
+// Modification manuelle du texte des livres (administration)
+router.use('/admin-edition', edition);
 
 // Petite mémoire pour ne pas relire le fichier Word à chaque ouverture
 const paragraphsCache = new Map();
 
 async function getReadableBook(id) {
-  const result = await pool.query(
-    "SELECT id, title, author, docx_data, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
-    [id]
-  );
-  return result.rows[0] || null;
+  try {
+    await edition.ensureSchema();
+    // « edited_paragraphs » : texte corrigé à la main par l'administration. Il n'est utilisé que tant que le fichier Word
+    // est le même ; si un nouveau Word est téléversé, c'est ce nouveau fichier qui fait foi.
+    const result = await pool.query(
+      `SELECT id, title, author, docx_data, is_study_book,
+              CASE WHEN reader_paragraphs IS NOT NULL AND reader_paragraphs_src = md5(docx_data) THEN reader_paragraphs END AS edited_paragraphs
+         FROM books WHERE id = $1 AND access_type != 'a_vendre'`,
+      [id]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    const result = await pool.query(
+      "SELECT id, title, author, docx_data, is_study_book FROM books WHERE id = $1 AND access_type != 'a_vendre'",
+      [id]
+    );
+    return result.rows[0] || null;
+  }
 }
 
 // Texte du livre, découpé en paragraphes, pour le lecteur intégré
@@ -27,6 +44,10 @@ router.get('/books/:id', async (req, res) => {
     }
     if (!book.docx_data) {
       return res.status(409).json({ message: 'Ce livre est disponible uniquement en PDF', fallback: 'pdf' });
+    }
+    // Texte corrigé à la main : servi tel quel, toujours à jour (jamais gardé en mémoire)
+    if (Array.isArray(book.edited_paragraphs) && book.edited_paragraphs.length) {
+      return res.json({ book: { id: book.id, title: book.title, author: book.author }, paragraphs: book.edited_paragraphs });
     }
     const key = `${book.id}:${book.docx_data.length}`;
     let paragraphs = paragraphsCache.get(key);
