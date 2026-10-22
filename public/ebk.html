@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>École Biblique Kainos (EBK)</title>
+<meta name="description" content="École Biblique Kainos : former des serviteurs puissants en parole et en œuvre.">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  :root { --k-navy: #14263f; --k-navy2: #1f3a5f; --k-gold: #c9a24b; --k-cream: #faf6ee; --k-line: #e6dcc6; --k-soft: #6b5f4d; }
+  .hidden { display: none !important; }
+  .k-sub { position: sticky; top: 0; z-index: 30; background: var(--k-navy); border-bottom: 2px solid var(--k-gold); display: flex; align-items: center; gap: 4px; padding: 0 12px; overflow-x: auto; white-space: nowrap; }
+  .k-sub .k-logo { font: 700 16px Georgia, serif; color: var(--k-gold); letter-spacing: 2px; padding: 14px 14px 14px 4px; }
+  .k-sub a { color: #e9e2d0; text-decoration: none; font: 600 13.5px system-ui, sans-serif; padding: 15px 12px; border-bottom: 3px solid transparent; }
+  .k-sub a.on, .k-sub a:hover { color: #fff; border-bottom-color: var(--k-gold); }
+  .k-sub a.k-cta { margin-left: auto; background: var(--k-gold); color: var(--k-navy); border-radius: 999px; padding: 8px 16px; border: none; }
+  .k-hero { background: linear-gradient(160deg, #0d1b2f, var(--k-navy2)); color: #fff; text-align: center; padding: 70px 22px 60px; }
+  .k-hero .k-eyebrow { color: var(--k-gold); letter-spacing: 4px; font: 700 12.5px system-ui, sans-serif; }
+  .k-hero h1 { font: 700 clamp(34px, 7vw, 58px)/1.1 Georgia, serif; margin: 14px 0 12px; }
+  .k-hero h1 span { color: var(--k-gold); }
+  .k-hero p { max-width: 640px; margin: 0 auto 26px; font-size: 18px; line-height: 1.6; color: #dfe6f0; }
+  .k-hero .k-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .k-pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .k-pill { border: 1px solid rgba(201,162,75,.6); color: #f3e6c4; border-radius: 999px; padding: 7px 16px; font: 600 13px system-ui, sans-serif; }
+  .k-sec { max-width: 980px; margin: 0 auto; padding: 54px 22px 10px; }
+  .k-sec h2 { font: 700 30px Georgia, serif; color: var(--k-navy); margin: 0 0 8px; }
+  .k-sec h2 + .k-lead { color: var(--k-soft); margin: 0 0 26px; font-size: 16px; line-height: 1.6; }
+  .k-bar { width: 56px; height: 3px; background: var(--k-gold); margin: 0 0 18px; }
+  .k-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .k-card { background: #fff; border: 1px solid var(--k-line); border-radius: 14px; padding: 22px; }
+  .k-card h3 { margin: 0 0 6px; font: 700 19px Georgia, serif; color: var(--k-navy); }
+  .k-card p { margin: 0; color: var(--k-soft); font-size: 14.5px; line-height: 1.55; }
+  .k-tag { display: inline-block; font: 700 11px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .5px; padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .k-tag.terminee { background: #efe9da; color: var(--k-soft); }
+  .k-tag.a_venir { background: #fff3d6; color: #8a6a12; }
+  .k-tag.en_cours { background: #e8f6ec; color: #2a7a44; }
+  .k-tag.ok { background: #e8f6ec; color: #2a7a44; }
+  .k-tag.lock { background: #f2ece0; color: var(--k-soft); }
+  .k-tag.todo { background: #e8f1fa; color: var(--k-navy2); }
+  .k-prog { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+  .k-prog li { counter-increment: n; display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--k-line); }
+  .k-prog li::before { content: counter(n); flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--k-navy); color: var(--k-gold); font: 700 15px Georgia, serif; display: flex; align-items: center; justify-content: center; }
+  .k-prog b { color: var(--k-navy); font-size: 16px; }
+  .k-prog small { display: block; color: var(--k-soft); font-size: 13.5px; margin-top: 2px; }
+  .k-steps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .k-step { background: var(--k-navy); color: #e9e2d0; border-radius: 14px; padding: 20px; }
+  .k-step b { color: var(--k-gold); font: 700 26px Georgia, serif; display: block; margin-bottom: 6px; }
+  .k-step span { font-size: 14.5px; line-height: 1.5; }
+  .k-gallery { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .k-gallery img { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; }
+  .k-contact { white-space: pre-line; }
+  .k-foot { text-align: center; color: var(--k-soft); font-size: 13px; padding: 40px 20px 60px; }
+
+  /* Salle de classe */
+  .k-class { max-width: 860px; margin: 0 auto; padding: 34px 20px 90px; }
+  .k-panel { background: #fff; border: 1px solid var(--k-line); border-radius: 14px; padding: 24px; margin-bottom: 18px; }
+  .k-panel h2 { margin: 0 0 6px; font: 700 26px Georgia, serif; color: var(--k-navy); }
+  .k-panel h3 { margin: 0 0 8px; font: 700 20px Georgia, serif; color: var(--k-navy); }
+  .k-muted { color: var(--k-soft); font-size: 14.5px; line-height: 1.55; }
+  .k-meter { height: 10px; background: #efe9da; border-radius: 99px; overflow: hidden; margin: 10px 0 4px; }
+  .k-meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--k-gold), #e0c274); }
+  .k-course { display: flex; gap: 14px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--k-line); }
+  .k-course:last-child { border-bottom: none; }
+  .k-course.locked { opacity: .5; }
+  .k-num { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--k-navy); color: var(--k-gold); font: 700 17px Georgia, serif; display: flex; align-items: center; justify-content: center; }
+  .k-course.done .k-num { background: #2a7a44; color: #fff; }
+  .k-course .k-body { flex: 1; min-width: 0; }
+  .k-course h4 { margin: 0 0 2px; font-size: 16.5px; color: var(--k-navy); }
+  .k-video { position: relative; padding-top: 56.25%; background: #000; border-radius: 12px; overflow: hidden; margin: 16px 0; }
+  .k-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .k-syl { background: var(--k-cream); border: 1px solid var(--k-line); border-radius: 12px; padding: 20px; font: 17px/1.75 Georgia, serif; color: #241e16; max-height: 70vh; overflow: auto; }
+  .k-syl h3 { font-size: 20px; margin: 1em 0 .4em; color: var(--k-navy); }
+  .k-syl p { margin: 0 0 1em; white-space: pre-line; }
+  .k-q { margin-bottom: 22px; }
+  .k-q p { font-weight: 600; margin: 0 0 10px; line-height: 1.5; }
+  .k-choice { display: block; padding: 11px 14px; border: 1px solid var(--k-line); border-radius: 10px; margin-bottom: 8px; cursor: pointer; line-height: 1.45; }
+  .k-choice input { margin-right: 9px; }
+  .k-choice:has(input:checked) { border-color: var(--k-gold); background: #fffaf0; }
+  .k-msg { padding: 11px 14px; border-radius: 10px; font-size: 14.5px; margin: 12px 0; line-height: 1.5; }
+  .k-msg.err { background: #fdeaea; color: #a33; }
+  .k-msg.ok { background: #e8f6ec; color: #2a7a44; }
+  .k-rev { border: 1px solid var(--k-line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fffdf8; }
+  .k-rev .bad { background: #fdeaea; color: #a33; padding: 7px 10px; border-radius: 8px; margin-top: 6px; font-size: 14px; }
+  .k-rev .good { background: #e8f6ec; color: #2a7a44; padding: 7px 10px; border-radius: 8px; margin-top: 6px; font-size: 14px; }
+  .k-field { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--k-line); border-radius: 10px; font: 16px system-ui, sans-serif; margin: 8px 0 12px; }
+  .k-sticky { position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--k-line); padding: 12px 0 4px; margin-top: 10px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .k-back { margin-bottom: 16px; }
+</style>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#14263f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav>
+    <a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a>
+    <a href="/login.html">Mon compte</a>
+  </nav>
+</header>
+
+<div class="k-sub" id="k-sub">
+  <span class="k-logo">EBK</span>
+  <a href="#accueil" data-v="school">Accueil</a>
+  <a href="#ecole" data-v="school">L'école</a>
+  <a href="#sessions" data-v="school">Sessions</a>
+  <a href="#programme" data-v="school">Programme</a>
+  <a href="#contact" data-v="school">Contact</a>
+  <a href="#classe" data-v="class" class="k-cta">🎓 Salle de classe</a>
+</div>
+
+<!-- ============ SITE DE L'ÉCOLE ============ -->
+<main id="view-school">
+  <section class="k-hero" id="accueil">
+    <div class="k-eyebrow">ÉCOLE BIBLIQUE</div>
+    <h1>École Biblique <span>Kainos</span></h1>
+    <p>Former des serviteurs puissants en parole et en œuvre.</p>
+    <div class="k-btns">
+      <a href="#classe" class="btn btn-primary" data-v="class">🎓 Entrer en salle de classe</a>
+      <a href="#programme" class="btn btn-ghost" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5);">Voir le programme</a>
+    </div>
+    <div class="k-pills" id="k-pills"></div>
+  </section>
+
+  <section class="k-sec" id="ecole">
+    <h2>L'école</h2><div class="k-bar"></div>
+    <p class="k-lead" id="k-about">L'École Biblique Kainos existe pour former des serviteurs puissants en parole et en œuvre.</p>
+    <div class="k-steps">
+      <div class="k-step"><b>1</b><span>Inscrivez-vous en salle de classe avec votre nom complet.</span></div>
+      <div class="k-step"><b>2</b><span>Suivez chaque cours : vidéo de l'enseignement et syllabus à étudier.</span></div>
+      <div class="k-step"><b>3</b><span>Réussissez le test de 15 questions pour déverrouiller le cours suivant.</span></div>
+      <div class="k-step"><b>4</b><span>Passez le grand test de 80 questions : il ouvre votre certificat sécurisé.</span></div>
+    </div>
+  </section>
+
+  <section class="k-sec" id="sessions">
+    <h2>Les sessions</h2><div class="k-bar"></div>
+    <div class="k-grid" id="k-sessions"><p class="k-muted">Chargement…</p></div>
+  </section>
+
+  <section class="k-sec" id="programme">
+    <h2>Le programme</h2><div class="k-bar"></div>
+    <p class="k-lead" id="k-prog-lead"></p>
+    <ol class="k-prog" id="k-prog"></ol>
+  </section>
+
+  <section class="k-sec" id="galerie" style="display:none;">
+    <h2>En images</h2><div class="k-bar"></div>
+    <div class="k-gallery" id="k-gallery"></div>
+  </section>
+
+  <section class="k-sec" id="contact">
+    <h2>Contact</h2><div class="k-bar"></div>
+    <p class="k-lead k-contact" id="k-contact">Pour toute question, utilisez la messagerie de votre compte sur le site.</p>
+  </section>
+  <div class="k-foot">École Biblique Kainos — Ministère de la Nouvelle Alliance © 2026</div>
+</main>
+
+<!-- ============ SALLE DE CLASSE ============ -->
+<main id="view-class" class="hidden">
+  <div class="k-class" id="k-box"><p class="k-muted">Chargement…</p></div>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  var token = '', me = null;
+  try { token = localStorage.getItem('mna_token') || ''; me = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
+  var STATUS = { terminee: 'Terminée', a_venir: 'À venir', en_cours: 'En cours' };
+  var info = null, st = null, current = null;
+
+  function api(path, opts) {
+    opts = opts || {};
+    var h = { 'Content-Type': 'application/json' };
+    if (token) h.Authorization = 'Bearer ' + token;
+    return fetch('/api/ebk' + path, { method: opts.method || 'GET', headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (d) {
+          if (!r.ok) { var e = new Error((d && d.message) || 'Erreur'); e.status = r.status; throw e; }
+          return d;
+        });
+      });
+  }
+
+  // ---------- Navigation entre le site de l'école et la salle de classe ----------
+  function route() {
+    var h = location.hash;
+    var cls = h === '#classe';
+    $('view-school').classList.toggle('hidden', cls);
+    $('view-class').classList.toggle('hidden', !cls);
+    var links = document.querySelectorAll('#k-sub a');
+    for (var i = 0; i < links.length; i++) {
+      var on = cls ? links[i].getAttribute('href') === '#classe' : (links[i].getAttribute('href') === (h || '#accueil'));
+      links[i].classList.toggle('on', on && !links[i].classList.contains('k-cta'));
+    }
+    if (cls) { window.scrollTo(0, 0); if (!st && !current) loadClass(); }
+    else if (h) { var el = document.getElementById(h.slice(1)); if (el) el.scrollIntoView(); }
+  }
+  window.addEventListener('hashchange', route);
+
+  // ---------- Site de l'école ----------
+  function loadSchool() {
+    api('/info').then(function (d) {
+      info = d;
+      var s = d.settings || {};
+      if (s.about) $('k-about').textContent = s.about;
+      if (s.contact) $('k-contact').textContent = s.contact;
+      var sessions = d.sessions || [];
+      $('k-pills').innerHTML = sessions.map(function (x) {
+        return '<span class="k-pill">' + esc(x.title) + (x.period_label ? ' — ' + esc(x.period_label) : '') + ' · ' + esc(STATUS[x.status] || '') + '</span>';
+      }).join('');
+      $('k-sessions').innerHTML = sessions.map(function (x) {
+        return '<div class="k-card"><span class="k-tag ' + esc(x.status) + '">' + esc(STATUS[x.status] || x.status) + '</span>' +
+          '<h3>' + esc(x.title) + (x.period_label ? ' — ' + esc(x.period_label) : '') + '</h3>' +
+          '<p>' + esc(x.description || '') + '</p>' +
+          (x.classroom_open ? '<p style="margin-top:10px;"><b>Cours disponibles en ligne</b>' + (x.registration_open ? ' · inscriptions ouvertes' : ' · inscriptions fermées') + '</p>' : '') +
+          (x.classroom_open ? '<p style="margin-top:12px;"><a class="btn btn-primary" href="#classe">Entrer en salle de classe</a></p>' : '') + '</div>';
+      }).join('') || '<p class="k-muted">Aucune session pour le moment.</p>';
+      var open = sessions.filter(function (x) { return x.classroom_open; })[0];
+      var courses = open ? open.courses : [];
+      $('k-prog-lead').textContent = courses.length
+        ? (open.title + ' — ' + courses.length + ' cours. Chaque cours se déverrouille quand le test du précédent est réussi.')
+        : 'Le programme sera affiché ici dès que les cours seront publiés.';
+      $('k-prog').innerHTML = courses.map(function (c) {
+        return '<li><div><b>' + esc(c.title) + '</b>' + (c.teacher ? '<small>' + esc(c.teacher) + '</small>' : '') + (c.description ? '<small>' + esc(c.description) + '</small>' : '') + '</div></li>';
+      }).join('');
+    }).catch(function () { $('k-sessions').innerHTML = '<p class="k-muted">Informations momentanément indisponibles.</p>'; });
+
+    // Galerie : photos de la cérémonie déjà présentes sur le site (celles qui n'existent pas sont ignorées)
+    var g = $('k-gallery'), ok = 0;
+    for (var i = 1; i <= 7; i++) {
+      (function (n) {
+        var im = new Image();
+        im.alt = 'Cérémonie de l\'École Biblique Kainos';
+        im.loading = 'lazy';
+        im.onload = function () { ok++; g.appendChild(im); $('galerie').style.display = ''; };
+        im.src = '/img/photo-' + n + '.jpg';
+      })(i);
+    }
+  }
+
+  // ---------- Salle de classe ----------
+  function box(html) { $('k-box').innerHTML = html; }
+  function back(label, fn) { return '<button class="btn btn-ghost k-back" id="k-back">← ' + label + '</button>'; }
+  function onBack(fn) { var b = $('k-back'); if (b) b.addEventListener('click', fn); }
+
+  function loadClass() {
+    current = null;
+    if (!token || !me) {
+      box('<div class="k-panel"><h2>Salle de classe</h2><p class="k-muted">Connectez-vous (ou créez un compte gratuit) pour entrer en salle de classe, suivre les cours et passer les tests.</p><p style="margin-top:14px;"><a class="btn btn-primary" href="/login.html">Se connecter / Créer un compte</a></p></div>');
+      return;
+    }
+    box('<p class="k-muted">Chargement…</p>');
+    api('/me').then(function (d) { st = d; renderHome(); })
+      .catch(function (e) {
+        if (e.status === 401) box('<div class="k-panel"><h2>Session expirée</h2><p class="k-muted">Reconnectez-vous pour continuer.</p><p style="margin-top:14px;"><a class="btn btn-primary" href="/login.html">Se connecter</a></p></div>');
+        else box('<div class="k-msg err">' + esc(e.message) + '</div>');
+      });
+  }
+
+  function renderHome() {
+    current = null;
+    if (!st.session) { box('<div class="k-panel"><h2>Salle de classe</h2><p class="k-muted">Aucune session n\'est ouverte pour le moment. Revenez bientôt.</p></div>'); return; }
+    if (!st.student) { renderEnroll(); return; }
+    var total = st.courses.length, done = st.courses.filter(function (c) { return c.passed; }).length;
+    var pct = total ? Math.round(done * 100 / total) : 0;
+    var h = '<div class="k-panel"><h2>Bienvenue, ' + esc(st.student.full_name) + '</h2>' +
+      '<p class="k-muted">' + esc(st.session.title) + (st.session.period_label ? ' — ' + esc(st.session.period_label) : '') + '</p>' +
+      '<div class="k-meter"><i style="width:' + pct + '%"></i></div>' +
+      '<p class="k-muted">' + done + ' cours réussi(s) sur ' + total + (st.certificate ? '' : ' · plus qu\'un grand test pour obtenir votre certificat') + '</p>' +
+      (st.certificate ? '' : '<p style="margin-top:6px;"><button class="btn btn-ghost" id="k-rename" style="font-size:12.5px;padding:6px 12px;">✏️ Corriger mon nom (certificat)</button></p>') + '</div>';
+    h += '<div class="k-panel"><h3>Mes cours</h3>';
+    if (!total) h += '<p class="k-muted">Les cours seront publiés bientôt.</p>';
+    st.courses.forEach(function (c) {
+      var tag = c.passed ? '<span class="k-tag ok">✓ Réussi</span>' : (c.unlocked ? '<span class="k-tag todo">À suivre</span>' : '<span class="k-tag lock">🔒 Verrouillé</span>');
+      h += '<div class="k-course ' + (c.passed ? 'done' : '') + (c.unlocked ? '' : ' locked') + '"><div class="k-num">' + (c.passed ? '✓' : c.position) + '</div>' +
+        '<div class="k-body"><h4>' + esc(c.title) + '</h4><div class="k-muted">' + esc(c.teacher || '') + '</div>' + tag + '</div>' +
+        (c.unlocked ? '<button class="btn ' + (c.passed ? 'btn-ghost' : 'btn-primary') + '" data-open="' + c.id + '">' + (c.passed ? 'Revoir' : 'Ouvrir') + '</button>' : '') + '</div>';
+    });
+    h += '</div>';
+    h += '<div class="k-panel"><h3>Grand test final</h3>';
+    if (st.certificate) {
+      h += '<div class="k-msg ok">🎉 Félicitations ! Grand test réussi (' + esc(st.certificate.score) + ' %).</div><button class="btn btn-primary" id="k-cert">🎓 Ouvrir mon certificat</button>' +
+        '<p class="k-muted" style="margin-top:10px;">Code de vérification : <b>' + esc(st.certificate.code) + '</b></p>';
+    } else if (st.all_passed) {
+      h += '<p class="k-muted">Vous avez réussi tous les cours. Le grand test compte ' + st.grand_quiz_size + ' questions portant sur chaque cours. Le réussir débloque votre certificat.</p><button class="btn btn-primary" id="k-grand">Passer le grand test</button>';
+    } else {
+      h += '<p class="k-muted">🔒 Il se débloque après la réussite des tests de tous les cours (' + st.grand_quiz_size + ' questions sur l\'ensemble des cours).</p>';
+    }
+    h += '</div>';
+    box(h);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.addEventListener('click', function () { openCourse(b.getAttribute('data-open')); }); });
+    if ($('k-grand')) $('k-grand').addEventListener('click', startGrand);
+    if ($('k-cert')) $('k-cert').addEventListener('click', openCertificate);
+    if ($('k-rename')) $('k-rename').addEventListener('click', function () {
+      var n = prompt('Votre nom complet tel qu\'il doit figurer sur le certificat :', st.student.full_name);
+      if (!n) return;
+      api('/name', { method: 'PUT', body: { full_name: n } }).then(function (d) { st = d; renderHome(); }).catch(function (e) { alert(e.message); });
+    });
+  }
+
+  function renderEnroll() {
+    var s = st.session;
+    if (!s.registration_open) {
+      box('<div class="k-panel"><h2>Salle de classe</h2><div class="k-msg err">Les inscriptions à la ' + esc(s.title) + ' sont fermées pour le moment.</div></div>');
+      return;
+    }
+    box('<div class="k-panel"><h2>Inscription à la salle de classe</h2>' +
+      '<p class="k-muted">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</p>' +
+      '<p class="k-muted" style="margin-top:12px;">Écrivez votre <b>nom complet</b> (prénom et nom). Il figurera sur votre certificat : vérifiez bien l\'orthographe.</p>' +
+      '<input class="k-field" id="k-name" placeholder="Ex. Jean Mukendi Kabasele" autocomplete="name" value="' + esc((me && me.full_name) || '') + '">' +
+      '<div id="k-err"></div><button class="btn btn-primary" id="k-enroll">Commencer les cours</button></div>');
+    $('k-enroll').addEventListener('click', function () {
+      $('k-enroll').disabled = true;
+      api('/enroll', { method: 'POST', body: { full_name: $('k-name').value } })
+        .then(function (d) { st = d; renderHome(); })
+        .catch(function (e) { $('k-enroll').disabled = false; $('k-err').innerHTML = '<div class="k-msg err">' + esc(e.message) + '</div>'; });
+    });
+  }
+
+  // ---------- Un cours : vidéo + syllabus + test ----------
+  function ytId(u) {
+    var m = String(u || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
+    return m ? m[1] : null;
+  }
+  function syllabusHtml(text) {
+    return String(text || '').split(/\n{2,}/).map(function (p) { return p.trim(); }).filter(Boolean).map(function (p) {
+      if (p.indexOf('# ') === 0) return '<h3>' + esc(p.slice(2)) + '</h3>';
+      if (p.indexOf('## ') === 0) return '<h3>' + esc(p.slice(3)) + '</h3>';
+      return '<p>' + esc(p) + '</p>';
+    }).join('');
+  }
+
+  function openCourse(id) {
+    box('<p class="k-muted">Chargement du cours…</p>');
+    api('/courses/' + id).then(function (c) {
+      current = c;
+      var vid = ytId(c.youtube_url);
+      var h = back('Mes cours') + '<div class="k-panel"><span class="k-tag todo">Cours ' + c.position + ' sur ' + c.total + '</span><h2>' + esc(c.title) + '</h2>' +
+        (c.teacher ? '<p class="k-muted">' + esc(c.teacher) + '</p>' : '') + (c.description ? '<p class="k-muted" style="margin-top:8px;">' + esc(c.description) + '</p>' : '');
+      if (vid) h += '<div class="k-video"><iframe src="https://www.youtube-nocookie.com/embed/' + vid + '" title="' + esc(c.title) + '" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>';
+      else if (c.youtube_url) h += '<p style="margin:16px 0;"><a class="btn btn-primary" target="_blank" rel="noopener" href="' + esc(c.youtube_url) + '">▶️ Regarder la vidéo</a></p>';
+      else h += '<div class="k-msg">La vidéo de ce cours sera ajoutée bientôt.</div>';
+      h += '</div><div class="k-panel"><h3>Syllabus</h3><p class="k-muted" style="margin-bottom:12px;">Étudiez-le attentivement : les 15 questions du test en sont tirées.</p>';
+      if (c.has_file) h += '<p style="margin-bottom:12px;"><button class="btn btn-ghost" id="k-file">📄 Ouvrir le fichier du syllabus</button></p>';
+      if (c.syllabus_url) h += '<p style="margin-bottom:12px;"><a class="btn btn-ghost" target="_blank" rel="noopener" href="' + esc(c.syllabus_url) + '">🔗 Ouvrir le syllabus (lien)</a></p>';
+      h += c.syllabus_text ? '<div class="k-syl">' + syllabusHtml(c.syllabus_text) + '</div>' : (c.has_file || c.syllabus_url ? '' : '<div class="k-msg">Le syllabus de ce cours sera ajouté bientôt.</div>');
+      h += '</div><div class="k-panel"><h3>Test du cours</h3>';
+      if (c.passed) {
+        h += '<div class="k-msg ok">✓ Test réussi.</div>' + (c.next_course_id ? '<button class="btn btn-primary" id="k-next">Cours suivant →</button>' : '');
+      } else {
+        h += '<p class="k-muted">15 questions tirées du syllabus. Il faut au moins 70 % pour déverrouiller le cours suivant.</p><button class="btn btn-primary" id="k-test" style="margin-top:10px;">Passer le test</button>';
+      }
+      h += '</div>';
+      box(h);
+      window.scrollTo(0, 0);
+      onBack(renderHome);
+      if ($('k-file')) $('k-file').addEventListener('click', function () {
+        api('/courses/' + id + '/syllabus-link').then(function (d) { window.open(d.url, '_blank'); }).catch(function (e) { alert(e.message); });
+      });
+      if ($('k-test')) $('k-test').addEventListener('click', function () { startQuiz('course', id, c.title); });
+      if ($('k-next')) $('k-next').addEventListener('click', function () { openCourse(c.next_course_id); });
+    }).catch(function (e) { box(back('Mes cours') + '<div class="k-msg err">' + esc(e.message) + '</div>'); onBack(refreshHome); });
+  }
+
+  function refreshHome() { api('/me').then(function (d) { st = d; renderHome(); }); }
+
+  // ---------- Tests ----------
+  var quiz = null;
+  function startQuiz(kind, id, title) {
+    var path = kind === 'course' ? '/courses/' + id + '/quiz' : '/grand-quiz';
+    api(path).then(function (d) {
+      quiz = { kind: kind, id: id, title: title, session_id: d.session_id, questions: d.questions };
+      renderQuiz();
+    }).catch(function (e) { alert(e.message); });
+  }
+  function startGrand() { startQuiz('grand', null, 'Grand test final'); }
+
+  function renderQuiz() {
+    var q = quiz, n = q.questions.length;
+    var h = back(q.kind === 'course' ? 'Retour au cours' : 'Mes cours') + '<div class="k-panel"><h2>' + esc(q.title) + '</h2><p class="k-muted">' + n + ' questions — une seule bonne réponse par question.</p>' +
+      '<form id="k-form" style="margin-top:18px;">' +
+      q.questions.map(function (x, i) {
+        return '<div class="k-q"><p>' + (i + 1) + '. ' + esc(x.question_text) + '</p>' +
+          x.choices.map(function (c, j) { return '<label class="k-choice"><input type="radio" name="q' + x.id + '" value="' + j + '"> ' + esc(c) + '</label>'; }).join('') + '</div>';
+      }).join('') +
+      '<div class="k-sticky"><span class="k-muted" id="k-count">0 / ' + n + ' répondues</span><button type="submit" class="btn btn-primary">Valider mes réponses</button></div></form><div id="k-result"></div></div>';
+    box(h);
+    window.scrollTo(0, 0);
+    onBack(function () { if (q.kind === 'course') openCourse(q.id); else renderHome(); });
+    var form = $('k-form');
+    form.addEventListener('change', function () { $('k-count').textContent = form.querySelectorAll('input:checked').length + ' / ' + n + ' répondues'; });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var answers = {}, missing = 0;
+      q.questions.forEach(function (x) {
+        var c = form.querySelector('input[name="q' + x.id + '"]:checked');
+        answers[x.id] = c ? parseInt(c.value, 10) : -1;
+        if (!c) missing++;
+      });
+      if (missing && !confirm(missing + ' question(s) sans réponse seront comptées fausses. Valider quand même ?')) return;
+      form.querySelector('button[type=submit]').disabled = true;
+      var path = q.kind === 'course' ? '/courses/' + q.id + '/quiz' : '/grand-quiz';
+      api(path, { method: 'POST', body: { session_id: q.session_id, answers: answers } }).then(showResult).catch(function (err) {
+        $('k-result').innerHTML = '<div class="k-msg err">' + esc(err.message) + '</div><button class="btn btn-ghost" id="k-home">Retour</button>';
+        $('k-home').addEventListener('click', refreshHome);
+      });
+    });
+  }
+
+  function showResult(r) {
+    var q = quiz, wrong = r.wrong || [];
+    var ct = function (w, i) { return i >= 0 && w.choices && w.choices[i] !== undefined ? w.choices[i] : null; };
+    var h = '<div class="k-msg ' + (r.passed ? 'ok' : 'err') + '" style="font-size:16px;">' + (r.passed ? '✅ Réussi !' : '❌ Non réussi.') + ' Score : ' + r.score + ' % (' + r.correct + '/' + r.total + ')' +
+      (r.passed ? (q.kind === 'grand' ? ' — votre certificat est prêt.' : ' — le cours suivant est déverrouillé.') : ' — relisez le syllabus, regardez la correction, puis retentez.') + '</div>';
+    if (wrong.length) {
+      h += '<h3 style="margin:18px 0 10px;">Correction — ' + wrong.length + ' réponse(s) à revoir</h3>' + wrong.map(function (w) {
+        return '<div class="k-rev"><b>' + esc(w.question_text) + '</b><div class="bad">Votre réponse : ' + esc(ct(w, w.your_answer) || 'aucune réponse') + '</div><div class="good">Bonne réponse : ' + esc(ct(w, w.correct_answer) || '') + '</div></div>';
+      }).join('');
+    }
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">';
+    if (!r.passed) h += '<button class="btn btn-primary" id="k-retry">Réessayer le test</button>';
+    if (r.passed && r.next_course_id) h += '<button class="btn btn-primary" id="k-nextc">Cours suivant →</button>';
+    if (r.passed && q.kind === 'grand') h += '<button class="btn btn-primary" id="k-certn">🎓 Ouvrir mon certificat</button>';
+    h += '<button class="btn btn-ghost" id="k-home">Mes cours</button></div>';
+    $('k-result').innerHTML = h;
+    $('k-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if ($('k-retry')) $('k-retry').addEventListener('click', function () { startQuiz(q.kind, q.id, q.title); });
+    if ($('k-nextc')) $('k-nextc').addEventListener('click', function () { api('/me').then(function (d) { st = d; openCourse(r.next_course_id); }); });
+    if ($('k-certn')) $('k-certn').addEventListener('click', function () { api('/me').then(function (d) { st = d; openCertificate(); }); });
+    $('k-home').addEventListener('click', refreshHome);
+  }
+
+  function openCertificate() {
+    api('/certificate-link').then(function (d) { window.open(d.url, '_blank'); }).catch(function (e) { alert(e.message); });
+  }
+
+  loadSchool();
+  route();
+})();
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>

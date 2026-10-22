@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vérification d'un certificat — École Biblique Kainos</title>
+<style>
+  body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #14263f; color: #241e16; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+  .card { background: #faf6ee; border: 2px solid #c9a24b; border-radius: 16px; max-width: 460px; width: 100%; padding: 30px 26px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  .school { font-size: 13px; letter-spacing: 3px; color: #14263f; font-weight: 700; }
+  .tag { font-size: 12px; color: #6b5f4d; font-style: italic; margin-top: 4px; }
+  .badge { display: inline-block; margin: 22px 0 10px; padding: 8px 18px; border-radius: 999px; font: 700 14px system-ui, sans-serif; }
+  .ok { background: #e8f6ec; color: #2a7a44; }
+  .ko { background: #fdeaea; color: #a33; }
+  .name { font-size: 26px; font-weight: 700; color: #1f3a5f; margin: 8px 0 6px; word-break: break-word; }
+  .line { font: 14.5px/1.6 system-ui, sans-serif; color: #6b5f4d; }
+  .code { margin-top: 18px; font: 12px monospace; color: #a89a7e; }
+  a { color: #1f3a5f; font: 13px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="school">ÉCOLE BIBLIQUE KAINOS</div>
+  <div class="tag">Former des serviteurs puissants en parole et en œuvre</div>
+  <div id="out"><p class="line" style="margin-top:24px;">Vérification en cours…</p></div>
+  <p style="margin-top:22px;"><a href="/ebk.html">Retour au site de l'école</a></p>
+</div>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var esc = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var code = (new URLSearchParams(location.search).get('code') || '').trim();
+  if (!code) { out.innerHTML = '<div class="badge ko">Aucun code fourni</div><p class="line">Scannez le code QR présent sur le certificat.</p>'; return; }
+  fetch('/api/ebk/verify/' + encodeURIComponent(code))
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (x) {
+      if (!x.ok || !x.d.valid) {
+        out.innerHTML = '<div class="badge ko">✗ Certificat non reconnu</div><p class="line">' + esc(x.d.message || 'Aucun certificat ne correspond à ce code.') + '</p><div class="code">' + esc(code) + '</div>';
+        return;
+      }
+      var c = x.d.certificate;
+      var date = new Date(c.issued_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      out.innerHTML =
+        '<div class="badge ok">✓ Certificat authentique</div>' +
+        '<div class="line">Décerné à</div>' +
+        '<div class="name">' + esc(c.full_name) + '</div>' +
+        '<div class="line">' + esc(c.title) + (c.period_label ? ' — ' + esc(c.period_label) : '') + '<br>Délivré le ' + esc(date) +
+        (c.score != null ? '<br>Résultat du grand test : ' + esc(c.score) + ' %' : '') + '</div>' +
+        '<div class="code">' + esc(c.code) + '</div>';
+    })
+    .catch(function () { out.innerHTML = '<div class="badge ko">Erreur</div><p class="line">Vérification impossible pour le moment. Réessayez.</p>'; });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration EBK — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 30px 18px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; }
+  .hidden { display: none !important; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .tabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 9px 16px; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+  .tabs button.on { background: #14263f; color: #fff; border-color: #14263f; }
+  .f { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: 15px system-ui, sans-serif; margin: 4px 0 12px; }
+  textarea.f { min-height: 90px; resize: vertical; }
+  label.l { font: 600 13px system-ui, sans-serif; color: var(--ink-soft); display: block; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row > .grow { flex: 1; min-width: 160px; }
+  .item { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fffdf8; }
+  .small { font-size: 13px; color: var(--ink-soft); }
+  .msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
+  .msg.ok { background: #e8f6ec; color: #2a7a44; }
+  .msg.err { background: #fdeaea; color: #a33; }
+  .tag { display: inline-block; font: 700 11px system-ui, sans-serif; padding: 3px 9px; border-radius: 999px; background: #efe9da; color: #6b5f4d; margin-right: 6px; }
+  .tag.g { background: #e8f6ec; color: #2a7a44; }
+  .tag.b { background: #e8f1fa; color: #1f3a5f; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .q { border-bottom: 1px solid var(--line); padding: 10px 0; font-size: 14px; }
+  .q ul { margin: 6px 0 0 18px; padding: 0; }
+  .q li.ok { color: #2a7a44; font-weight: 700; }
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#16130f">
+</head>
+<body>
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/admin.html">Administration</a><a href="/ebk.html">Voir l'EBK</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <h1 style="font-family:'Fraunces',Georgia,serif;margin-bottom:4px;">✝️ Administration de l'École Biblique Kainos</h1>
+  <p class="small" style="margin-bottom:18px;">Sessions, cours, vidéos, syllabus, questions des tests, inscrits et certificats.</p>
+  <div id="denied" class="panel hidden"><p>Cette page est réservée à l'administrateur principal. <a href="/login.html">Se connecter</a></p></div>
+  <div id="app" class="hidden">
+    <div class="tabs" id="tabs">
+      <button data-t="sessions" class="on">Sessions</button>
+      <button data-t="cours">Cours</button>
+      <button data-t="inscrits">Inscrits</button>
+      <button data-t="certificats">Certificats</button>
+      <button data-t="reglages">Réglages</button>
+    </div>
+    <div id="out"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  var token = '', me = null;
+  try { token = localStorage.getItem('mna_token') || ''; me = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
+  if (!token || !me || me.role !== 'admin' || me.admin_scope === 'limited') { $('denied').classList.remove('hidden'); return; }
+  $('app').classList.remove('hidden');
+
+  var STATUS = { terminee: 'Terminée', a_venir: 'À venir', en_cours: 'En cours' };
+  var ov = null, tab = 'sessions', sessionId = null, editingCourse = null;
+
+  function api(path, opts) {
+    opts = opts || {};
+    var h = { Authorization: 'Bearer ' + token };
+    var body;
+    if (opts.form) body = opts.form;
+    else if (opts.body) { h['Content-Type'] = 'application/json'; body = JSON.stringify(opts.body); }
+    return fetch('/api/ebk/admin' + path, { method: opts.method || 'GET', headers: h, body: body }).then(function (r) {
+      if (r.status === 204) return null;
+      return r.json().catch(function () { return null; }).then(function (d) {
+        if (!r.ok) throw new Error((d && d.message) || 'Erreur');
+        return d;
+      });
+    });
+  }
+  function note(id, text, ok) { var el = $(id); if (el) el.innerHTML = '<div class="msg ' + (ok ? 'ok' : 'err') + '">' + esc(text) + '</div>'; }
+
+  function loadOverview() {
+    return api('/overview').then(function (d) {
+      ov = d;
+      if (!sessionId || !d.sessions.some(function (s) { return s.id === sessionId; })) {
+        var open = d.sessions.filter(function (s) { return s.classroom_open; })[0] || d.sessions[0];
+        sessionId = open ? open.id : null;
+      }
+    });
+  }
+
+  $('tabs').addEventListener('click', function (e) {
+    var t = e.target.getAttribute && e.target.getAttribute('data-t');
+    if (!t) return;
+    tab = t; editingCourse = null;
+    Array.prototype.forEach.call($('tabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-t') === t); });
+    render();
+  });
+
+  function render() {
+    if (!ov) { $('out').innerHTML = '<p class="small">Chargement…</p>'; return; }
+    if (tab === 'sessions') renderSessions();
+    else if (tab === 'cours') renderCourses();
+    else if (tab === 'inscrits') renderStudents();
+    else if (tab === 'certificats') renderCertificates();
+    else renderSettings();
+  }
+
+  // ---------- Sessions ----------
+  function renderSessions() {
+    var h = '<div class="panel"><h3 style="margin:0 0 6px;">Sessions</h3><p class="small">« Salle de classe ouverte » = la session dont les cours sont accessibles aux étudiants (une seule à la fois). « Inscriptions ouvertes » = les nouveaux étudiants peuvent s\'inscrire.</p></div>';
+    ov.sessions.forEach(function (s) {
+      h += '<div class="item" data-sid="' + s.id + '">' +
+        '<div class="row"><div class="grow"><label class="l">Titre</label><input class="f" data-f="title" value="' + esc(s.title) + '"></div>' +
+        '<div class="grow"><label class="l">Période</label><input class="f" data-f="period_label" value="' + esc(s.period_label) + '" placeholder="Juillet 2026"></div>' +
+        '<div><label class="l">Statut</label><select class="f" data-f="status">' + Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (s.status === k ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('') + '</select></div></div>' +
+        '<label class="l">Description</label><textarea class="f" data-f="description">' + esc(s.description) + '</textarea>' +
+        '<div class="row" style="margin-bottom:10px;"><label><input type="checkbox" data-f="classroom_open"' + (s.classroom_open ? ' checked' : '') + '> Salle de classe ouverte</label>' +
+        '<label><input type="checkbox" data-f="registration_open"' + (s.registration_open ? ' checked' : '') + '> Inscriptions ouvertes</label></div>' +
+        '<p class="small">' + s.courses_count + ' cours · ' + s.students_count + ' inscrit(s) · ' + s.certificates_count + ' certificat(s)</p>' +
+        '<div class="row"><button class="btn btn-primary" data-save="' + s.id + '">Enregistrer</button><button class="btn btn-ghost" data-del="' + s.id + '">Supprimer</button><span id="ns-' + s.id + '"></span></div></div>';
+    });
+    h += '<div class="panel"><h3 style="margin:0 0 10px;">Nouvelle session</h3><div class="row"><div class="grow"><input class="f" id="ns-title" placeholder="Titre (ex. Session 3)"></div><div class="grow"><input class="f" id="ns-period" placeholder="Période (ex. Juillet 2028)"></div></div><button class="btn btn-primary" id="ns-add">Ajouter la session</button><span id="ns-msg"></span></div>';
+    $('out').innerHTML = h;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-save]'), function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-save'), root = document.querySelector('[data-sid="' + id + '"]'), body = {};
+        Array.prototype.forEach.call(root.querySelectorAll('[data-f]'), function (el) { body[el.getAttribute('data-f')] = el.type === 'checkbox' ? el.checked : el.value; });
+        api('/sessions/' + id, { method: 'PUT', body: body }).then(function () { return loadOverview(); }).then(function () { renderSessions(); note('ns-' + id, 'Enregistré ✓', true); }).catch(function (e) { note('ns-' + id, e.message); });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del]'), function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('Supprimer cette session, ses cours, ses questions, ses inscrits et ses certificats ? Cette action est définitive.')) return;
+        api('/sessions/' + b.getAttribute('data-del'), { method: 'DELETE' }).then(loadOverview).then(render).catch(function (e) { alert(e.message); });
+      });
+    });
+    $('ns-add').addEventListener('click', function () {
+      api('/sessions', { method: 'POST', body: { title: $('ns-title').value, period_label: $('ns-period').value } }).then(loadOverview).then(render).catch(function (e) { note('ns-msg', e.message); });
+    });
+  }
+
+  // ---------- Cours ----------
+  function sessionPicker() {
+    return '<div class="panel"><label class="l">Session</label><select class="f" id="sp" style="margin-bottom:0;">' +
+      ov.sessions.map(function (s) { return '<option value="' + s.id + '"' + (s.id === sessionId ? ' selected' : '') + '>' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</option>'; }).join('') + '</select></div>';
+  }
+  function renderCourses() {
+    if (!sessionId) { $('out').innerHTML = '<div class="panel"><p>Créez d\'abord une session.</p></div>'; return; }
+    if (editingCourse) { renderEditor(); return; }
+    api('/courses?session_id=' + sessionId).then(function (list) {
+      var h = sessionPicker() + '<div class="panel"><h3 style="margin:0 0 6px;">Cours de la session</h3><p class="small">L\'ordre ci-dessous est l\'ordre de déverrouillage : chaque cours s\'ouvre quand le test du précédent est réussi.</p></div>';
+      list.forEach(function (c, i) {
+        h += '<div class="item"><div class="row"><div class="grow"><b>' + (i + 1) + '. ' + esc(c.title) + '</b><div class="small">' + esc(c.teacher || '') + '</div>' +
+          '<div style="margin-top:6px;"><span class="tag ' + (c.youtube_url ? 'g' : '') + '">' + (c.youtube_url ? '▶ vidéo' : 'sans vidéo') + '</span><span class="tag ' + (c.has_text || c.has_file ? 'g' : '') + '">' + (c.has_text || c.has_file ? 'syllabus' : 'sans syllabus') + '</span><span class="tag ' + (c.questions_count >= 15 ? 'g' : '') + '">' + c.questions_count + ' question(s)</span></div></div>' +
+          '<div class="row"><button class="btn btn-ghost" data-up="' + c.id + '"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="btn btn-ghost" data-down="' + c.id + '"' + (i === list.length - 1 ? ' disabled' : '') + '>↓</button><button class="btn btn-primary" data-edit="' + c.id + '">Modifier</button><button class="btn btn-ghost" data-rm="' + c.id + '">🗑</button></div></div></div>';
+      });
+      if (!list.length) h += '<div class="panel"><p class="small">Aucun cours pour le moment.</p></div>';
+      h += '<div class="panel"><h3 style="margin:0 0 10px;">Ajouter un cours</h3><input class="f" id="nc-title" placeholder="Titre du cours"><input class="f" id="nc-teacher" placeholder="Enseignant (facultatif)"><button class="btn btn-primary" id="nc-add">Ajouter le cours</button><span id="nc-msg"></span></div>';
+      $('out').innerHTML = h;
+      $('sp').addEventListener('change', function () { sessionId = Number($('sp').value); renderCourses(); });
+      var each = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
+      each('[data-up]', function (b) { b.addEventListener('click', function () { api('/courses/' + b.getAttribute('data-up') + '/move', { method: 'POST', body: { dir: 'up' } }).then(renderCourses); }); });
+      each('[data-down]', function (b) { b.addEventListener('click', function () { api('/courses/' + b.getAttribute('data-down') + '/move', { method: 'POST', body: { dir: 'down' } }).then(renderCourses); }); });
+      each('[data-edit]', function (b) { b.addEventListener('click', function () { editingCourse = b.getAttribute('data-edit'); renderCourses(); }); });
+      each('[data-rm]', function (b) { b.addEventListener('click', function () { if (confirm('Supprimer ce cours, son syllabus et ses questions ?')) api('/courses/' + b.getAttribute('data-rm'), { method: 'DELETE' }).then(renderCourses); }); });
+      $('nc-add').addEventListener('click', function () {
+        api('/courses', { method: 'POST', body: { session_id: sessionId, title: $('nc-title').value, teacher: $('nc-teacher').value } })
+          .then(function (c) { editingCourse = c.id; renderCourses(); }).catch(function (e) { note('nc-msg', e.message); });
+      });
+    }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+  }
+
+  function renderEditor() {
+    api('/courses/' + editingCourse).then(function (d) {
+      var c = d.course, qs = d.questions;
+      var ia = qs.filter(function (q) { return q.source === 'ia'; }).length;
+      var h = '<button class="btn btn-ghost" id="ed-back" style="margin-bottom:14px;">← Retour aux cours</button>' +
+        '<div class="panel"><h3 style="margin:0 0 10px;">Cours</h3>' +
+        '<label class="l">Titre</label><input class="f" id="ed-title" value="' + esc(c.title) + '">' +
+        '<label class="l">Enseignant</label><input class="f" id="ed-teacher" value="' + esc(c.teacher) + '">' +
+        '<label class="l">Description courte</label><textarea class="f" id="ed-desc">' + esc(c.description) + '</textarea>' +
+        '<label class="l">Lien de la vidéo YouTube</label><input class="f" id="ed-yt" value="' + esc(c.youtube_url) + '" placeholder="https://youtu.be/...">' +
+        '<label class="l">Lien du syllabus (facultatif, ex. PDF hébergé ailleurs)</label><input class="f" id="ed-syurl" value="' + esc(c.syllabus_url) + '">' +
+        '<button class="btn btn-primary" id="ed-save">Enregistrer le cours</button> <span id="ed-msg"></span></div>' +
+        '<div class="panel"><h3 style="margin:0 0 6px;">Syllabus</h3><p class="small" style="margin-bottom:10px;">Le texte du syllabus est lu en ligne par les étudiants, et les questions du test en sont tirées. Importez un fichier (PDF, Word ou texte) ou collez le texte.</p>' +
+        (c.has_file ? '<p class="small">Fichier enregistré : <b>' + esc(c.syllabus_filename) + '</b></p>' : '') +
+        '<input type="file" id="ed-file" accept=".pdf,.docx,.txt" class="f"><button class="btn btn-ghost" id="ed-upload">Importer le fichier</button> <span id="ed-fmsg"></span>' +
+        '<label class="l" style="margin-top:12px;">Texte du syllabus (titres : une ligne commençant par « # »)</label><textarea class="f" id="ed-text" style="min-height:220px;">' + esc(c.syllabus_text) + '</textarea>' +
+        '<button class="btn btn-primary" id="ed-savetext">Enregistrer le texte</button> <span id="ed-tmsg"></span></div>' +
+        '<div class="panel"><h3 style="margin:0 0 6px;">Questions du test (' + qs.length + ')</h3>' +
+        '<p class="small" style="margin-bottom:10px;">Chaque test tire 15 questions au hasard dans cette réserve. Visez au moins 30 questions. ' + (ov.ia_ready ? '' : '⚠️ La génération automatique n\'est pas activée (clé MISTRAL_API_KEY absente) : ajoutez les questions à la main.') + '</p>' +
+        '<button class="btn btn-primary" id="ed-gen"' + (ov.ia_ready ? '' : ' disabled') + '>⚡ Générer les questions depuis le syllabus</button> <span id="ed-gmsg"></span>' +
+        (ia ? '<p class="small" style="margin-top:6px;">Régénérer remplace les ' + ia + ' question(s) automatiques ; vos questions manuelles sont conservées.</p>' : '') +
+        '<div style="margin-top:14px;">' + (qs.map(function (q) {
+          return '<div class="q"><div class="row"><div class="grow"><span class="tag ' + (q.source === 'ia' ? 'b' : '') + '">' + (q.source === 'ia' ? 'auto' : 'manuel') + '</span>' + esc(q.question_text) + '</div><button class="btn btn-ghost" data-qdel="' + q.id + '">🗑</button></div><ul>' +
+            q.choices.map(function (x, i) { return '<li class="' + (i === q.correct_choice_index ? 'ok' : '') + '">' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+        }).join('') || '<p class="small">Aucune question.</p>') + '</div>' +
+        '<h4 style="margin:18px 0 8px;">Ajouter une question à la main</h4><input class="f" id="nq-q" placeholder="Question">' +
+        [0, 1, 2, 3].map(function (i) { return '<div class="row"><input type="radio" name="nq-ok" value="' + i + '"' + (i === 0 ? ' checked' : '') + '><input class="f grow" id="nq-c' + i + '" placeholder="Proposition ' + (i + 1) + (i === 0 ? ' (bonne réponse cochée à gauche)' : '') + '"></div>'; }).join('') +
+        '<button class="btn btn-primary" id="nq-add">Ajouter la question</button> <span id="nq-msg"></span></div>';
+      $('out').innerHTML = h;
+      var id = editingCourse;
+      $('ed-back').addEventListener('click', function () { editingCourse = null; renderCourses(); });
+      $('ed-save').addEventListener('click', function () {
+        api('/courses/' + id, { method: 'PUT', body: { title: $('ed-title').value, teacher: $('ed-teacher').value, description: $('ed-desc').value, youtube_url: $('ed-yt').value, syllabus_url: $('ed-syurl').value } })
+          .then(function () { note('ed-msg', 'Enregistré ✓', true); }).catch(function (e) { note('ed-msg', e.message); });
+      });
+      $('ed-savetext').addEventListener('click', function () {
+        api('/courses/' + id, { method: 'PUT', body: { syllabus_text: $('ed-text').value } }).then(function () { note('ed-tmsg', 'Texte enregistré ✓', true); }).catch(function (e) { note('ed-tmsg', e.message); });
+      });
+      $('ed-upload').addEventListener('click', function () {
+        var f = $('ed-file').files[0];
+        if (!f) return note('ed-fmsg', 'Choisissez d\'abord un fichier.');
+        var fd = new FormData(); fd.append('file', f);
+        note('ed-fmsg', 'Import en cours…', true);
+        api('/courses/' + id + '/syllabus-file', { method: 'POST', form: fd }).then(function (r) { renderEditor(); setTimeout(function () { note('ed-fmsg', 'Fichier importé (' + r.characters + ' caractères de texte lus) ✓', true); }, 400); }).catch(function (e) { note('ed-fmsg', e.message); });
+      });
+      $('ed-gen').addEventListener('click', function () {
+        if (qs.length && !confirm('Les questions automatiques actuelles seront remplacées. Continuer ?')) return;
+        $('ed-gen').disabled = true;
+        note('ed-gmsg', 'Génération en cours… cela peut prendre une à deux minutes.', true);
+        api('/courses/' + id + '/generate', { method: 'POST' }).then(function (r) { renderEditor(); setTimeout(function () { note('ed-gmsg', r.generated + ' questions générées ✓', true); }, 400); }).catch(function (e) { $('ed-gen').disabled = false; note('ed-gmsg', e.message); });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-qdel]'), function (b) {
+        b.addEventListener('click', function () { api('/questions/' + b.getAttribute('data-qdel'), { method: 'DELETE' }).then(renderEditor); });
+      });
+      $('nq-add').addEventListener('click', function () {
+        var choices = [0, 1, 2, 3].map(function (i) { return $('nq-c' + i).value.trim(); });
+        var ok = Number(document.querySelector('input[name="nq-ok"]:checked').value);
+        var filled = [], idx = -1;
+        choices.forEach(function (c, i) { if (c) { if (i === ok) idx = filled.length; filled.push(c); } });
+        api('/courses/' + id + '/questions', { method: 'POST', body: { question_text: $('nq-q').value, choices: filled, correct_choice_index: idx } })
+          .then(renderEditor).catch(function (e) { note('nq-msg', e.message); });
+      });
+    }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+  }
+
+  // ---------- Inscrits / Certificats / Réglages ----------
+  var fmt = function (d) { try { return new Date(d).toLocaleDateString('fr-FR'); } catch (e) { return ''; } };
+  function renderStudents() {
+    api('/students').then(function (rows) {
+      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Inscrits (' + rows.length + ')</h3>' + (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Nom complet</th><th>E-mail</th><th>Session</th><th>Cours réussis</th><th>Certificat</th><th>Inscrit le</th></tr>' +
+        rows.map(function (r) { return '<tr><td>' + esc(r.full_name) + '</td><td>' + esc(r.email) + '</td><td>' + esc(r.session_title) + '</td><td>' + r.courses_passed + ' / ' + r.courses_total + '</td><td>' + (r.certificate_code ? '<span class="tag g">' + esc(r.certificate_code) + '</span>' : '—') + '</td><td>' + fmt(r.created_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Personne ne s\'est encore inscrit.</p>') + '</div>';
+    }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+  }
+  function renderCertificates() {
+    api('/certificates').then(function (rows) {
+      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Certificats délivrés (' + rows.length + ')</h3>' +
+        '<p class="small" style="margin-bottom:10px;">Un certificat est authentique si son code figure ici. Le code QR du certificat ouvre la page publique de vérification.</p>' +
+        (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Code</th><th>Nom</th><th>Session</th><th>Résultat</th><th>Date</th></tr>' +
+        rows.map(function (r) { return '<tr><td><a href="/ebk-verification.html?code=' + encodeURIComponent(r.code) + '" target="_blank">' + esc(r.code) + '</a></td><td>' + esc(r.full_name) + '<div class="small">' + esc(r.email) + '</div></td><td>' + esc(r.session_title) + '</td><td>' + r.score + ' %</td><td>' + fmt(r.issued_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Aucun certificat délivré pour le moment.</p>') + '</div>';
+    }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+  }
+  function renderSettings() {
+    var s = ov.settings;
+    $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Réglages de l\'école</h3>' +
+      '<label class="l">Texte « L\'école » (page d\'accueil de l\'EBK)</label><textarea class="f" id="st-about" style="min-height:120px;">' + esc(s.about) + '</textarea>' +
+      '<label class="l">Contact (adresse, WhatsApp, e-mail… une information par ligne)</label><textarea class="f" id="st-contact">' + esc(s.contact) + '</textarea>' +
+      '<div class="row"><div class="grow"><label class="l">Légende sous la 1re signature du certificat</label><input class="f" id="st-s1" value="' + esc(s.sig1) + '" placeholder="Ex. Le Directeur"></div>' +
+      '<div class="grow"><label class="l">Légende sous la 2e signature</label><input class="f" id="st-s2" value="' + esc(s.sig2) + '" placeholder="Ex. Le Responsable pédagogique"></div></div>' +
+      '<p class="small" style="margin-bottom:10px;">Les deux espaces de signature restent vides sur le certificat : vous signez à la main après l\'impression.</p>' +
+      '<button class="btn btn-primary" id="st-save">Enregistrer</button> <span id="st-msg"></span></div>';
+    $('st-save').addEventListener('click', function () {
+      api('/settings', { method: 'PUT', body: { about: $('st-about').value, contact: $('st-contact').value, sig1: $('st-s1').value, sig2: $('st-s2').value } })
+        .then(function (d) { ov.settings = d; note('st-msg', 'Enregistré ✓', true); }).catch(function (e) { note('st-msg', e.message); });
+    });
+  }
+
+  loadOverview().then(render).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+})();
+</script>
+<script src="/js/pwa.js"></script>
+</body>
+</html>
