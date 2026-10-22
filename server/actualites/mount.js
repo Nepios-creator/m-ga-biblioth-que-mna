@@ -2,6 +2,7 @@
 //  1. API         : /api/actualites (public + administration)
 //  2. Navigation  : ajoute le lien « Actualités » dans les pages existantes (sans modifier leurs fichiers)
 //  3. Quotidien   : lance la recherche quotidienne d'actualités dans les sources officielles
+//  4. EBK         : branche l'API /api/ebk (École Biblique Kainos) et ajoute l'onglet « EBK » dans les pages
 const fs = require('fs');
 const path = require('path');
 const pool = require('../db/pool');
@@ -11,9 +12,19 @@ const buildRouter = require('./routes');
 const { startScheduler } = require('./feeds');
 
 const OWN_PAGES = new Set(['actualites.html', 'actualite.html', 'admin-actualites.html']);
+const NO_INJECT = new Set(['ebk-verification.html']); // page autonome (ouverte par le code QR du certificat)
 const NAV_SCRIPT = '<script src="/js/actualites-nav.js" defer></script>';
+const EBK_SCRIPT = '<script src="/js/ebk-nav.js" defer></script>';
 
 module.exports = function mountActualites(app, express, publicDir) {
+  // École Biblique Kainos : si ce module échoue, le reste du site continue de fonctionner normalement
+  try {
+    app.use('/api/ebk', require('../routes/ebk'));
+    console.log('[ebk] module branché');
+  } catch (err) {
+    console.error('[ebk] module non chargé :', err.message);
+  }
+
   const ready = ensureSchema()
     .then(() => true)
     .catch((err) => { console.error('[actualités] base de données indisponible :', err.message); return false; });
@@ -44,18 +55,23 @@ module.exports = function mountActualites(app, express, publicDir) {
     } catch (err) { next(); }
   });
 
-  // Pages HTML existantes : on ajoute une ligne de script au moment de l'envoi (les fichiers restent intacts)
+  // Pages HTML existantes : on ajoute des lignes de script au moment de l'envoi (les fichiers restent intacts)
   app.use((req, res, next) => {
     if (req.method !== 'GET') return next();
     const urlPath = req.path === '/' ? '/index.html' : req.path;
-    if (!urlPath.endsWith('.html') || OWN_PAGES.has(path.basename(urlPath))) return next();
+    if (!urlPath.endsWith('.html') || NO_INJECT.has(path.basename(urlPath))) return next();
     const file = path.normalize(path.join(publicDir, urlPath));
     if (!file.startsWith(publicDir + path.sep)) return next();
+    const own = OWN_PAGES.has(path.basename(urlPath));
     fs.readFile(file, 'utf8', (err, html) => {
       if (err) return next();
-      if (!html.includes('actualites-nav.js')) {
+      const add = [];
+      if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
+      if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
+      if (add.length) {
         const i = html.toLowerCase().lastIndexOf('</body>');
-        html = i === -1 ? html + NAV_SCRIPT : html.slice(0, i) + NAV_SCRIPT + '\n' + html.slice(i);
+        const tags = add.join('\n');
+        html = i === -1 ? html + tags : html.slice(0, i) + tags + '\n' + html.slice(i);
       }
       res.set('Cache-Control', 'no-cache').type('html').send(html);
     });
