@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Délais et compte à rebours — Administration</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 820px; margin: 0 auto; padding: 36px 20px 90px; }
+  .panel { background: #fff; border: 1px solid var(--line, #e6dfd0); border-radius: 14px; padding: 22px; margin-bottom: 20px; }
+  .hidden { display: none; }
+  .seg { display: flex; gap: 8px; margin-bottom: 18px; }
+  .seg button { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--line, #e6dfd0); background: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .seg button.on { background: #1f5386; color: #fff; border-color: #1f5386; }
+  label.f { display: block; font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #3a2f1f; }
+  select, input[type=number], input[type=text], input[type=datetime-local] { width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e6dfd0); border-radius: 10px; font-size: 15px; font-family: inherit; background: #fff; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 14px; }
+  .opt input { margin-top: 3px; }
+  details { margin-top: 14px; font-size: 14px; }
+  summary { cursor: pointer; color: #1f5386; font-weight: 600; }
+  .hint { font-size: 12.5px; color: var(--ink-soft, #6b5f4d); margin-top: 5px; }
+  .msg { font-size: 14px; margin: 12px 0; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .msg.success { background: #e8f6ec; color: #2a7a44; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chip { background: #e8f1fa; color: #1f5386; border-radius: 99px; padding: 4px 6px 4px 12px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+  .chip button { border: none; background: rgba(31,83,134,.15); border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; }
+  .results { border: 1px solid var(--line, #e6dfd0); border-radius: 10px; max-height: 220px; overflow: auto; margin-top: 6px; }
+  .results div { padding: 9px 12px; border-bottom: 1px solid var(--line, #e6dfd0); display: flex; justify-content: space-between; gap: 8px; font-size: 14px; cursor: pointer; }
+  .results div:last-child { border-bottom: none; }
+  .results small { color: var(--ink-soft, #6b5f4d); }
+  .item { border: 1px solid var(--line, #e6dfd0); border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fffdf8; }
+  .item h3 { font-size: 16px; margin: 0 0 4px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px; text-transform: uppercase; }
+  .badge.active { background: #e8f1fa; color: #1f5386; }
+  .badge.expired { background: #eee9df; color: #6b6558; }
+  .badge.scheduled { background: #fff3df; color: #9a5b00; }
+  .clock { font-size: 22px; font-weight: 700; margin: 8px 0 2px; font-variant-numeric: tabular-nums; color: #1f5386; }
+  .clock.warn { color: #b7791f; } .clock.danger { color: #b3261e; } .clock.over { color: #6b6558; font-size: 15px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .acts .btn { padding: 7px 12px; font-size: 13px; }
+  .small { font-size: 13px; color: var(--ink-soft, #6b5f4d); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/admin.html" style="font-size:14px;">← Administration</a>
+  <h1 style="font-family:'Fraunces',serif;margin:10px 0 6px;">Délais et compte à rebours</h1>
+  <p class="small" style="margin-bottom:20px;">Donnez une durée à un livre d'étude ou à une session EBK. Le compte à rebours s'affiche pour les personnes concernées, et l'accès se ferme tout seul à la fin. Le fonctionnement actuel du site ne change pas.</p>
+
+  <div id="denied" class="hidden panel">Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></div>
+
+  <div id="main" class="hidden">
+    <div class="seg">
+      <button id="k-study" class="on" type="button">📚 Livre d'étude</button>
+      <button id="k-ebk" type="button">🎓 Session EBK</button>
+    </div>
+
+    <div class="panel">
+      <form id="f">
+        <label class="f" id="l-target">Livre à étudier</label>
+        <select id="target" required></select>
+
+        <label class="f">Durée</label>
+        <div class="row">
+          <input type="number" id="dur" min="1" step="1" value="45">
+          <select id="unit">
+            <option value="jours">jours</option>
+            <option value="semaines">semaines</option>
+            <option value="mois">mois</option>
+          </select>
+        </div>
+        <details>
+          <summary>Choisir des dates précises</summary>
+          <label class="f">Date et heure de fin (remplace la durée)</label>
+          <input type="datetime-local" id="endAt">
+          <div id="start-box">
+            <label class="f">Début différé (facultatif — par défaut : maintenant)</label>
+            <input type="datetime-local" id="startAt">
+          </div>
+        </details>
+
+        <div id="aud-box">
+          <label class="f">Personnes concernées</label>
+          <label class="opt" style="margin-top:0;"><input type="radio" name="aud" value="all" checked> <span><b>Tous les membres</b> — chacun voit le compte à rebours</span></label>
+          <label class="opt"><input type="radio" name="aud" value="selected"> <span><b>Certaines personnes</b> — seules elles voient le livre</span></label>
+          <div id="picker" class="hidden">
+            <input type="text" id="q" placeholder="Rechercher par nom ou e-mail…" style="margin-top:10px;" autocomplete="off">
+            <div id="results" class="results hidden"></div>
+            <div id="chips" class="chips"></div>
+          </div>
+        </div>
+
+        <label class="opt" id="o-open"><input type="checkbox" id="open_now" checked> <span id="o-open-t">Ouvrir le livre maintenant dans l'espace d'étude</span></label>
+        <label class="opt hidden" id="o-reg"><input type="checkbox" id="open_reg" checked> <span>Garder les inscriptions ouvertes pendant la session</span></label>
+        <p class="hint" id="hint"></p>
+
+        <div id="form-msg"></div>
+        <button class="btn btn-primary" type="submit" style="margin-top:14px;">⏳ Lancer le compte à rebours</button>
+      </form>
+    </div>
+
+    <h2 style="margin:26px 0 12px;">Délais en cours et terminés</h2>
+    <div id="list"><p class="small">Chargement…</p></div>
+  </div>
+</div>
+
+<script src="/js/pwa.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var token = localStorage.getItem('mna_token');
+  var me = null; try { me = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
+  if (!token || !me || me.role !== 'admin' || me.admin_scope === 'limited') { $('denied').classList.remove('hidden'); return; }
+  $('main').classList.remove('hidden');
+
+  var H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  var kind = 'study_book', options = { books: [], sessions: [] }, picked = {}, items = [], offset = 0;
+
+  function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function pad(x) { return (x < 10 ? '0' : '') + x; }
+  function dt(iso) { return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' }); }
+  function api(url, opt) {
+    return fetch(url, Object.assign({ headers: H }, opt || {})).then(function (r) {
+      if (r.status === 204) return {};
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.message || 'Erreur'); return d; });
+    });
+  }
+  function msg(t, type) { $('form-msg').innerHTML = t ? '<div class="msg ' + type + '">' + esc(t) + '</div>' : ''; }
+
+  // ----- Formulaire -----
+  function setKind(k) {
+    kind = k;
+    $('k-study').classList.toggle('on', k === 'study_book');
+    $('k-ebk').classList.toggle('on', k === 'ebk_session');
+    var study = k === 'study_book';
+    $('l-target').textContent = study ? 'Livre à étudier' : 'Session EBK';
+    $('dur').value = study ? 45 : 6;
+    $('unit').value = study ? 'jours' : 'mois';
+    $('aud-box').classList.toggle('hidden', !study);
+    $('start-box').classList.toggle('hidden', !study);
+    $('o-reg').classList.toggle('hidden', study);
+    $('o-open-t').textContent = study ? 'Ouvrir le livre maintenant dans l\'espace d\'étude' : 'Ouvrir la salle de classe maintenant (les autres sessions sont fermées)';
+    $('hint').textContent = study
+      ? 'Tous les membres : chacun voit le livre et le compte à rebours, puis le livre est bloqué pour tous à la fin. Certaines personnes : seules elles (et les administrateurs) voient le livre et le compte à rebours ; pour les autres il reste invisible et bloqué ; à la fin il est bloqué pour elles aussi. Le brevet déjà obtenu reste téléchargeable.'
+      : 'À la fin de la durée, la salle de classe et les inscriptions de la session sont fermées automatiquement, et la session passe en « terminée ».';
+    fillTargets();
+  }
+  function fillTargets() {
+    var list = kind === 'study_book' ? options.books : options.sessions;
+    $('target').innerHTML = list.length
+      ? list.map(function (o) { return '<option value="' + o.id + '">' + esc(o.title) + (o.period_label ? ' — ' + esc(o.period_label) : '') + '</option>'; }).join('')
+      : '<option value="">' + (kind === 'study_book' ? 'Aucun livre dans l\'espace d\'étude' : 'Aucune session EBK') + '</option>';
+  }
+  $('k-study').onclick = function () { setKind('study_book'); };
+  $('k-ebk').onclick = function () { setKind('ebk_session'); };
+
+  // ----- Choix des personnes -----
+  function renderChips() {
+    var ids = Object.keys(picked);
+    $('chips').innerHTML = ids.map(function (id) {
+      return '<span class="chip">' + esc(picked[id]) + '<button type="button" data-rm="' + id + '">×</button></span>';
+    }).join('') || '<span class="small">Aucune personne choisie.</span>';
+  }
+  $('chips').addEventListener('click', function (e) {
+    var id = e.target.getAttribute && e.target.getAttribute('data-rm');
+    if (id) { delete picked[id]; renderChips(); }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=aud]'), function (r) {
+    r.onchange = function () { $('picker').classList.toggle('hidden', document.querySelector('input[name=aud]:checked').value !== 'selected'); renderChips(); };
+  });
+  var qt = null;
+  $('q').addEventListener('input', function () {
+    clearTimeout(qt);
+    qt = setTimeout(function () {
+      var q = $('q').value.trim();
+      if (q.length < 2) { $('results').classList.add('hidden'); return; }
+      api('/api/admin/delais/users?q=' + encodeURIComponent(q)).then(function (rows) {
+        $('results').classList.remove('hidden');
+        $('results').innerHTML = rows.length ? rows.map(function (u) {
+          return '<div data-id="' + u.id + '" data-name="' + esc(u.full_name || u.email) + '"><span>' + esc(u.full_name || '(sans nom)') + '<br><small>' + esc(u.email) + '</small></span><b>＋</b></div>';
+        }).join('') : '<div>Aucun résultat</div>';
+      }).catch(function () {});
+    }, 250);
+  });
+  $('results').addEventListener('click', function (e) {
+    var row = e.target.closest ? e.target.closest('[data-id]') : null;
+    if (!row) return;
+    picked[row.getAttribute('data-id')] = row.getAttribute('data-name');
+    renderChips();
+  });
+
+  // ----- Création -----
+  function localToIso(v) { return v ? new Date(v).toISOString() : undefined; }
+  $('f').addEventListener('submit', function (e) {
+    e.preventDefault();
+    msg('');
+    var aud = document.querySelector('input[name=aud]:checked').value;
+    var body = {
+      kind: kind, target_id: $('target').value,
+      duration_value: $('dur').value, duration_unit: $('unit').value,
+      ends_at: localToIso($('endAt').value), starts_at: localToIso($('startAt').value),
+      audience: kind === 'study_book' ? aud : 'all',
+      user_ids: Object.keys(picked).map(Number),
+      open_now: $('open_now').checked, open_registration: $('open_reg').checked,
+    };
+    api('/api/admin/delais', { method: 'POST', body: JSON.stringify(body) }).then(function () {
+      msg('Compte à rebours lancé.', 'success');
+      $('endAt').value = ''; $('startAt').value = '';
+      load();
+    }).catch(function (err) { msg(err.message, 'error'); });
+  });
+
+  // ----- Liste -----
+  function nowMs() { return Date.now() + offset; }
+  function load() {
+    api('/api/admin/delais').then(function (d) {
+      offset = new Date(d.now).getTime() - Date.now();
+      items = d.items;
+      render();
+    }).catch(function (err) { $('list').innerHTML = '<div class="msg error">' + esc(err.message) + '</div>'; });
+  }
+  function render() {
+    if (!items.length) { $('list').innerHTML = '<p class="small">Aucun délai pour le moment.</p>'; return; }
+    $('list').innerHTML = items.map(function (it) {
+      var who = it.kind === 'ebk_session' ? 'Session EBK' : (it.audience === 'all' ? 'Livre d\'étude — tous les membres' : 'Livre d\'étude — ' + it.users.length + ' personne(s) : ' + it.users.map(function (u) { return esc(u.full_name || u.email); }).join(', '));
+      var label = { active: 'En cours', expired: 'Terminé', scheduled: 'Programmé' }[it.state];
+      return '<div class="item" data-id="' + it.id + '">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><h3>' + esc(it.title) + '</h3><div class="small">' + who + '</div></div><span class="badge ' + it.state + '">' + label + '</span></div>' +
+        '<div class="clock" data-end="' + esc(it.ends_at) + '" data-state="' + it.state + '"></div>' +
+        '<div class="small">Fin : ' + esc(dt(it.ends_at)) + '</div>' +
+        '<div class="acts">' +
+        '<button class="btn btn-ghost" data-act="plus7">+7 jours</button>' +
+        '<button class="btn btn-ghost" data-act="plus1m">+1 mois</button>' +
+        '<button class="btn btn-ghost" data-act="date">Changer la date</button>' +
+        (it.state !== 'expired' ? '<button class="btn btn-ghost" data-act="stop">Terminer maintenant</button>' : '') +
+        '<button class="btn btn-ghost" data-act="del" style="color:#a33;">Supprimer</button>' +
+        '</div></div>';
+    }).join('');
+    tick();
+  }
+  function tick() {
+    Array.prototype.forEach.call(document.querySelectorAll('.clock'), function (c) {
+      var left = new Date(c.getAttribute('data-end')).getTime() - nowMs();
+      if (left <= 0) { c.className = 'clock over'; c.textContent = 'Délai terminé'; return; }
+      var s = Math.floor(left / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+      c.className = 'clock' + (left < 86400000 ? ' danger' : (left < 3 * 86400000 ? ' warn' : ''));
+      c.textContent = d + ' j ' + pad(h) + ' h ' + pad(m) + ' min ' + pad(s % 60) + ' s';
+    });
+  }
+  setInterval(tick, 1000);
+
+  function put(id, body) { return api('/api/admin/delais/' + id, { method: 'PUT', body: JSON.stringify(body) }).then(load).catch(function (e) { alert(e.message); }); }
+  $('list').addEventListener('click', function (e) {
+    var act = e.target.getAttribute && e.target.getAttribute('data-act');
+    if (!act) return;
+    var id = e.target.closest('.item').getAttribute('data-id');
+    var it = items.filter(function (x) { return String(x.id) === id; })[0];
+    if (!it) return;
+    var base = new Date(Math.max(new Date(it.ends_at).getTime(), nowMs()));
+    if (act === 'plus7') put(id, { ends_at: new Date(base.getTime() + 7 * 86400000).toISOString() });
+    else if (act === 'plus1m') { var d = new Date(base); d.setMonth(d.getMonth() + 1); put(id, { ends_at: d.toISOString() }); }
+    else if (act === 'date') {
+      var v = prompt('Nouvelle date de fin (AAAA-MM-JJ HH:MM) :', new Date(it.ends_at).toISOString().slice(0, 16).replace('T', ' '));
+      if (!v) return;
+      var nd = new Date(v.replace(' ', 'T'));
+      if (isNaN(nd.getTime())) return alert('Date invalide.');
+      put(id, { ends_at: nd.toISOString() });
+    }
+    else if (act === 'stop') { if (confirm('Terminer ce délai maintenant ? L\'accès sera bloqué tout de suite.')) put(id, { ends_at: new Date(nowMs()).toISOString() }); }
+    else if (act === 'del') {
+      if (confirm('Supprimer ce délai ? Le compte à rebours disparaît, le blocage automatique n\'a plus lieu et un livre réservé redevient verrouillé comme avant.')) api('/api/admin/delais/' + id, { method: 'DELETE' }).then(load).catch(function (er) { alert(er.message); });
+    }
+  });
+
+  api('/api/admin/delais/options').then(function (o) { options = o; setKind('study_book'); renderChips(); load(); }).catch(function (err) { msg(err.message, 'error'); });
+})();
+</script>
+</body>
+</html>
