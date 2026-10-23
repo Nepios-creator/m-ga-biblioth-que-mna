@@ -3,6 +3,7 @@
 //  2. Navigation  : ajoute le lien « Actualités » dans les pages existantes (sans modifier leurs fichiers)
 //  3. Quotidien   : lance la recherche quotidienne d'actualités dans les sources officielles
 //  4. EBK         : branche l'API /api/ebk (École Biblique Kainos) et ajoute l'onglet « EBK » dans les pages
+//  5. Délais      : livres d'étude et sessions EBK à durée limitée, avec compte à rebours
 const fs = require('fs');
 const path = require('path');
 const pool = require('../db/pool');
@@ -15,8 +16,17 @@ const OWN_PAGES = new Set(['actualites.html', 'actualite.html', 'admin-actualite
 const NO_INJECT = new Set(['ebk-verification.html']); // page autonome (ouverte par le code QR du certificat)
 const NAV_SCRIPT = '<script src="/js/actualites-nav.js" defer></script>';
 const EBK_SCRIPT = '<script src="/js/ebk-nav.js" defer></script>';
+const DELAIS_SCRIPT = '<script src="/js/delais.js" defer></script>';
 
 module.exports = function mountActualites(app, express, publicDir) {
+  // Délais (compte à rebours) : si ce module échoue, le reste du site continue de fonctionner normalement
+  try {
+    require('../delais/mount')(app, express);
+    console.log('[délais] module branché');
+  } catch (err) {
+    console.error('[délais] module non chargé :', err.message);
+  }
+
   // École Biblique Kainos : si ce module échoue, le reste du site continue de fonctionner normalement
   try {
     app.use('/api/ebk', require('../routes/ebk'));
@@ -68,6 +78,7 @@ module.exports = function mountActualites(app, express, publicDir) {
       const add = [];
       if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
       if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
+      if (!html.includes('delais.js')) add.push(DELAIS_SCRIPT);
       if (add.length) {
         const i = html.toLowerCase().lastIndexOf('</body>');
         const tags = add.join('\n');
