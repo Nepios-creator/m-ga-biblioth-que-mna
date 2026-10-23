@@ -15,6 +15,10 @@
   .k-sub a.on, .k-sub a:hover { color: #fff; border-bottom-color: var(--k-gold); }
   .k-sub a.k-cta { margin-left: auto; background: var(--k-gold); color: var(--k-navy); border-radius: 999px; padding: 8px 16px; border: none; }
   .k-hero { background: linear-gradient(160deg, #0d1b2f, var(--k-navy2)); color: #fff; text-align: center; padding: 70px 22px 60px; }
+  .k-logo-img { width: 124px; height: 124px; border-radius: 50%; background: #fff; padding: 6px; object-fit: contain; display: block; margin: 0 auto 16px; border: 2px solid var(--k-gold); }
+  .k-mini { width: 34px; height: 34px; border-radius: 50%; background: #fff; object-fit: contain; flex: none; margin-right: 8px; }
+  .k-pay { background: #fffaf0; border: 1px solid var(--k-gold); border-radius: 12px; padding: 16px 18px; margin: 14px 0; font-size: 14.5px; line-height: 1.6; }
+  .k-pay ol { margin: 8px 0 8px 20px; padding: 0; }
   .k-hero .k-eyebrow { color: var(--k-gold); letter-spacing: 4px; font: 700 12.5px system-ui, sans-serif; }
   .k-hero h1 { font: 700 clamp(34px, 7vw, 58px)/1.1 Georgia, serif; margin: 14px 0 12px; }
   .k-hero h1 span { color: var(--k-gold); }
@@ -102,7 +106,7 @@
 </header>
 
 <div class="k-sub" id="k-sub">
-  <span class="k-logo">EBK</span>
+  <img class="k-mini" src="/img/ebk-logo.png" alt="Logo École Biblique Kainos"><span class="k-logo">EBK</span>
   <a href="#accueil" data-v="school">Accueil</a>
   <a href="#ecole" data-v="school">L'école</a>
   <a href="#sessions" data-v="school">Sessions</a>
@@ -114,6 +118,7 @@
 <!-- ============ SITE DE L'ÉCOLE ============ -->
 <main id="view-school">
   <section class="k-hero" id="accueil">
+    <img class="k-logo-img" src="/img/ebk-logo.png" alt="Logo officiel de l'École Biblique Kainos">
     <div class="k-eyebrow">ÉCOLE BIBLIQUE</div>
     <h1>École Biblique <span>Kainos</span></h1>
     <p>Former des serviteurs puissants en parole et en œuvre.</p>
@@ -128,10 +133,10 @@
     <h2>L'école</h2><div class="k-bar"></div>
     <p class="k-lead" id="k-about">L'École Biblique Kainos existe pour former des serviteurs puissants en parole et en œuvre.</p>
     <div class="k-steps">
-      <div class="k-step"><b>1</b><span>Inscrivez-vous en salle de classe avec votre nom complet.</span></div>
+      <div class="k-step"><b>1</b><span>Inscrivez-vous avec votre nom complet et la capture de votre paiement. L'administration confirme votre accès.</span></div>
       <div class="k-step"><b>2</b><span>Suivez chaque cours : vidéo de l'enseignement et syllabus à étudier.</span></div>
       <div class="k-step"><b>3</b><span>Réussissez le test de 15 questions pour déverrouiller le cours suivant.</span></div>
-      <div class="k-step"><b>4</b><span>Passez le grand test de 80 questions : il ouvre votre certificat sécurisé.</span></div>
+      <div class="k-step"><b>4</b><span>Passez le grand test de 80 questions : il débloque votre brevet sécurisé, avec code QR personnel.</span></div>
     </div>
   </section>
 
@@ -174,9 +179,9 @@
 
   function api(path, opts) {
     opts = opts || {};
-    var h = { 'Content-Type': 'application/json' };
+    var h = opts.form ? {} : { 'Content-Type': 'application/json' };
     if (token) h.Authorization = 'Bearer ' + token;
-    return fetch('/api/ebk' + path, { method: opts.method || 'GET', headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined })
+    return fetch('/api/ebk' + path, { method: opts.method || 'GET', headers: h, body: opts.form ? opts.form : (opts.body ? JSON.stringify(opts.body) : undefined) })
       .then(function (r) {
         return r.json().catch(function () { return null; }).then(function (d) {
           if (!r.ok) { var e = new Error((d && d.message) || 'Erreur'); e.status = r.status; throw e; }
@@ -216,7 +221,8 @@
         return '<div class="k-card"><span class="k-tag ' + esc(x.status) + '">' + esc(STATUS[x.status] || x.status) + '</span>' +
           '<h3>' + esc(x.title) + (x.period_label ? ' — ' + esc(x.period_label) : '') + '</h3>' +
           '<p>' + esc(x.description || '') + '</p>' +
-          (x.classroom_open ? '<p style="margin-top:10px;"><b>Cours disponibles en ligne</b>' + (x.registration_open ? ' · inscriptions ouvertes' : ' · inscriptions fermées') + '</p>' : '') +
+          (Number(x.price_usd) > 0 ? '<p style="margin-top:10px;"><b>Inscription : ' + esc(Number(x.price_usd)) + ' $</b> (Airtel Money)</p>' : '') +
+          (x.classroom_open ? '<p style="margin-top:8px;"><b>Cours disponibles en ligne</b>' + (x.registration_open ? ' · inscriptions ouvertes' : ' · inscriptions fermées') + '</p><p style="margin-top:8px;">Votre date de début est celle de l\'ouverture de votre premier cours ; votre date de fin est celle de la réussite du grand test, également date de délivrance de votre brevet.</p>' : '') +
           (x.classroom_open ? '<p style="margin-top:12px;"><a class="btn btn-primary" href="#classe">Entrer en salle de classe</a></p>' : '') + '</div>';
       }).join('') || '<p class="k-muted">Aucune session pour le moment.</p>';
       var open = sessions.filter(function (x) { return x.classroom_open; })[0];
@@ -265,13 +271,14 @@
     current = null;
     if (!st.session) { box('<div class="k-panel"><h2>Salle de classe</h2><p class="k-muted">Aucune session n\'est ouverte pour le moment. Revenez bientôt.</p></div>'); return; }
     if (!st.student) { renderEnroll(); return; }
+    if (st.student.payment_status !== 'confirme') { renderPayment(); return; }
     var total = st.courses.length, done = st.courses.filter(function (c) { return c.passed; }).length;
     var pct = total ? Math.round(done * 100 / total) : 0;
     var h = '<div class="k-panel"><h2>Bienvenue, ' + esc(st.student.full_name) + '</h2>' +
-      '<p class="k-muted">' + esc(st.session.title) + (st.session.period_label ? ' — ' + esc(st.session.period_label) : '') + '</p>' +
+      '<p class="k-muted"><b>' + esc(st.session.title) + '</b> · Début : ' + (st.dates && st.dates.start ? fmtDate(st.dates.start) : 'à l\'ouverture de votre premier cours') + ' · Fin : ' + (st.dates && st.dates.end ? fmtDate(st.dates.end) : 'à la réussite du grand test') + '</p>' +
       '<div class="k-meter"><i style="width:' + pct + '%"></i></div>' +
-      '<p class="k-muted">' + done + ' cours réussi(s) sur ' + total + (st.certificate ? '' : ' · plus qu\'un grand test pour obtenir votre certificat') + '</p>' +
-      (st.certificate ? '' : '<p style="margin-top:6px;"><button class="btn btn-ghost" id="k-rename" style="font-size:12.5px;padding:6px 12px;">✏️ Corriger mon nom (certificat)</button></p>') + '</div>';
+      '<p class="k-muted">' + done + ' cours réussi(s) sur ' + total + (st.certificate ? '' : ' · plus qu\'un grand test pour obtenir votre brevet') + '</p>' +
+      (st.certificate ? '' : '<p style="margin-top:6px;"><button class="btn btn-ghost" id="k-rename" style="font-size:12.5px;padding:6px 12px;">✏️ Corriger mon nom (brevet)</button></p>') + '</div>';
     h += '<div class="k-panel"><h3>Mes cours</h3>';
     if (!total) h += '<p class="k-muted">Les cours seront publiés bientôt.</p>';
     st.courses.forEach(function (c) {
@@ -283,10 +290,10 @@
     h += '</div>';
     h += '<div class="k-panel"><h3>Grand test final</h3>';
     if (st.certificate) {
-      h += '<div class="k-msg ok">🎉 Félicitations ! Grand test réussi (' + esc(st.certificate.score) + ' %).</div><button class="btn btn-primary" id="k-cert">🎓 Ouvrir mon certificat</button>' +
+      h += '<div class="k-msg ok">🎉 Félicitations ! Grand test réussi (' + esc(st.certificate.score) + ' %).</div><button class="btn btn-primary" id="k-cert">🎓 Ouvrir mon brevet</button>' +
         '<p class="k-muted" style="margin-top:10px;">Code de vérification : <b>' + esc(st.certificate.code) + '</b></p>';
     } else if (st.all_passed) {
-      h += '<p class="k-muted">Vous avez réussi tous les cours. Le grand test compte ' + st.grand_quiz_size + ' questions portant sur chaque cours. Le réussir débloque votre certificat.</p><button class="btn btn-primary" id="k-grand">Passer le grand test</button>';
+      h += '<p class="k-muted">Vous avez réussi tous les cours. Le grand test compte ' + st.grand_quiz_size + ' questions portant sur chaque cours. Le réussir débloque votre brevet.</p><button class="btn btn-primary" id="k-grand">Passer le grand test</button>';
     } else {
       h += '<p class="k-muted">🔒 Il se débloque après la réussite des tests de tous les cours (' + st.grand_quiz_size + ' questions sur l\'ensemble des cours).</p>';
     }
@@ -296,28 +303,69 @@
     if ($('k-grand')) $('k-grand').addEventListener('click', startGrand);
     if ($('k-cert')) $('k-cert').addEventListener('click', openCertificate);
     if ($('k-rename')) $('k-rename').addEventListener('click', function () {
-      var n = prompt('Votre nom complet tel qu\'il doit figurer sur le certificat :', st.student.full_name);
+      var n = prompt('Votre nom complet tel qu\'il doit figurer sur le brevet :', st.student.full_name);
       if (!n) return;
       api('/name', { method: 'PUT', body: { full_name: n } }).then(function (d) { st = d; renderHome(); }).catch(function (e) { alert(e.message); });
     });
   }
 
+  function fmtDate(d) { try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Africa/Kinshasa' }); } catch (e) { return ''; } }
+  function waLink() { return 'https://wa.me/' + String((st.payment && st.payment.pay_number) || '').replace(/\D/g, ''); }
+  function payBlock() {
+    var p = st.payment || {}, price = Number(p.price_usd) || 0;
+    if (!price) return '';
+    return '<div class="k-pay"><b>Frais d\'inscription : ' + price + ' $</b> — paiement par <b>Airtel Money</b> au numéro <b>' + esc(p.pay_number) + '</b>.' +
+      '<ol><li>Envoyez ' + price + ' $ par Airtel Money à ce numéro.</li><li>Faites une capture d\'écran de la confirmation du paiement.</li>' +
+      '<li>Joignez-la dans le champ ci-dessous <b>et</b> envoyez-la aussi sur WhatsApp au même numéro.</li></ol>' +
+      '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' + waLink() + '">💬 Ouvrir WhatsApp</a></div>';
+  }
+
   function renderEnroll() {
-    var s = st.session;
+    var s = st.session, price = Number((st.payment || {}).price_usd) || 0;
     if (!s.registration_open) {
       box('<div class="k-panel"><h2>Salle de classe</h2><div class="k-msg err">Les inscriptions à la ' + esc(s.title) + ' sont fermées pour le moment.</div></div>');
       return;
     }
     box('<div class="k-panel"><h2>Inscription à la salle de classe</h2>' +
-      '<p class="k-muted">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</p>' +
-      '<p class="k-muted" style="margin-top:12px;">Écrivez votre <b>nom complet</b> (prénom et nom). Il figurera sur votre certificat : vérifiez bien l\'orthographe.</p>' +
+      '<p class="k-muted">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</p>' + payBlock() +
+      '<p class="k-muted" style="margin-top:12px;">Écrivez votre <b>nom complet</b> (prénom et nom). Il figurera sur votre brevet : vérifiez bien l\'orthographe.</p>' +
       '<input class="k-field" id="k-name" placeholder="Ex. Jean Mukendi Kabasele" autocomplete="name" value="' + esc((me && me.full_name) || '') + '">' +
-      '<div id="k-err"></div><button class="btn btn-primary" id="k-enroll">Commencer les cours</button></div>');
+      (price ? '<label class="k-muted" for="k-proof" style="display:block;"><b>Capture d\'écran du paiement</b></label><input class="k-field" id="k-proof" type="file" accept="image/*">' : '') +
+      '<div id="k-err"></div><button class="btn btn-primary" id="k-enroll">' + (price ? 'Envoyer mon inscription' : 'Commencer les cours') + '</button></div>');
     $('k-enroll').addEventListener('click', function () {
+      var fd = new FormData();
+      fd.append('full_name', $('k-name').value);
+      if (price) {
+        var f = $('k-proof').files[0];
+        if (!f) { $('k-err').innerHTML = '<div class="k-msg err">Joignez la capture d\'écran de votre paiement.</div>'; return; }
+        fd.append('proof', f);
+      }
       $('k-enroll').disabled = true;
-      api('/enroll', { method: 'POST', body: { full_name: $('k-name').value } })
+      api('/enroll', { method: 'POST', form: fd })
         .then(function (d) { st = d; renderHome(); })
         .catch(function (e) { $('k-enroll').disabled = false; $('k-err').innerHTML = '<div class="k-msg err">' + esc(e.message) + '</div>'; });
+    });
+  }
+
+  // Inscription reçue : en attente de confirmation (ou paiement refusé)
+  function renderPayment() {
+    var s = st.student, refused = s.payment_status === 'refuse';
+    var h = '<div class="k-panel"><h2>' + (refused ? 'Paiement non validé' : '⏳ En attente de confirmation') + '</h2>' +
+      '<p class="k-muted">Inscrit(e) sous le nom : <b>' + esc(s.full_name) + '</b></p>';
+    if (refused) h += '<div class="k-msg err">Votre paiement n\'a pas pu être validé.' + (s.payment_note ? ' Motif : ' + esc(s.payment_note) : '') + ' Envoyez une nouvelle capture ci-dessous.</div>';
+    else h += '<div class="k-msg ok">Votre inscription et votre capture ont bien été reçues. Dès que l\'administration confirme votre paiement, la salle de classe s\'ouvre ici. Pensez à envoyer aussi la capture sur WhatsApp au même numéro.</div>';
+    h += '<p style="margin:12px 0;"><a class="btn btn-ghost" target="_blank" rel="noopener" href="' + waLink() + '">💬 Envoyer la capture sur WhatsApp</a> <button class="btn btn-primary" id="k-refresh">Actualiser</button></p>';
+    h += '<h3 style="margin-top:18px;">' + (refused ? 'Nouvelle capture' : 'Capture illisible ? Envoyez-en une autre') + '</h3>' +
+      '<input class="k-field" id="k-proof2" type="file" accept="image/*"><div id="k-err"></div><button class="btn btn-ghost" id="k-resend">Envoyer cette capture</button></div>';
+    box(h);
+    $('k-refresh').addEventListener('click', refreshHome);
+    $('k-resend').addEventListener('click', function () {
+      var f = $('k-proof2').files[0];
+      if (!f) { $('k-err').innerHTML = '<div class="k-msg err">Choisissez d\'abord une image.</div>'; return; }
+      var fd = new FormData(); fd.append('proof', f);
+      $('k-resend').disabled = true;
+      api('/payment-proof', { method: 'POST', form: fd }).then(function (d) { st = d; renderHome(); })
+        .catch(function (e) { $('k-resend').disabled = false; $('k-err').innerHTML = '<div class="k-msg err">' + esc(e.message) + '</div>'; });
     });
   }
 
@@ -415,7 +463,7 @@
     var q = quiz, wrong = r.wrong || [];
     var ct = function (w, i) { return i >= 0 && w.choices && w.choices[i] !== undefined ? w.choices[i] : null; };
     var h = '<div class="k-msg ' + (r.passed ? 'ok' : 'err') + '" style="font-size:16px;">' + (r.passed ? '✅ Réussi !' : '❌ Non réussi.') + ' Score : ' + r.score + ' % (' + r.correct + '/' + r.total + ')' +
-      (r.passed ? (q.kind === 'grand' ? ' — votre certificat est prêt.' : ' — le cours suivant est déverrouillé.') : ' — relisez le syllabus, regardez la correction, puis retentez.') + '</div>';
+      (r.passed ? (q.kind === 'grand' ? ' — votre brevet est prêt.' : ' — le cours suivant est déverrouillé.') : ' — relisez le syllabus, regardez la correction, puis retentez.') + '</div>';
     if (wrong.length) {
       h += '<h3 style="margin:18px 0 10px;">Correction — ' + wrong.length + ' réponse(s) à revoir</h3>' + wrong.map(function (w) {
         return '<div class="k-rev"><b>' + esc(w.question_text) + '</b><div class="bad">Votre réponse : ' + esc(ct(w, w.your_answer) || 'aucune réponse') + '</div><div class="good">Bonne réponse : ' + esc(ct(w, w.correct_answer) || '') + '</div></div>';
@@ -424,7 +472,7 @@
     h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">';
     if (!r.passed) h += '<button class="btn btn-primary" id="k-retry">Réessayer le test</button>';
     if (r.passed && r.next_course_id) h += '<button class="btn btn-primary" id="k-nextc">Cours suivant →</button>';
-    if (r.passed && q.kind === 'grand') h += '<button class="btn btn-primary" id="k-certn">🎓 Ouvrir mon certificat</button>';
+    if (r.passed && q.kind === 'grand') h += '<button class="btn btn-primary" id="k-certn">🎓 Ouvrir mon brevet</button>';
     h += '<button class="btn btn-ghost" id="k-home">Mes cours</button></div>';
     $('k-result').innerHTML = h;
     $('k-result').scrollIntoView({ behavior: 'smooth', block: 'start' });

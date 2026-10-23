@@ -41,15 +41,16 @@
 </header>
 
 <div class="wrap">
-  <h1 style="font-family:'Fraunces',Georgia,serif;margin-bottom:4px;">✝️ Administration de l'École Biblique Kainos</h1>
-  <p class="small" style="margin-bottom:18px;">Sessions, cours, vidéos, syllabus, questions des tests, inscrits et certificats.</p>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;"><img src="/img/ebk-logo.png" alt="Logo EBK" style="width:54px;height:54px;border-radius:50%;border:2px solid #c9a24b;background:#fff;"><h1 style="font-family:'Fraunces',Georgia,serif;margin:0;">Administration de l'École Biblique Kainos</h1></div>
+  <p class="small" style="margin-bottom:18px;">Paiements, sessions, cours, vidéos, syllabus, questions des tests, inscrits et brevets.</p>
   <div id="denied" class="panel hidden"><p>Cette page est réservée à l'administrateur principal. <a href="/login.html">Se connecter</a></p></div>
   <div id="app" class="hidden">
     <div class="tabs" id="tabs">
+      <button data-t="paiements" id="tab-pay">Paiements</button>
       <button data-t="sessions" class="on">Sessions</button>
       <button data-t="cours">Cours</button>
       <button data-t="inscrits">Inscrits</button>
-      <button data-t="certificats">Certificats</button>
+      <button data-t="brevets">Brevets</button>
       <button data-t="reglages">Réglages</button>
     </div>
     <div id="out"></div>
@@ -65,6 +66,7 @@
   if (!token || !me || me.role !== 'admin' || me.admin_scope === 'limited') { $('denied').classList.remove('hidden'); return; }
   $('app').classList.remove('hidden');
 
+  var fmt = function (d) { try { return new Date(d).toLocaleDateString('fr-FR'); } catch (e) { return ''; } };
   var STATUS = { terminee: 'Terminée', a_venir: 'À venir', en_cours: 'En cours' };
   var ov = null, tab = 'sessions', sessionId = null, editingCourse = null;
 
@@ -87,6 +89,7 @@
   function loadOverview() {
     return api('/overview').then(function (d) {
       ov = d;
+      $('tab-pay').textContent = 'Paiements' + (d.pending_payments ? ' (' + d.pending_payments + ')' : '');
       if (!sessionId || !d.sessions.some(function (s) { return s.id === sessionId; })) {
         var open = d.sessions.filter(function (s) { return s.classroom_open; })[0] || d.sessions[0];
         sessionId = open ? open.id : null;
@@ -105,10 +108,53 @@
   function render() {
     if (!ov) { $('out').innerHTML = '<p class="small">Chargement…</p>'; return; }
     if (tab === 'sessions') renderSessions();
+    else if (tab === 'paiements') renderPayments();
     else if (tab === 'cours') renderCourses();
     else if (tab === 'inscrits') renderStudents();
-    else if (tab === 'certificats') renderCertificates();
+    else if (tab === 'brevets') renderCertificates();
     else renderSettings();
+  }
+
+
+  // ---------- Paiements ----------
+  var PAY = { en_attente: ['En attente', ''], confirme: ['Confirmé', 'g'], refuse: ['Refusé', ''] };
+  function viewProof(id) {
+    fetch('/api/ebk/admin/students/' + id + '/proof', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { if (!r.ok) throw new Error('Aucune capture reçue'); return r.blob(); })
+      .then(function (b) {
+        var url = URL.createObjectURL(b);
+        var o = document.createElement('div');
+        o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99;display:flex;align-items:center;justify-content:center;padding:14px;';
+        o.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:100%;border-radius:8px;background:#fff;">';
+        o.addEventListener('click', function () { URL.revokeObjectURL(url); o.remove(); });
+        document.body.appendChild(o);
+      }).catch(function (e) { alert(e.message); });
+  }
+  function setPayment(id, status, note) {
+    return api('/students/' + id + '/payment', { method: 'POST', body: { status: status, note: note } }).then(loadOverview).then(renderPayments);
+  }
+  function renderPayments() {
+    api('/payments').then(function (rows) {
+      var pending = rows.filter(function (r) { return r.payment_status === 'en_attente'; }).length;
+      var h = '<div class="panel"><h3 style="margin:0 0 6px;">Paiements d\'inscription</h3><p class="small">Ouvrez la capture, vérifiez le paiement (et sur WhatsApp), puis cliquez sur « Confirmer » : l\'étudiant entre aussitôt dans la salle de classe. ' + pending + ' en attente.</p></div>';
+      rows.forEach(function (r) {
+        var p = PAY[r.payment_status] || ['', ''];
+        h += '<div class="item"><div class="row"><div class="grow"><b>' + esc(r.full_name) + '</b> <span class="tag ' + p[1] + '">' + p[0] + '</span>' +
+          '<div class="small">' + esc(r.email) + ' · ' + esc(r.session_title) + (r.price_usd ? ' · ' + Number(r.price_usd) + ' $' : '') + ' · ' + fmt(r.created_at) + '</div>' +
+          (r.payment_note ? '<div class="small">Motif du refus : ' + esc(r.payment_note) + '</div>' : '') + '</div>' +
+          '<div class="row">' + (r.has_proof ? '<button class="btn btn-ghost" data-proof="' + r.id + '">🖼 Voir la capture</button>' : '<span class="small">Pas de capture</span>') +
+          (r.payment_status !== 'confirme' ? '<button class="btn btn-primary" data-ok="' + r.id + '">✓ Confirmer</button>' : '') +
+          (r.payment_status === 'en_attente' ? '<button class="btn btn-ghost" data-no="' + r.id + '">Refuser</button>' : '') +
+          (r.payment_status === 'confirme' ? '<button class="btn btn-ghost" data-undo="' + r.id + '">Annuler</button>' : '') + '</div></div></div>';
+      });
+      if (!rows.length) h += '<div class="panel"><p class="small">Aucune inscription pour le moment.</p></div>';
+      $('out').innerHTML = h;
+      var each = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
+      each('[data-proof]', function (b) { b.addEventListener('click', function () { viewProof(b.getAttribute('data-proof')); }); });
+      each('[data-ok]', function (b) { b.addEventListener('click', function () { setPayment(b.getAttribute('data-ok'), 'confirme').catch(function (e) { alert(e.message); }); }); });
+      each('[data-no]', function (b) { b.addEventListener('click', function () { var n = prompt('Motif du refus (visible par l\'étudiant) :', 'Capture illisible ou paiement introuvable'); if (n !== null) setPayment(b.getAttribute('data-no'), 'refuse', n).catch(function (e) { alert(e.message); }); }); });
+      each('[data-undo]', function (b) { b.addEventListener('click', function () { if (confirm('Remettre cette inscription en attente ? L\'étudiant perdra l\'accès tant que vous ne confirmez pas.')) setPayment(b.getAttribute('data-undo'), 'en_attente').catch(function (e) { alert(e.message); }); }); });
+    }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
   }
 
   // ---------- Sessions ----------
@@ -119,10 +165,11 @@
         '<div class="row"><div class="grow"><label class="l">Titre</label><input class="f" data-f="title" value="' + esc(s.title) + '"></div>' +
         '<div class="grow"><label class="l">Période</label><input class="f" data-f="period_label" value="' + esc(s.period_label) + '" placeholder="Juillet 2026"></div>' +
         '<div><label class="l">Statut</label><select class="f" data-f="status">' + Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (s.status === k ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('') + '</select></div></div>' +
+        '<div class="row"><div><label class="l">Prix d\'inscription (en $, 0 ou vide = gratuit)</label><input class="f" type="number" min="0" step="0.5" data-f="price_usd" value="' + esc(s.price_usd == null ? '' : Number(s.price_usd)) + '"></div></div>' +
         '<label class="l">Description</label><textarea class="f" data-f="description">' + esc(s.description) + '</textarea>' +
         '<div class="row" style="margin-bottom:10px;"><label><input type="checkbox" data-f="classroom_open"' + (s.classroom_open ? ' checked' : '') + '> Salle de classe ouverte</label>' +
         '<label><input type="checkbox" data-f="registration_open"' + (s.registration_open ? ' checked' : '') + '> Inscriptions ouvertes</label></div>' +
-        '<p class="small">' + s.courses_count + ' cours · ' + s.students_count + ' inscrit(s) · ' + s.certificates_count + ' certificat(s)</p>' +
+        '<p class="small">' + s.courses_count + ' cours · ' + s.students_count + ' inscrit(s) · ' + s.certificates_count + ' brevet(s)</p>' +
         '<div class="row"><button class="btn btn-primary" data-save="' + s.id + '">Enregistrer</button><button class="btn btn-ghost" data-del="' + s.id + '">Supprimer</button><span id="ns-' + s.id + '"></span></div></div>';
     });
     h += '<div class="panel"><h3 style="margin:0 0 10px;">Nouvelle session</h3><div class="row"><div class="grow"><input class="f" id="ns-title" placeholder="Titre (ex. Session 3)"></div><div class="grow"><input class="f" id="ns-period" placeholder="Période (ex. Juillet 2028)"></div></div><button class="btn btn-primary" id="ns-add">Ajouter la session</button><span id="ns-msg"></span></div>';
@@ -136,7 +183,7 @@
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-del]'), function (b) {
       b.addEventListener('click', function () {
-        if (!confirm('Supprimer cette session, ses cours, ses questions, ses inscrits et ses certificats ? Cette action est définitive.')) return;
+        if (!confirm('Supprimer cette session, ses cours, ses questions, ses inscrits et ses brevets ? Cette action est définitive.')) return;
         api('/sessions/' + b.getAttribute('data-del'), { method: 'DELETE' }).then(loadOverview).then(render).catch(function (e) { alert(e.message); });
       });
     });
@@ -241,20 +288,19 @@
     }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
   }
 
-  // ---------- Inscrits / Certificats / Réglages ----------
-  var fmt = function (d) { try { return new Date(d).toLocaleDateString('fr-FR'); } catch (e) { return ''; } };
+  // ---------- Inscrits / Brevets / Réglages ----------
   function renderStudents() {
     api('/students').then(function (rows) {
-      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Inscrits (' + rows.length + ')</h3>' + (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Nom complet</th><th>E-mail</th><th>Session</th><th>Cours réussis</th><th>Certificat</th><th>Inscrit le</th></tr>' +
-        rows.map(function (r) { return '<tr><td>' + esc(r.full_name) + '</td><td>' + esc(r.email) + '</td><td>' + esc(r.session_title) + '</td><td>' + r.courses_passed + ' / ' + r.courses_total + '</td><td>' + (r.certificate_code ? '<span class="tag g">' + esc(r.certificate_code) + '</span>' : '—') + '</td><td>' + fmt(r.created_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Personne ne s\'est encore inscrit.</p>') + '</div>';
+      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Inscrits (' + rows.length + ')</h3>' + (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Nom complet</th><th>E-mail</th><th>Session</th><th>Paiement</th><th>Cours réussis</th><th>Brevet</th><th>Inscrit le</th></tr>' +
+        rows.map(function (r) { return '<tr><td>' + esc(r.full_name) + '</td><td>' + esc(r.email) + '</td><td>' + esc(r.session_title) + '</td><td>' + esc((PAY[r.payment_status] || [''])[0]) + '</td><td>' + r.courses_passed + ' / ' + r.courses_total + '</td><td>' + (r.certificate_code ? '<span class="tag g">' + esc(r.certificate_code) + '</span>' : '—') + '</td><td>' + fmt(r.created_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Personne ne s\'est encore inscrit.</p>') + '</div>';
     }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
   }
   function renderCertificates() {
     api('/certificates').then(function (rows) {
-      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Certificats délivrés (' + rows.length + ')</h3>' +
-        '<p class="small" style="margin-bottom:10px;">Un certificat est authentique si son code figure ici. Le code QR du certificat ouvre la page publique de vérification.</p>' +
+      $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Brevets délivrés (' + rows.length + ')</h3>' +
+        '<p class="small" style="margin-bottom:10px;">Un brevet est authentique si son code figure ici. Le code QR du brevet ouvre la page publique de vérification.</p>' +
         (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Code</th><th>Nom</th><th>Session</th><th>Résultat</th><th>Date</th></tr>' +
-        rows.map(function (r) { return '<tr><td><a href="/ebk-verification.html?code=' + encodeURIComponent(r.code) + '" target="_blank">' + esc(r.code) + '</a></td><td>' + esc(r.full_name) + '<div class="small">' + esc(r.email) + '</div></td><td>' + esc(r.session_title) + '</td><td>' + r.score + ' %</td><td>' + fmt(r.issued_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Aucun certificat délivré pour le moment.</p>') + '</div>';
+        rows.map(function (r) { return '<tr><td><a href="/ebk-verification.html?code=' + encodeURIComponent(r.code) + '" target="_blank">' + esc(r.code) + '</a></td><td>' + esc(r.full_name) + '<div class="small">' + esc(r.email) + '</div></td><td>' + esc(r.session_title) + '</td><td>' + r.score + ' %</td><td>' + fmt(r.issued_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Aucun brevet délivré pour le moment.</p>') + '</div>';
     }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
   }
   function renderSettings() {
@@ -262,12 +308,11 @@
     $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Réglages de l\'école</h3>' +
       '<label class="l">Texte « L\'école » (page d\'accueil de l\'EBK)</label><textarea class="f" id="st-about" style="min-height:120px;">' + esc(s.about) + '</textarea>' +
       '<label class="l">Contact (adresse, WhatsApp, e-mail… une information par ligne)</label><textarea class="f" id="st-contact">' + esc(s.contact) + '</textarea>' +
-      '<div class="row"><div class="grow"><label class="l">Légende sous la 1re signature du certificat</label><input class="f" id="st-s1" value="' + esc(s.sig1) + '" placeholder="Ex. Le Directeur"></div>' +
-      '<div class="grow"><label class="l">Légende sous la 2e signature</label><input class="f" id="st-s2" value="' + esc(s.sig2) + '" placeholder="Ex. Le Responsable pédagogique"></div></div>' +
-      '<p class="small" style="margin-bottom:10px;">Les deux espaces de signature restent vides sur le certificat : vous signez à la main après l\'impression.</p>' +
+      '<label class="l">Numéro Airtel Money de l\'école (affiché aux étudiants pour le paiement, et utilisé pour WhatsApp)</label><input class="f" id="st-pay" value="' + esc(s.pay_number) + '" placeholder="+243...">' +
+      '<p class="small" style="margin-bottom:10px;">Changez ce numéro à tout moment : il est mis à jour tout de suite sur le site.</p>' +
       '<button class="btn btn-primary" id="st-save">Enregistrer</button> <span id="st-msg"></span></div>';
     $('st-save').addEventListener('click', function () {
-      api('/settings', { method: 'PUT', body: { about: $('st-about').value, contact: $('st-contact').value, sig1: $('st-s1').value, sig2: $('st-s2').value } })
+      api('/settings', { method: 'PUT', body: { about: $('st-about').value, contact: $('st-contact').value, pay_number: $('st-pay').value } })
         .then(function (d) { ov.settings = d; note('st-msg', 'Enregistré ✓', true); }).catch(function (e) { note('st-msg', e.message); });
     });
   }
