@@ -1,14 +1,16 @@
-// École Biblique Kainos (EBK) — cours, tests automatiques, grand test, certificat sécurisé et administration.
+// École Biblique Kainos (EBK) — cours, tests automatiques, grand test, brevet sécurisé et administration.
 // Les tables sont créées automatiquement au démarrage : aucune action manuelle sur la base de données.
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const pool = require('../db/pool');
 const { requireAuth, requireAdmin, JWT_SECRET } = require('../lib/auth-middleware');
 
 let QRCode = null;
-try { QRCode = require('qrcode'); } catch (e) { console.warn('[ebk] module "qrcode" absent : certificats sans code QR'); }
+try { QRCode = require('qrcode'); } catch (e) { console.warn('[ebk] module "qrcode" absent : brevets sans code QR'); }
 let multer = null;
 try { multer = require('multer'); } catch (e) { console.warn('[ebk] module "multer" absent : import de syllabus indisponible'); }
 
@@ -20,7 +22,7 @@ const COURSE_QUIZ_SIZE = 15;  // test de chaque cours
 const GRAND_QUIZ_SIZE = 80;   // grand test final
 const POOL_TARGET = 45;       // réserve de questions générées par cours
 
-const DEFAULT_SETTINGS = { about: '', contact: '', sig1: 'Signature', sig2: 'Signature' };
+const DEFAULT_SETTINGS = { about: '', contact: '', pay_number: '+243999983163' };
 
 // ---------- Base de données ----------
 let schemaReady = null;
@@ -99,12 +101,27 @@ function ensureSchema() {
         );
         CREATE TABLE IF NOT EXISTS ebk_settings (key TEXT PRIMARY KEY, value TEXT);
       `);
+      const hadPrice = (await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='ebk_sessions' AND column_name='price_usd'")).rows.length > 0;
+      await pool.query(`
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS price_usd NUMERIC(8,2);
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'en_attente';
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS payment_proof BYTEA;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS payment_proof_mime TEXT;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS payment_note TEXT;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+        ALTER TABLE ebk_certificates ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+      `);
+      if (!hadPrice) {
+        await pool.query("UPDATE ebk_sessions SET price_usd = 10 WHERE position = 1 AND price_usd IS NULL");
+        await pool.query("UPDATE ebk_sessions SET title = 'Session 1 en ligne' WHERE position = 1 AND title = 'Session 1'");
+      }
       const n = (await pool.query('SELECT COUNT(*)::int AS n FROM ebk_sessions')).rows[0].n;
       if (!n) {
         await pool.query(
-          `INSERT INTO ebk_sessions (title, period_label, status, description, registration_open, classroom_open, position) VALUES
-           ('Session 1', 'Juillet 2026', 'terminee', 'Première session de l''École Biblique Kainos. Les cours sont disponibles en ligne.', true, true, 1),
-           ('Session 2', 'Juillet 2027', 'a_venir', 'Prochaine session de l''École Biblique Kainos.', false, false, 2)`
+          `INSERT INTO ebk_sessions (title, period_label, status, description, registration_open, classroom_open, position, price_usd) VALUES
+           ('Session 1 en ligne', 'Juillet 2026', 'terminee', 'Première session de l''École Biblique Kainos, reprise en ligne : suivez les cours à votre rythme.', true, true, 1, 10),
+           ('Session 2', 'Juillet 2027', 'a_venir', 'Prochaine session de l''École Biblique Kainos.', false, false, 2, NULL)`
         );
       }
     })().catch((err) => { schemaReady = null; throw err; });
@@ -135,12 +152,18 @@ async function passedSet(userId, sid) {
   const r = await pool.query('SELECT DISTINCT course_id FROM ebk_attempts WHERE user_id=$1 AND session_id=$2 AND course_id IS NOT NULL AND passed=true', [userId, sid]);
   return new Set(r.rows.map((x) => x.course_id));
 }
-function newCode() {
+function newCode(year) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = crypto.randomBytes(10);
+  const bytes = crypto.randomBytes(8);
   let code = '';
-  for (let i = 0; i < 10; i++) code += alphabet[bytes[i] % alphabet.length];
-  return 'EBK-' + code;
+  for (let i = 0; i < 8; i++) code += alphabet[bytes[i] % alphabet.length];
+  return `EBK-PART-${year}-${code}`;
+}
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+// Date à l'heure de Kinshasa (UTC+1), ex. « 02 août 2026 »
+function frDate(d) {
+  const k = new Date(new Date(d).getTime() + 3600 * 1000);
+  return `${String(k.getUTCDate()).padStart(2, '0')} ${MONTHS[k.getUTCMonth()]} ${k.getUTCFullYear()}`;
 }
 const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const cleanName = (v) => String(v || '').replace(/\s+/g, ' ').trim();
@@ -162,96 +185,92 @@ function gradeQuiz(questions, orderedIds, answers) {
 
 // ---------- Public ----------
 router.get('/info', wrap(async (req, res) => {
-  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open FROM ebk_sessions ORDER BY position, id')).rows;
+  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd FROM ebk_sessions ORDER BY position, id')).rows;
   const courses = (await pool.query('SELECT id, session_id, position, title, teacher, description FROM ebk_courses ORDER BY position, id')).rows;
   res.json({ settings: await getSettings(), sessions: sessions.map((s) => ({ ...s, courses: courses.filter((c) => c.session_id === s.id) })) });
 }));
 
-// Vérification d'un certificat (page ouverte par le code QR) — n'expose que le nom, la session, la date et le résultat
+// Vérification d'un brevet (page ouverte par le code QR) — n'expose que le nom, la session, la date et le résultat
 router.get('/verify/:code', wrap(async (req, res) => {
   const r = (await pool.query(
-    `SELECT c.code, c.full_name, c.score, c.issued_at, s.title, s.period_label
+    `SELECT c.code, c.full_name, c.score, c.issued_at, c.started_at, s.title, s.period_label
        FROM ebk_certificates c JOIN ebk_sessions s ON s.id = c.session_id
       WHERE upper(c.code) = upper($1)`, [String(req.params.code || '').trim()]
   )).rows[0];
-  if (!r) return res.status(404).json({ valid: false, message: 'Aucun certificat ne correspond à ce code.' });
+  if (!r) return res.status(404).json({ valid: false, message: 'Aucun brevet ne correspond à ce code.' });
   res.json({ valid: true, certificate: r });
 }));
 
-// ---------- Certificat PDF (lien à durée limitée, comme les brevets de l'espace d'étude) ----------
-function centered(doc, text, y, size, color, font, extra) {
-  doc.font(font || 'Helvetica').fontSize(size).fillColor(color);
-  doc.text(text, 0, y, Object.assign({ width: doc.page.width, align: 'center', lineBreak: false }, extra || {}));
+// ---------- Brevet PDF : reproduction fidèle du modèle de l'école (fond, filigrane KAINOS, logo, bordure) ----------
+const ASSETS = path.join(__dirname, '..', 'assets');
+const TEMPLATE = path.join(ASSETS, 'ebk-brevet-modele.png');
+const PAGE_W = 842, PAGE_H = 595.25;
+
+function pickFont(doc, name, file, fallback) {
+  try {
+    const p = path.join(ASSETS, 'fonts', file);
+    if (!fs.existsSync(p)) return fallback;
+    doc.registerFont(name, p);
+    doc.font(name);
+    return name;
+  } catch (e) { return fallback; }
 }
 
 router.get('/certificate', wrap(async (req, res) => {
   let decoded;
   try { decoded = jwt.verify(String(req.query.token || ''), JWT_SECRET); } catch (e) { return res.status(401).json({ message: 'Lien expiré, rechargez la page.' }); }
   if (decoded.purpose !== 'ebk-certificate') return res.status(401).json({ message: 'Lien invalide' });
-  const cert = (await pool.query('SELECT * FROM ebk_certificates WHERE user_id=$1 AND session_id=$2', [decoded.userId, decoded.sessionId])).rows[0];
-  if (!cert) return res.status(403).json({ message: 'Le certificat n\'est pas encore disponible.' });
-  const session = (await pool.query('SELECT title, period_label FROM ebk_sessions WHERE id=$1', [cert.session_id])).rows[0];
-  const nbCourses = (await pool.query('SELECT COUNT(*)::int AS n FROM ebk_courses WHERE session_id=$1', [cert.session_id])).rows[0].n;
-  const settings = await getSettings();
+  const cert = (await pool.query(
+    `SELECT c.*, st.started_at AS st_started, st.confirmed_at, st.created_at AS enrolled_at
+       FROM ebk_certificates c LEFT JOIN ebk_students st ON st.user_id = c.user_id AND st.session_id = c.session_id
+      WHERE c.user_id=$1 AND c.session_id=$2`, [decoded.userId, decoded.sessionId]
+  )).rows[0];
+  if (!cert) return res.status(403).json({ message: 'Le brevet n\'est pas encore disponible.' });
 
+  // Dates : début = ouverture du premier cours ; fin = réussite du grand test = date de délivrance du brevet
+  const start = cert.started_at || cert.st_started || cert.confirmed_at || cert.enrolled_at || cert.issued_at;
+  const end = cert.issued_at;
+  const startTxt = frDate(start), endTxt = frDate(end);
+  const sessionLine = (startTxt === endTxt ? `SESSION 1 EN LIGNE  ·  LE ${endTxt}` : `SESSION 1 EN LIGNE  ·  DU ${startTxt} AU ${endTxt}`).toUpperCase();
+
+  // Code QR personnel : il mène à la page de vérification de CE brevet
   const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
   const verifyUrl = `${proto}://${req.get('host')}/ebk-verification.html?code=${encodeURIComponent(cert.code)}`;
   let qr = null;
-  if (QRCode) { try { qr = await QRCode.toBuffer(verifyUrl, { margin: 1, width: 320, errorCorrectionLevel: 'M' }); } catch (e) { qr = null; } }
-  const dateText = new Date(cert.issued_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  if (QRCode) { try { qr = await QRCode.toBuffer(verifyUrl, { margin: 1, width: 600, errorCorrectionLevel: 'M' }); } catch (e) { qr = null; } }
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'inline; filename="certificat-ebk.pdf"');
-  const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 0 });
+  res.setHeader('Content-Disposition', 'inline; filename="brevet-ebk.pdf"');
+  const doc = new PDFDocument({ size: [PAGE_W, PAGE_H], margin: 0, info: { Title: 'Brevet de participation — École Biblique Kainos', Author: 'École Biblique Kainos' } });
   doc.pipe(res);
-  const W = doc.page.width, H = doc.page.height;
-  const GOLD = '#c9a24b', NAVY = '#14263f', BLUE = '#1f3a5f', SOFT = '#6b5f4d';
+  const fBold = pickFont(doc, 'ebk-bold', 'Caladea-Bold.ttf', 'Helvetica-Bold');
+  const fReg = pickFont(doc, 'ebk-reg', 'Caladea-Regular.ttf', 'Helvetica');
+  const fItal = pickFont(doc, 'ebk-ital', 'texgyrepagella-italic.otf', 'Helvetica-Oblique');
 
-  doc.rect(0, 0, W, H).fill('#faf6ee');
-  // Filigrane de sécurité
-  doc.save();
-  doc.rotate(-30, { origin: [W / 2, H / 2] });
-  doc.font('Helvetica-Bold').fontSize(20).fillColor(GOLD).opacity(0.07);
-  for (let y = -250; y < H + 350; y += 80) for (let x = -300; x < W + 350; x += 300) doc.text('ÉCOLE BIBLIQUE KAINOS', x, y, { lineBreak: false });
-  doc.restore();
-  doc.opacity(1);
-  // Double bordure
-  doc.rect(20, 20, W - 40, H - 40).lineWidth(2).stroke(GOLD);
-  doc.rect(27, 27, W - 54, H - 54).lineWidth(0.75).stroke(GOLD);
+  if (fs.existsSync(TEMPLATE)) doc.image(TEMPLATE, 0, 0, { width: PAGE_W, height: PAGE_H });
 
-  centered(doc, 'ÉCOLE BIBLIQUE KAINOS', 56, 24, NAVY, 'Helvetica-Bold', { characterSpacing: 3 });
-  centered(doc, 'Former des serviteurs puissants en parole et en œuvre', 88, 11, SOFT, 'Helvetica-Oblique');
-  centered(doc, 'CERTIFICAT DE FORMATION', 122, 32, NAVY, 'Helvetica-Bold', { characterSpacing: 1 });
-  doc.moveTo(W / 2 - 60, 172).lineTo(W / 2 + 60, 172).lineWidth(1).stroke(GOLD);
-  centered(doc, 'Ce certificat est décerné à', 190, 14, SOFT, 'Helvetica');
+  // Texte centré sur cx, ligne de base à yBase (repère du modèle, origine en bas)
+  const put = (txt, cx, yBase, font, size, color, spacing) => {
+    doc.font(font).fontSize(size).fillColor(color);
+    const w = doc.widthOfString(txt) + spacing * Math.max(0, txt.length - 1);
+    doc.text(txt, cx - w / 2, PAGE_H - yBase, { baseline: 'alphabetic', lineBreak: false, characterSpacing: spacing });
+  };
+  const NAVY = '#0D1B2A', GOLD = '#C8A951', GREY = '#5A5A5A';
 
-  const name = cert.full_name;
-  let nameSize = 32;
-  doc.font('Helvetica-Bold').fontSize(nameSize);
-  while (nameSize > 14 && doc.widthOfString(name) > W - 160) { nameSize -= 1; doc.fontSize(nameSize); }
-  centered(doc, name, 216, nameSize, BLUE, 'Helvetica-Bold');
-  doc.moveTo(W / 2 - 200, 216 + nameSize + 8).lineTo(W / 2 + 200, 216 + nameSize + 8).lineWidth(0.5).stroke(GOLD);
+  put(sessionLine, 421.13, 297.13, fBold, 8.5, NAVY, 1.5);
+  // 2e ligne du texte de reconnaissance (session en ligne)
+  put('fondements doctrinaux de la nouvelle alliance, dispensée en ligne sur mna-world.org sous l’autorité du Ministère de la Nouvelle Alliance.', 421.13, 165.58, fItal, 11, '#3A3A3A', 0);
 
-  centered(doc, `pour avoir suivi et réussi les ${nbCourses} cours de la formation`, 278, 14, SOFT, 'Helvetica');
-  centered(doc, `${session.title}${session.period_label ? ' — ' + session.period_label : ''}`, 302, 20, NAVY, 'Helvetica-Bold');
-  if (cert.score !== null && cert.score !== undefined) centered(doc, `Résultat du grand test final : ${cert.score} %`, 340, 15, BLUE, 'Helvetica-Bold');
-  centered(doc, `Délivré le ${dateText}`, 370, 11, SOFT, 'Helvetica');
+  let name = String(cert.full_name || '').toUpperCase();
+  let size = 17;
+  doc.font(fBold).fontSize(size);
+  while (size > 10 && doc.widthOfString(name) + 0.6 * name.length > 350) { size -= 0.5; doc.fontSize(size); }
+  put(name, 421.13, 235.5, fBold, size, NAVY, 0.6);
 
-  // Pied de page : code QR à gauche, deux espaces de signature à droite
-  const footY = 430;
-  if (qr) {
-    doc.image(qr, 62, footY, { width: 92 });
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(SOFT).text('Vérifier l\'authenticité', 164, footY + 24, { lineBreak: false });
-    doc.font('Helvetica').fontSize(8).fillColor('#a89a7e').text('Scannez ce code QR', 164, footY + 38, { lineBreak: false });
-    doc.font('Helvetica').fontSize(8).fillColor('#a89a7e').text(`Code : ${cert.code}`, 164, footY + 51, { lineBreak: false });
-  } else {
-    doc.font('Helvetica').fontSize(8.5).fillColor('#a89a7e').text(`Code de vérification : ${cert.code}`, 62, footY + 50, { lineBreak: false });
-  }
-  const lineY = footY + 78;
-  [[330, settings.sig1], [585, settings.sig2]].forEach(([x, label]) => {
-    doc.moveTo(x, lineY).lineTo(x + 190, lineY).lineWidth(0.6).stroke(SOFT);
-    doc.font('Helvetica').fontSize(10).fillColor(SOFT).text(label || 'Signature', x, lineY + 7, { width: 190, align: 'center', lineBreak: false });
-  });
+  put(`Fait à Kinshasa, République Démocratique du Congo, le ${endTxt}`, 421.13, 65.525, fItal, 8, GREY, 0);
+
+  if (qr) doc.image(qr, 727.7, PAGE_H - 61.85 - 55.1, { width: 55.1, height: 55.1 });
+  put(cert.code, 755.25, 51.525, fReg, 6, GOLD, 0.45);
   doc.end();
 }));
 
@@ -274,13 +293,18 @@ router.use(requireAuth);
 async function studentState(userId) {
   const session = await openSession();
   if (!session) return { session: null };
+  const settings = await getSettings();
   const out = {
     session: { id: session.id, title: session.title, period_label: session.period_label, registration_open: session.registration_open },
-    student: null, courses: [], all_passed: false, certificate: null,
+    payment: { price_usd: Number(session.price_usd || 0), pay_number: settings.pay_number },
+    student: null, courses: [], all_passed: false, certificate: null, dates: null,
   };
-  const student = (await pool.query('SELECT full_name FROM ebk_students WHERE user_id=$1 AND session_id=$2', [userId, session.id])).rows[0];
+  const student = (await pool.query(
+    'SELECT full_name, payment_status, payment_note, started_at, confirmed_at, created_at, (payment_proof IS NOT NULL) AS has_proof FROM ebk_students WHERE user_id=$1 AND session_id=$2', [userId, session.id]
+  )).rows[0];
   if (!student) return out;
-  out.student = { full_name: student.full_name };
+  out.student = { full_name: student.full_name, payment_status: student.payment_status, payment_note: student.payment_note, has_proof: student.has_proof };
+  if (student.payment_status !== 'confirme') return out;   // accès à la salle de classe après confirmation de l'administration
   const courses = await coursesOf(session.id);
   const passed = await passedSet(userId, session.id);
   out.courses = courses.map((c, i) => ({
@@ -289,6 +313,7 @@ async function studentState(userId) {
   }));
   out.all_passed = courses.length > 0 && courses.every((c) => passed.has(c.id));
   out.certificate = (await pool.query('SELECT code, score, issued_at FROM ebk_certificates WHERE user_id=$1 AND session_id=$2', [userId, session.id])).rows[0] || null;
+  out.dates = { start: student.started_at || null, end: out.certificate ? out.certificate.issued_at : null };
   out.grand_quiz_size = GRAND_QUIZ_SIZE;
   out.course_quiz_size = COURSE_QUIZ_SIZE;
   return out;
@@ -296,28 +321,66 @@ async function studentState(userId) {
 
 router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id))));
 
-// Inscription : le nom complet saisi ici figurera sur le certificat
-router.post('/enroll', wrap(async (req, res) => {
+// Capture d'écran du paiement (envoyée depuis le champ d'inscription)
+const proofUpload = multer ? multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }).single('proof') : null;
+const withProof = (req, res, next) => {
+  if (!proofUpload) return next();
+  proofUpload(req, res, (err) => {
+    if (err) return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'Image trop lourde (8 Mo maximum).' : 'Envoi de la capture impossible.' });
+    next();
+  });
+};
+const PROOF_MIME = /^image\/(jpeg|png|webp)$/;
+
+// Inscription : nom complet (qui figurera sur le brevet) + capture du paiement. L'accès s'ouvre quand l'administration confirme.
+router.post('/enroll', withProof, wrap(async (req, res) => {
   const name = cleanName(req.body.full_name);
-  if (name.length < 5 || !name.includes(' ')) return res.status(400).json({ message: 'Écrivez votre nom complet (prénom et nom), tel qu\'il doit figurer sur le certificat.' });
+  if (name.length < 5 || !name.includes(' ')) return res.status(400).json({ message: 'Écrivez votre nom complet (prénom et nom), tel qu\'il doit figurer sur le brevet.' });
   if (name.length > 120) return res.status(400).json({ message: 'Nom trop long.' });
   const session = await openSession();
   if (!session) return res.status(404).json({ message: 'Aucune session n\'est ouverte pour le moment.' });
   const existing = (await pool.query('SELECT id FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (existing) return res.status(409).json({ message: 'Vous êtes déjà inscrit.' });
   if (!session.registration_open) return res.status(403).json({ message: 'Les inscriptions sont fermées pour le moment.' });
-  await pool.query('INSERT INTO ebk_students (user_id, session_id, full_name) VALUES ($1,$2,$3)', [req.user.id, session.id, name]);
+  const paid = Number(session.price_usd || 0) > 0;
+  const file = req.file;
+  if (paid) {
+    if (!file) return res.status(400).json({ message: 'Joignez la capture d\'écran de votre paiement.' });
+    if (!PROOF_MIME.test(file.mimetype)) return res.status(400).json({ message: 'La capture doit être une image (JPG, PNG ou WEBP).' });
+  }
+  await pool.query(
+    `INSERT INTO ebk_students (user_id, session_id, full_name, payment_status, payment_proof, payment_proof_mime, confirmed_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [req.user.id, session.id, name, paid ? 'en_attente' : 'confirme', paid ? file.buffer : null, paid ? file.mimetype : null, paid ? null : new Date()]
+  );
   res.status(201).json(await studentState(req.user.id));
 }));
 
-// Correction du nom — impossible une fois le certificat délivré
+// Nouvel envoi de la capture (paiement refusé ou capture illisible)
+router.post('/payment-proof', withProof, wrap(async (req, res) => {
+  const session = await openSession();
+  if (!session) return res.status(404).json({ message: 'Aucune session ouverte.' });
+  const st = (await pool.query('SELECT payment_status FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
+  if (!st) return res.status(404).json({ message: 'Inscrivez-vous d\'abord.' });
+  if (st.payment_status === 'confirme') return res.status(409).json({ message: 'Votre paiement est déjà confirmé.' });
+  const file = req.file;
+  if (!file) return res.status(400).json({ message: 'Joignez la capture d\'écran de votre paiement.' });
+  if (!PROOF_MIME.test(file.mimetype)) return res.status(400).json({ message: 'La capture doit être une image (JPG, PNG ou WEBP).' });
+  await pool.query(
+    "UPDATE ebk_students SET payment_proof=$3, payment_proof_mime=$4, payment_status='en_attente', payment_note=NULL WHERE user_id=$1 AND session_id=$2",
+    [req.user.id, session.id, file.buffer, file.mimetype]
+  );
+  res.json(await studentState(req.user.id));
+}));
+
+// Correction du nom — impossible une fois le brevet délivré
 router.put('/name', wrap(async (req, res) => {
   const name = cleanName(req.body.full_name);
   if (name.length < 5 || !name.includes(' ') || name.length > 120) return res.status(400).json({ message: 'Écrivez votre nom complet (prénom et nom).' });
   const session = await openSession();
   if (!session) return res.status(404).json({ message: 'Aucune session ouverte.' });
   const cert = (await pool.query('SELECT 1 FROM ebk_certificates WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
-  if (cert) return res.status(403).json({ message: 'Votre certificat est déjà délivré : le nom ne peut plus être modifié.' });
+  if (cert) return res.status(403).json({ message: 'Votre brevet est déjà délivré : le nom ne peut plus être modifié.' });
   await pool.query('UPDATE ebk_students SET full_name=$3 WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id, name]);
   res.json(await studentState(req.user.id));
 }));
@@ -328,8 +391,9 @@ async function accessCourse(req, res) {
   if (!course) { res.status(404).json({ message: 'Cours introuvable' }); return null; }
   const session = await openSession();
   if (!session || session.id !== course.session_id) { res.status(403).json({ message: 'Ce cours n\'est pas ouvert.' }); return null; }
-  const student = (await pool.query('SELECT 1 FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
+  const student = (await pool.query('SELECT payment_status FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (!student) { res.status(403).json({ message: 'Inscrivez-vous d\'abord à la salle de classe.' }); return null; }
+  if (student.payment_status !== 'confirme') { res.status(403).json({ message: 'Votre inscription n\'est pas encore confirmée par l\'administration.' }); return null; }
   const courses = await coursesOf(session.id);
   const idx = courses.findIndex((c) => c.id === course.id);
   const passed = await passedSet(req.user.id, session.id);
@@ -341,6 +405,7 @@ router.get('/courses/:id', wrap(async (req, res) => {
   const a = await accessCourse(req, res);
   if (!a) return;
   const c = a.course;
+  await pool.query('UPDATE ebk_students SET started_at = now() WHERE user_id=$1 AND session_id=$2 AND started_at IS NULL', [req.user.id, a.session.id]);
   const next = a.courses[a.idx + 1];
   res.json({
     id: c.id, position: a.idx + 1, total: a.courses.length, title: c.title, teacher: c.teacher, description: c.description,
@@ -430,11 +495,13 @@ router.post('/grand-quiz', wrap(async (req, res) => {
   const percent = Math.round(score * 100);
   await pool.query('INSERT INTO ebk_attempts (user_id, session_id, course_id, passed, score) VALUES ($1,$2,NULL,$3,$4)', [req.user.id, st.session.id, passed, percent]);
   if (passed) {
+    const startRow = (await pool.query('SELECT started_at, confirmed_at, created_at FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, st.session.id])).rows[0] || {};
+    const started = startRow.started_at || startRow.confirmed_at || startRow.created_at || new Date();
     for (let i = 0; i < 5; i++) {
       try {
         await pool.query(
-          'INSERT INTO ebk_certificates (user_id, session_id, full_name, code, score) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id, session_id) DO NOTHING',
-          [req.user.id, st.session.id, st.student.full_name, newCode(), percent]
+          'INSERT INTO ebk_certificates (user_id, session_id, full_name, code, score, started_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (user_id, session_id) DO NOTHING',
+          [req.user.id, st.session.id, st.student.full_name, newCode(new Date().getUTCFullYear()), percent, started]
         );
         break;
       } catch (e) { if (i === 4) throw e; }
@@ -446,7 +513,7 @@ router.post('/grand-quiz', wrap(async (req, res) => {
 router.get('/certificate-link', wrap(async (req, res) => {
   const session = await openSession();
   const cert = session ? (await pool.query('SELECT 1 FROM ebk_certificates WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0] : null;
-  if (!cert) return res.status(403).json({ message: 'Le certificat n\'est pas encore disponible.' });
+  if (!cert) return res.status(403).json({ message: 'Le brevet n\'est pas encore disponible.' });
   const t = jwt.sign({ userId: req.user.id, sessionId: session.id, purpose: 'ebk-certificate' }, JWT_SECRET, { expiresIn: '10m' });
   res.json({ url: `/api/ebk/certificate?token=${t}` });
 }));
@@ -472,16 +539,18 @@ admin.get('/overview', wrap(async (req, res) => {
             (SELECT COUNT(*)::int FROM ebk_certificates ce WHERE ce.session_id = s.id) AS certificates_count
        FROM ebk_sessions s ORDER BY position, id`
   )).rows;
-  res.json({ sessions, settings: await getSettings(), ia_ready: !!process.env.MISTRAL_API_KEY });
+  const pending = (await pool.query("SELECT COUNT(*)::int AS n FROM ebk_students WHERE payment_status='en_attente'")).rows[0].n;
+  res.json({ sessions, settings: await getSettings(), ia_ready: !!process.env.MISTRAL_API_KEY, pending_payments: pending });
 }));
 
 admin.post('/sessions', wrap(async (req, res) => {
   const b = req.body;
   if (!cleanName(b.title)) return res.status(400).json({ message: 'Titre requis' });
   const pos = (await pool.query('SELECT COALESCE(MAX(position),0)+1 AS p FROM ebk_sessions')).rows[0].p;
+  const price = b.price_usd === '' || b.price_usd == null ? null : Number(b.price_usd);
   const r = await pool.query(
-    'INSERT INTO ebk_sessions (title, period_label, status, description, position) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-    [cleanName(b.title), b.period_label || null, STATUSES.includes(b.status) ? b.status : 'a_venir', b.description || null, pos]
+    'INSERT INTO ebk_sessions (title, period_label, status, description, position, price_usd) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+    [cleanName(b.title), b.period_label || null, STATUSES.includes(b.status) ? b.status : 'a_venir', b.description || null, pos, Number.isFinite(price) ? price : null]
   );
   res.status(201).json(r.rows[0]);
 }));
@@ -490,8 +559,9 @@ admin.put('/sessions/:id', wrap(async (req, res) => {
   const b = { ...req.body };
   if (b.status !== undefined && !STATUSES.includes(b.status)) return res.status(400).json({ message: 'Statut invalide' });
   ['registration_open', 'classroom_open'].forEach((k) => { if (b[k] !== undefined) b[k] = !!b[k]; });
+  if (b.price_usd !== undefined) { const p = b.price_usd === '' || b.price_usd === null ? null : Number(b.price_usd); b.price_usd = Number.isFinite(p) && p >= 0 ? p : null; }
   if (b.classroom_open === true) await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [req.params.id]);
-  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position']);
+  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd']);
   if (!u) return res.status(400).json({ message: 'Rien à modifier' });
   const r = await pool.query(u.sql, u.vals);
   if (!r.rows[0]) return res.status(404).json({ message: 'Session introuvable' });
@@ -668,7 +738,7 @@ Règles impératives :
 
 admin.get('/students', wrap(async (req, res) => {
   const r = await pool.query(
-    `SELECT st.id, st.full_name, st.created_at, u.email, s.title AS session_title,
+    `SELECT st.id, st.full_name, st.created_at, st.payment_status, u.email, s.title AS session_title,
             (SELECT COUNT(DISTINCT a.course_id)::int FROM ebk_attempts a WHERE a.user_id = st.user_id AND a.session_id = st.session_id AND a.course_id IS NOT NULL AND a.passed) AS courses_passed,
             (SELECT COUNT(*)::int FROM ebk_courses c WHERE c.session_id = st.session_id) AS courses_total,
             (SELECT ce.code FROM ebk_certificates ce WHERE ce.user_id = st.user_id AND ce.session_id = st.session_id) AS certificate_code
@@ -676,6 +746,38 @@ admin.get('/students', wrap(async (req, res) => {
       ORDER BY st.created_at DESC`
   );
   res.json(r.rows);
+}));
+
+// Paiements : l'administration consulte la capture puis confirme (ou refuse) l'inscription
+admin.get('/payments', wrap(async (req, res) => {
+  const r = await pool.query(
+    `SELECT st.id, st.full_name, st.payment_status, st.payment_note, st.created_at, st.confirmed_at,
+            (st.payment_proof IS NOT NULL) AS has_proof, u.email, s.title AS session_title, s.price_usd
+       FROM ebk_students st JOIN users u ON u.id = st.user_id JOIN ebk_sessions s ON s.id = st.session_id
+      ORDER BY (st.payment_status = 'en_attente') DESC, st.created_at DESC`
+  );
+  res.json(r.rows);
+}));
+
+admin.get('/students/:id/proof', wrap(async (req, res) => {
+  const r = (await pool.query('SELECT payment_proof, payment_proof_mime FROM ebk_students WHERE id=$1', [req.params.id])).rows[0];
+  if (!r || !r.payment_proof) return res.status(404).json({ message: 'Aucune capture reçue' });
+  res.setHeader('Content-Type', PROOF_MIME.test(r.payment_proof_mime || '') ? r.payment_proof_mime : 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(r.payment_proof);
+}));
+
+admin.post('/students/:id/payment', wrap(async (req, res) => {
+  const status = req.body.status;
+  if (!['confirme', 'refuse', 'en_attente'].includes(status)) return res.status(400).json({ message: 'Statut invalide' });
+  const note = status === 'refuse' ? String(req.body.note || '').slice(0, 500) || null : null;
+  const r = await pool.query(
+    `UPDATE ebk_students SET payment_status=$1::text, payment_note=$2,
+            confirmed_at = CASE WHEN $1::text = 'confirme' THEN COALESCE(confirmed_at, now()) ELSE confirmed_at END
+      WHERE id=$3 RETURNING id`, [status, note, req.params.id]
+  );
+  if (!r.rows[0]) return res.status(404).json({ message: 'Inscription introuvable' });
+  res.json({ ok: true });
 }));
 
 admin.get('/certificates', wrap(async (req, res) => {
