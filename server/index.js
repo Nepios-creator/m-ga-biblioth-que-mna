@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const pool = require('./db/pool');
 const { requireAuth, JWT_SECRET } = require('./lib/auth-middleware');
@@ -25,6 +26,50 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Page d'accueil : « Bibliothèque numérique » est remplacé par la phrase animée « Partout avec vous ».
+// Le reste de la page (Ministère de la Nouvelle Alliance, contenu, images) n'est pas modifié.
+const HOME_FILE = path.join(__dirname, '..', 'public', 'index.html');
+const TAGLINE_STYLE = '<style>' +
+  '.hero h1 .mna-tagline{display:block;margin-top:.35em;font-size:.62em;font-weight:600;letter-spacing:.04em;' +
+  'background:linear-gradient(100deg,#b8893a 0%,#f6e3a8 30%,#c9a24b 50%,#f6e3a8 70%,#b8893a 100%);background-size:200% 100%;' +
+  '-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;' +
+  'animation:mnaFadeUp 1.1s ease both,mnaShimmer 3.2s ease-in-out 1.1s infinite alternate;}' +
+  '@keyframes mnaFadeUp{from{opacity:0;transform:translateY(14px);letter-spacing:.22em}to{opacity:1;transform:none;letter-spacing:.04em}}' +
+  '@keyframes mnaShimmer{from{background-position:0% 50%}to{background-position:100% 50%}}' +
+  '@media (prefers-reduced-motion:reduce){.hero h1 .mna-tagline{animation:none;background:none;-webkit-text-fill-color:#c9a24b;color:#c9a24b;}}' +
+  '</style>';
+
+function buildHome(html) {
+  return html
+    .replace('<meta property="og:title" content="Ministère de la Nouvelle Alliance — Bibliothèque numérique">',
+             '<meta property="og:title" content="Ministère de la Nouvelle Alliance — Partout avec vous">')
+    .replace('<title>Ministère de la Nouvelle Alliance — Bibliothèque numérique</title>',
+             '<title>Ministère de la Nouvelle Alliance — Partout avec vous</title>')
+    .replace('<h1>La bibliothèque numérique du Ministère de la Nouvelle Alliance</h1>',
+             '<h1>Ministère de la Nouvelle Alliance<span class="mna-tagline">Partout avec vous</span></h1>')
+    .replace('Cette bibliothèque numérique en est l\'une des expressions.',
+             'Cette plateforme numérique en est l\'une des expressions.')
+    .replace('<div>Grande Bibliothèque numérique MNA — © 2026</div>',
+             '<div>La plateforme numérique MNA — © 2026</div>')
+    .replace('</head>', TAGLINE_STYLE + '</head>');
+}
+
+let homeCache = { mtime: 0, html: '' };
+app.get(['/', '/index.html'], (req, res, next) => {
+  fs.stat(HOME_FILE, (err, st) => {
+    if (err) return next();
+    if (homeCache.mtime === st.mtimeMs && homeCache.html) {
+      return res.type('html').send(homeCache.html);
+    }
+    fs.readFile(HOME_FILE, 'utf8', (err2, html) => {
+      if (err2) return next();
+      homeCache = { mtime: st.mtimeMs, html: buildHome(html) };
+      res.type('html').send(homeCache.html);
+    });
+  });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Vérifie que le serveur et la base de données répondent
