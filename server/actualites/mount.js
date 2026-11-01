@@ -18,31 +18,31 @@ const NAV_SCRIPT = '<script src="/js/actualites-nav.js" defer></script>';
 const EBK_SCRIPT = '<script src="/js/ebk-nav.js" defer></script>';
 const DELAIS_SCRIPT = '<script src="/js/delais.js" defer></script>';
 
-// Page d'accueil : « Bibliothèque numérique » est remplacé par la phrase animée « Partout avec vous »
-// (et « bibliothèque numérique » par « plateforme numérique »). Le fichier index.html reste intact.
-const TAGLINE_STYLE = '<style>' +
-  '.hero h1 .mna-tagline{display:block;margin-top:.35em;font-size:.62em;font-weight:600;letter-spacing:.04em;' +
-  'background:linear-gradient(100deg,#b8893a 0%,#f6e3a8 30%,#c9a24b 50%,#f6e3a8 70%,#b8893a 100%);background-size:200% 100%;' +
+// Titre du ministère (en-tête de TOUTES les pages) : le sous-titre « Bibliothèque numérique » est défini
+// dans style.css (header .brand::after). Il est remplacé ici, sans toucher à style.css, par la phrase
+// animée « Partout avec vous ». « Ministère de la Nouvelle Alliance » reste tel quel.
+const TAGLINE_STYLE = '<style id="mna-tagline">' +
+  'html body header .brand::after{content:"Partout avec vous" !important;' +
+  'background:linear-gradient(100deg,#a67f2e 0%,#e8c978 30%,#c9a24b 50%,#e8c978 70%,#a67f2e 100%);background-size:200% 100%;' +
   '-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;' +
   'animation:mnaFadeUp 1.1s ease both,mnaShimmer 3.2s ease-in-out 1.1s infinite alternate;}' +
-  '@keyframes mnaFadeUp{from{opacity:0;transform:translateY(14px);letter-spacing:.22em}to{opacity:1;transform:none;letter-spacing:.04em}}' +
+  '@keyframes mnaFadeUp{from{opacity:0;transform:translateY(10px);letter-spacing:.18em}to{opacity:1;transform:none;letter-spacing:.01em}}' +
   '@keyframes mnaShimmer{from{background-position:0% 50%}to{background-position:100% 50%}}' +
-  '@media (prefers-reduced-motion:reduce){.hero h1 .mna-tagline{animation:none;background:none;-webkit-text-fill-color:#c9a24b;color:#c9a24b;}}' +
+  '@media (prefers-reduced-motion:reduce){html body header .brand::after{animation:none;background:none;-webkit-text-fill-color:#a67f2e;color:#a67f2e;}}' +
   '</style>';
 
+// Page d'accueil : titre de l'onglet, aperçu WhatsApp, phrase « Qui sommes-nous » et pied de page.
+// Le fichier index.html reste intact.
 function applyHome(html) {
   return html
     .replace('<meta property="og:title" content="Ministère de la Nouvelle Alliance — Bibliothèque numérique">',
              '<meta property="og:title" content="Ministère de la Nouvelle Alliance — Partout avec vous">')
     .replace('<title>Ministère de la Nouvelle Alliance — Bibliothèque numérique</title>',
              '<title>Ministère de la Nouvelle Alliance — Partout avec vous</title>')
-    .replace('<h1>La bibliothèque numérique du Ministère de la Nouvelle Alliance</h1>',
-             '<h1>Ministère de la Nouvelle Alliance<span class="mna-tagline">Partout avec vous</span></h1>')
     .replace('Cette bibliothèque numérique en est l\'une des expressions.',
              'Cette plateforme numérique en est l\'une des expressions.')
     .replace('<div>Grande Bibliothèque numérique MNA — © 2026</div>',
-             '<div>La plateforme numérique MNA — © 2026</div>')
-    .replace('</head>', TAGLINE_STYLE + '</head>');
+             '<div>La plateforme numérique MNA — © 2026</div>');
 }
 
 module.exports = function mountActualites(app, express, publicDir) {
@@ -103,6 +103,7 @@ module.exports = function mountActualites(app, express, publicDir) {
     fs.readFile(file, 'utf8', (err, html) => {
       if (err) return next();
       if (urlPath === '/index.html') html = applyHome(html);
+      if (html.indexOf('id="mna-tagline"') === -1) html = html.replace('</head>', TAGLINE_STYLE + '</head>');
       const add = [];
       if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
       if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
