@@ -74,14 +74,19 @@
   }
 
   // --- 3. Panneau admin : raccourci vers l'administration des actualités ---
+  // Visible par l'administrateur principal et par les administrateurs délégués qui ont le droit « actualites »
   if (path === '/admin.html') {
+    let me = null;
+    try { me = JSON.parse(localStorage.getItem('mna_user') || 'null'); } catch (e) {}
+    const limited = !!(me && me.admin_scope === 'limited');
+    const allowed = !limited || (me.permissions || []).includes('actualites');
     let tries = 0;
     const timer = setInterval(() => {
       tries++;
       const area = document.getElementById('admin-area');
       if (area && !area.classList.contains('hidden')) {
         clearInterval(timer);
-        if (document.getElementById('nw-admin-panel')) return;
+        if (!allowed || document.getElementById('nw-admin-panel')) return;
         const panel = document.createElement('div');
         panel.className = 'panel';
         panel.id = 'nw-admin-panel';
