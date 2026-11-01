@@ -90,12 +90,57 @@ async function titlesOf(kind, ids) {
   } catch (e) { return {}; }
 }
 
+// ---------- Lecture souple de ce que l'administrateur saisit ----------
+// Une date peut arriver sous plusieurs formes : « 2026-12-31T18:00:00.000Z », « 2026-12-31 18:00 »,
+// « 2026-12-31 » (= toute la journée), « 31/12/2026 », « 31/12/2026 18:30 ». Une année saisie sur 2 chiffres
+// (ex. 26) est comprise comme 2026. Retourne null seulement si rien de compréhensible n'a été saisi.
+function fixYear(d) {
+  if (d && !isNaN(d.getTime()) && d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000);
+  return d && !isNaN(d.getTime()) ? d : null;
+}
+function parseWhen(v) {
+  if (v === undefined || v === null) return null;
+  if (v instanceof Date) return fixYear(new Date(v.getTime()));
+  if (typeof v === 'number') return fixYear(new Date(v));
+  const s = String(v).trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?:[ T,]+(\d{1,2})(?:[:h](\d{2}))?)?$/);
+  if (m) {
+    let y = Number(m[3]); if (y < 100) y += 2000;
+    const hasTime = m[4] !== undefined;
+    return fixYear(new Date(y, Number(m[2]) - 1, Number(m[1]), hasTime ? Number(m[4]) : 23, hasTime ? Number(m[5] || 0) : 59, hasTime ? 0 : 59));
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return fixYear(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59)));
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return fixYear(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] || 0))));
+  return fixYear(new Date(s));
+}
+
+// Une durée peut être « 45 » + une unité, ou « 45 jours », « 6 mois », « 1,5 semaine », « 2 ans »…
+function unitOf(text, fallback) {
+  const u = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() ||
+    String(fallback || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (/^(h|heure|heures)$/.test(u)) return 'heures';
+  if (/^(s|sem|semaine|semaines)$/.test(u)) return 'semaines';
+  if (/^(m|mois)$/.test(u)) return 'mois';
+  if (/^(a|an|ans|annee|annees)$/.test(u)) return 'ans';
+  return 'jours';
+}
 function addDuration(base, value, unit) {
-  const v = Number(value);
+  const m = String(value == null ? '' : value).trim().toLowerCase().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*([^\d\s.]*)/);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
   if (!Number.isFinite(v) || v <= 0) return null;
+  const u = unitOf(m[2], unit);
   const d = new Date(base);
-  if (unit === 'mois') { d.setMonth(d.getMonth() + Math.floor(v)); return d; }
-  const ms = { heures: 3600000, jours: 86400000, semaines: 7 * 86400000 }[unit] || 86400000;
+  if (u === 'mois' || u === 'ans') {
+    const months = u === 'ans' ? v * 12 : v;
+    d.setMonth(d.getMonth() + Math.floor(months));
+    const rest = months - Math.floor(months);
+    return rest ? new Date(d.getTime() + rest * 30 * 86400000) : d;
+  }
+  const ms = { heures: 3600000, jours: 86400000, semaines: 7 * 86400000 }[u];
   return new Date(d.getTime() + v * ms);
 }
 
@@ -267,12 +312,15 @@ module.exports = function mountDelais(app, express) {
     if (!exists) return res.status(404).json({ message: 'Livre ou session introuvable.' });
 
     // Une session EBK s'ouvre toujours tout de suite ; un livre d'étude peut avoir un début différé
-    const starts = b.kind === 'study_book' && b.starts_at ? new Date(b.starts_at) : new Date();
-    if (isNaN(starts.getTime())) return res.status(400).json({ message: 'Date de début invalide.' });
-    const ends = b.ends_at ? new Date(b.ends_at) : addDuration(starts, b.duration_value, b.duration_unit);
-    if (!ends || isNaN(ends.getTime()) || ends.getTime() <= Date.now() || ends.getTime() <= starts.getTime()) {
-      return res.status(400).json({ message: 'La durée ou la date de fin doit se situer dans le futur.' });
+    let starts = (b.kind === 'study_book' && parseWhen(b.starts_at)) || new Date();
+    // La fin : la date précise si elle est donnée, sinon la durée (comptée à partir du début). Ce que
+    // l'administrateur saisit est appliqué tel quel, sans contrôle supplémentaire.
+    const ends = parseWhen(b.ends_at) || addDuration(starts, b.duration_value, b.duration_unit);
+    if (!ends) {
+      return res.status(400).json({ message: 'Indiquez une durée (par exemple 45 jours) ou une date de fin.' });
     }
+    // Un début placé après la fin n'a pas de sens : le compte à rebours commence alors tout de suite
+    if (ends.getTime() <= starts.getTime()) starts = new Date(Math.min(Date.now(), ends.getTime() - 1000));
     const audience = b.kind === 'study_book' && b.audience === 'selected' ? 'selected' : 'all';
     const userIds = audience === 'selected' ? [...new Set((b.user_ids || []).map(Number).filter(Boolean))] : [];
     if (audience === 'selected' && !userIds.length) return res.status(400).json({ message: 'Choisissez au moins une personne.' });
@@ -293,10 +341,11 @@ module.exports = function mountDelais(app, express) {
     if (userIds.length) {
       await pool.query('INSERT INTO access_deadline_users (deadline_id, user_id) SELECT $1, id FROM users WHERE id = ANY($2::int[]) ON CONFLICT DO NOTHING', [id, userIds]);
     }
-    if (b.open_now !== false && starts.getTime() <= Date.now()) {
+    if (b.open_now !== false && starts.getTime() <= Date.now() && ends.getTime() > Date.now()) {
       if (b.kind === 'study_book') await pool.query('UPDATE books SET admin_locked = false WHERE id = $1', [targetId]);
       else await openEbkSession(targetId, b.open_registration);
     }
+    await sweep(); // si la fin saisie est déjà passée, la session EBK se ferme tout de suite
     res.status(201).json({ id });
   }));
 
@@ -306,11 +355,18 @@ module.exports = function mountDelais(app, express) {
     if (!d) return res.status(404).json({ message: 'Délai introuvable.' });
     const b = req.body || {};
     if (b.ends_at !== undefined) {
-      const ends = new Date(b.ends_at);
-      if (isNaN(ends.getTime()) || ends.getTime() <= new Date(d.starts_at).getTime()) return res.status(400).json({ message: 'Date de fin invalide.' });
+      const ends = parseWhen(b.ends_at);
+      if (!ends) return res.status(400).json({ message: 'Date de fin non comprise : écrivez-la par exemple 2026-12-31 18:00.' });
       // Prolongé : la fermeture automatique est de nouveau programmée et la session est rouverte
       const reopen = d.kind === 'ebk_session' && ends.getTime() > Date.now();
-      await pool.query('UPDATE access_deadlines SET ends_at = $1, applied_at = CASE WHEN $3::boolean THEN NULL ELSE applied_at END WHERE id = $2', [ends, d.id, reopen]);
+      await pool.query(
+        `UPDATE access_deadlines
+            SET ends_at = $1,
+                starts_at = LEAST(starts_at, $1::timestamptz - interval '1 second'),
+                applied_at = CASE WHEN $3::boolean THEN NULL ELSE applied_at END
+          WHERE id = $2`,
+        [ends, d.id, reopen]
+      );
       if (reopen) await openEbkSession(d.target_id, d.open_registration);
     }
     if (d.kind === 'study_book' && b.audience !== undefined) {
