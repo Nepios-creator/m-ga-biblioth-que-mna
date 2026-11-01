@@ -31,6 +31,19 @@ const TAGLINE_STYLE = '<style id="mna-tagline">' +
   '@media (prefers-reduced-motion:reduce){html body header .brand::after{animation:none;background:none;-webkit-text-fill-color:#a67f2e;color:#a67f2e;}}' +
   '</style>';
 
+// Accueil seulement : la phrase devient plus vivante (dégradé de couleurs qui coule, apparition en fondu,
+// légère respiration lumineuse, petites étoiles). Les autres pages gardent la version simple ci-dessus.
+const HOME_TAGLINE_STYLE = '<style id="mna-tagline-home">' +
+  'html body header .brand::after{content:"\\2726  Partout avec vous \\2726" !important;font-size:.98em;font-weight:600;letter-spacing:.02em;padding:2px 0 4px;' +
+  'background:linear-gradient(100deg,#b8860b 0%,#e8a317 22%,#e2703a 42%,#2f6fb0 62%,#e8a317 82%,#b8860b 100%);background-size:250% 100%;' +
+  '-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;' +
+  'animation:mnaLiveIn 1.5s cubic-bezier(.18,.7,.2,1) both,mnaLiveFlow 4.5s ease-in-out 1.5s infinite alternate,mnaLiveGlow 3s ease-in-out 1.5s infinite;}' +
+  '@keyframes mnaLiveIn{0%{opacity:0;transform:translateY(14px) scale(.8);filter:blur(8px);letter-spacing:.3em}100%{opacity:1;transform:none;filter:blur(0);letter-spacing:.02em}}' +
+  '@keyframes mnaLiveFlow{from{background-position:0% 50%}to{background-position:100% 50%}}' +
+  '@keyframes mnaLiveGlow{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(232,163,23,0))}50%{transform:scale(1.045);filter:drop-shadow(0 2px 7px rgba(232,163,23,.55))}}' +
+  '@media (prefers-reduced-motion:reduce){html body header .brand::after{animation:none;}}' +
+  '</style>';
+
 // Page d'accueil : titre de l'onglet, aperçu WhatsApp, phrase « Qui sommes-nous » et pied de page.
 // Le fichier index.html reste intact.
 function applyHome(html) {
@@ -103,7 +116,7 @@ module.exports = function mountActualites(app, express, publicDir) {
     fs.readFile(file, 'utf8', (err, html) => {
       if (err) return next();
       if (urlPath === '/index.html') html = applyHome(html);
-      if (html.indexOf('id="mna-tagline"') === -1) html = html.replace('</head>', TAGLINE_STYLE + '</head>');
+      if (html.indexOf('id="mna-tagline"') === -1) html = html.replace('</head>', TAGLINE_STYLE + (urlPath === '/index.html' ? HOME_TAGLINE_STYLE : '') + '</head>');
       const add = [];
       if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
       if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
