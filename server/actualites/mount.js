@@ -67,6 +67,21 @@ function applyHome(html) {
              '<div>La plateforme numérique MNA — © 2026</div>');
 }
 
+// Page « À propos » : « Grande Bibliothèque numérique », « Bibliothèque numérique » et « cette bibliothèque »
+// deviennent « plateforme numérique MNA » / « cette plateforme ». Le fichier a-propos.html reste intact.
+const ABOUT_SWAPS = [
+  ['<h2>La Bibliothèque numérique</h2>', '<h2>La plateforme numérique MNA</h2>'],
+  ['La Bibliothèque numérique du Ministère de la Nouvelle Alliance est née de cette vision.', 'La plateforme numérique MNA est née de cette vision.'],
+  ['Cette bibliothèque veut être plus qu\'un simple espace de téléchargement', 'Cette plateforme veut être plus qu\'un simple espace de téléchargement'],
+  ['met cette bibliothèque à votre disposition.', 'met cette plateforme à votre disposition.'],
+  ['<h2>Bienvenue dans la Bibliothèque numérique du MNA</h2>', '<h2>Bienvenue sur la plateforme numérique MNA</h2>'],
+  ['<div>Grande Bibliothèque numérique MNA — © 2026</div>', '<div>La plateforme numérique MNA — © 2026</div>']
+];
+function applyAbout(html) {
+  ABOUT_SWAPS.forEach(([from, to]) => { html = html.split(from).join(to); });
+  return html;
+}
+
 module.exports = function mountActualites(app, express, publicDir) {
   // Délais (compte à rebours) : si ce module échoue, le reste du site continue de fonctionner normalement
   try {
@@ -125,6 +140,7 @@ module.exports = function mountActualites(app, express, publicDir) {
     fs.readFile(file, 'utf8', (err, html) => {
       if (err) return next();
       if (urlPath === '/index.html') html = applyHome(html);
+      if (urlPath === '/a-propos.html') html = applyAbout(html);
       if (html.indexOf('id="mna-tagline') === -1) {
         let headExtra = urlPath === '/index.html' ? HOME_TAGLINE_STYLE : TAGLINE_STYLE;
         if (path.basename(urlPath) === 'ebk.html') headExtra += EBK_FIX_STYLE;
