@@ -18,6 +18,7 @@ const PERMISSIONS = [
   { key: 'assistant_ia', label: 'Gérer l\'assistant (connaissances)', description: 'Documents de connaissance de l\'assistant.' },
   { key: 'bible', label: 'Gérer la Bible', description: 'Publier, masquer ou supprimer les livres de la Bible.' },
   { key: 'audio', label: 'Gérer les livres audio', description: 'Administration des livres audio.' },
+  { key: 'actualites', label: 'Gérer les publications des actualités', description: 'Publier, modifier, masquer ou supprimer les actualités, valider les propositions du jour et gérer les sources.' },
 ];
 const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 
@@ -32,6 +33,7 @@ const RULES = [
   [/^\/api\/admin\/knowledge/, ['assistant_ia']],
   [/^\/api\/bible\/admin/, ['bible']],
   [/^\/api\/audio\/admin/, ['audio']],
+  [/^\/api\/actualites\/admin/, ['actualites']],
 ];
 
 function neededPermissions(req) {
