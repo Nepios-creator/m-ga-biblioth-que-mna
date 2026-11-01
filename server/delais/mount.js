@@ -27,6 +27,8 @@ function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_access_deadlines_target ON access_deadlines (kind, target_id);
       ALTER TABLE access_deadlines ADD COLUMN IF NOT EXISTS prev_locked BOOLEAN;
+      ALTER TABLE access_deadlines ADD COLUMN IF NOT EXISTS open_now BOOLEAN NOT NULL DEFAULT true;
+      ALTER TABLE access_deadlines ADD COLUMN IF NOT EXISTS start_applied_at TIMESTAMPTZ;
       CREATE TABLE IF NOT EXISTS access_deadline_users (
         deadline_id INTEGER NOT NULL REFERENCES access_deadlines(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -60,15 +62,17 @@ async function userWindows(userId, kind) {
   return r.rows;
 }
 
-// État d'un livre / d'une session pour une personne : en cours, terminé, ou sans effet (pas encore commencé)
+// État d'un livre / d'une session pour une personne : en cours, programmé (ouvre bientôt) ou terminé
 function stateOf(windows, now) {
-  let active = null, expired = null;
+  let active = null, expired = null, scheduled = null;
   (windows || []).forEach((w) => {
     const s = new Date(w.starts_at).getTime(), e = new Date(w.ends_at).getTime();
     if (s <= now && e > now) { if (!active || e > new Date(active.ends_at).getTime()) active = w; }
+    else if (s > now && e > s) { if (!scheduled || s < new Date(scheduled.starts_at).getTime()) scheduled = w; }
     else if (e <= now) { if (!expired || e > new Date(expired.ends_at).getTime()) expired = w; }
   });
   if (active) return { state: 'active', w: active };
+  if (scheduled) return { state: 'scheduled', w: scheduled };
   if (expired) return { state: 'expired', w: expired };
   return null;
 }
@@ -153,6 +157,18 @@ async function openEbkSession(id, openRegistration) {
 async function sweep() {
   try {
     await ensureSchema();
+    // Ouverture à la date de début programmée (session EBK : salle de classe ; livre d'étude : déverrouillage)
+    const starting = (await pool.query(
+      "SELECT id, kind, target_id, open_registration, open_now, ends_at > now() AS still_on FROM access_deadlines WHERE start_applied_at IS NULL AND starts_at <= now()"
+    )).rows;
+    for (const row of starting) {
+      if (row.still_on && row.open_now !== false) {
+        if (row.kind === 'ebk_session') await openEbkSession(row.target_id, row.open_registration);
+        else await pool.query('UPDATE books SET admin_locked = false WHERE id = $1', [row.target_id]);
+        console.log('[délais]', row.kind, row.target_id, 'ouvert automatiquement (date de début atteinte)');
+      }
+      await pool.query('UPDATE access_deadlines SET start_applied_at = now() WHERE id = $1', [row.id]);
+    }
     const due = (await pool.query("SELECT id, target_id FROM access_deadlines WHERE kind = 'ebk_session' AND applied_at IS NULL AND ends_at <= now()")).rows;
     for (const row of due) {
       await pool.query("UPDATE ebk_sessions SET classroom_open = false, registration_open = false, status = 'terminee' WHERE id = $1", [row.target_id]);
@@ -206,6 +222,7 @@ async function studyGuard(req, res, next) {
               const st = stateOf(by[b.id], now);
               if (!st) return b;
               if (st.state === 'expired') return { ...b, unlocked: false, deadline_expired: true, deadline_ends_at: st.w.ends_at };
+              if (st.state === 'scheduled') return { ...b, unlocked: false, deadline_scheduled: true, deadline_starts_at: st.w.starts_at, deadline_ends_at: st.w.ends_at };
               return { ...b, deadline_ends_at: st.w.ends_at };
             });
           }
@@ -217,6 +234,9 @@ async function studyGuard(req, res, next) {
     const st = stateOf(by[bookId], now);
     if (st && st.state === 'expired') {
       return res.status(403).json({ expired: true, message: 'Le délai d\'étude de ce livre est terminé : il est maintenant bloqué.' });
+    }
+    if (st && st.state === 'scheduled') {
+      return res.status(403).json({ scheduled: true, starts_at: st.w.starts_at, message: 'Ce livre n\'est pas encore ouvert : l\'ouverture est programmée.' });
     }
     if (!st && restricted.has(bookId)) {
       return res.status(403).json({ restricted: true, message: 'Ce livre n\'est pas accessible.' });
@@ -311,8 +331,8 @@ module.exports = function mountDelais(app, express) {
       : (await pool.query('SELECT id FROM ebk_sessions WHERE id = $1', [targetId])).rows[0];
     if (!exists) return res.status(404).json({ message: 'Livre ou session introuvable.' });
 
-    // Une session EBK s'ouvre toujours tout de suite ; un livre d'étude peut avoir un début différé
-    let starts = (b.kind === 'study_book' && parseWhen(b.starts_at)) || new Date();
+    // Le début peut être programmé (livre d'étude comme session EBK) ; sans date, tout commence maintenant
+    let starts = parseWhen(b.starts_at) || new Date();
     // La fin : la date précise si elle est donnée, sinon la durée (comptée à partir du début). Ce que
     // l'administrateur saisit est appliqué tel quel, sans contrôle supplémentaire.
     const ends = parseWhen(b.ends_at) || addDuration(starts, b.duration_value, b.duration_unit);
@@ -327,15 +347,15 @@ module.exports = function mountDelais(app, express) {
 
     if (b.kind === 'ebk_session') {
       // Un nouveau délai remplace les anciens de la même session
-      await pool.query("UPDATE access_deadlines SET applied_at = COALESCE(applied_at, now()) WHERE kind = 'ebk_session' AND target_id = $1", [targetId]);
+      await pool.query("UPDATE access_deadlines SET applied_at = COALESCE(applied_at, now()), ends_at = LEAST(ends_at, now()), starts_at = LEAST(starts_at, now()) WHERE kind = 'ebk_session' AND target_id = $1", [targetId]);
     }
     let prevLocked = null;
     if (b.kind === 'study_book' && audience === 'selected') {
       prevLocked = !!(await pool.query('SELECT admin_locked FROM books WHERE id = $1', [targetId])).rows[0].admin_locked;
     }
     const r = await pool.query(
-      'INSERT INTO access_deadlines (kind, target_id, audience, open_registration, starts_at, ends_at, prev_locked) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [b.kind, targetId, audience, !!b.open_registration, starts, ends, prevLocked]
+      'INSERT INTO access_deadlines (kind, target_id, audience, open_registration, starts_at, ends_at, prev_locked, open_now) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [b.kind, targetId, audience, !!b.open_registration, starts, ends, prevLocked, b.open_now !== false]
     );
     const id = r.rows[0].id;
     if (userIds.length) {
@@ -345,6 +365,7 @@ module.exports = function mountDelais(app, express) {
       if (b.kind === 'study_book') await pool.query('UPDATE books SET admin_locked = false WHERE id = $1', [targetId]);
       else await openEbkSession(targetId, b.open_registration);
     }
+    if (starts.getTime() <= Date.now()) await pool.query('UPDATE access_deadlines SET start_applied_at = now() WHERE id = $1', [id]);
     await sweep(); // si la fin saisie est déjà passée, la session EBK se ferme tout de suite
     res.status(201).json({ id });
   }));
@@ -395,6 +416,7 @@ module.exports = function mountDelais(app, express) {
 
   // Ordre important : ces lignes passent AVANT l'EBK et l'espace d'étude
   app.use('/api/ebk', lazySweep);
+  app.use('/api/study', lazySweep);
   app.use('/api/study', studyGuard);
   app.use('/api/delais', express.json(), pub);
   app.use('/api/admin/delais', express.json(), requireAuth, requireAdmin, adm);
