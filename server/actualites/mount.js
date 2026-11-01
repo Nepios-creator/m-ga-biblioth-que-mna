@@ -31,18 +31,26 @@ const TAGLINE_STYLE = '<style id="mna-tagline">' +
   '@media (prefers-reduced-motion:reduce){html body header .brand::after{animation:none;background:none;-webkit-text-fill-color:#a67f2e;color:#a67f2e;}}' +
   '</style>';
 
-// Accueil seulement : la phrase défile sans arrêt (elle sort à droite et revient par la gauche), avec un dégradé
-// de couleurs qui coule et une lueur qui pulse. Les autres pages gardent la version simple ci-dessus.
+// Accueil seulement : la phrase animée est retirée (l'emplacement reste vide) et le nom du site
+// « mna-world.org » s'écrit très discrètement sous « Se familiariser avec les enseignements… ».
+// Il est écrit en CSS (::after) : le script de l'accueil, qui réécrit ce texte, ne peut pas l'effacer.
 const HOME_TAGLINE_STYLE = '<style id="mna-tagline-home">' +
-  'html body header .brand{overflow:hidden;}' +
-  'html body header .brand::after{content:"\\2726  Partout avec vous \\2726" !important;white-space:nowrap;font-size:.98em;font-weight:600;letter-spacing:.02em;padding:2px 0 4px;' +
-  'background:linear-gradient(100deg,#b8860b 0%,#e8a317 22%,#e2703a 42%,#2f6fb0 62%,#e8a317 82%,#b8860b 100%);background-size:250% 100%;' +
-  '-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;' +
-  'animation:mnaLiveSlide 9s linear infinite,mnaLiveFlow 4.5s ease-in-out infinite alternate,mnaLiveGlow 3s ease-in-out infinite;}' +
-  '@keyframes mnaLiveSlide{from{transform:translateX(calc(-50vw - 100%))}to{transform:translateX(calc(50vw + 100%))}}' +
-  '@keyframes mnaLiveFlow{from{background-position:0% 50%}to{background-position:100% 50%}}' +
-  '@keyframes mnaLiveGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(232,163,23,0))}50%{filter:drop-shadow(0 2px 7px rgba(232,163,23,.55))}}' +
-  '@media (prefers-reduced-motion:reduce){html body header .brand::after{animation:none;}}' +
+  'html body header .brand::after{content:none !important;display:none !important;}' +
+  'html body .hero > p:first-of-type::after{content:"mna-world.org";display:block;margin:8px auto 0;' +
+  'font:500 11px/1.2 Inter,system-ui,sans-serif;font-style:normal;letter-spacing:.14em;text-transform:none;' +
+  'color:var(--ink-soft,#6b5f4d);opacity:.55;}' +
+  '</style>';
+
+// Page EBK : le titre « École Biblique Kainos » restait noir sur le fond bleu nuit en mode jour.
+// Il est maintenant clair dans les deux modes ; en mode nuit, les titres et textes posés directement
+// sur le fond sombre (programme, sessions, pied de page) deviennent clairs aussi.
+const EBK_FIX_STYLE = '<style id="mna-ebk-fix">' +
+  'html body .k-hero h1{color:#fbf3e3 !important;}' +
+  'html body .k-hero h1 span{color:#d9b45a !important;}' +
+  'html.mna-dark .k-sec h2,html.mna-dark .k-prog b{color:#f1e7cf !important;}' +
+  'html.mna-dark .k-sec h2 + .k-lead,html.mna-dark .k-prog small,html.mna-dark .k-foot,html.mna-dark .k-contact{color:#c9bda4 !important;}' +
+  'html.mna-dark .k-prog li{border-bottom-color:#372f24;}' +
+  'html.mna-dark .k-prog li::before{background:#1f3a5f;}' +
   '</style>';
 
 // Page d'accueil : titre de l'onglet, aperçu WhatsApp, phrase « Qui sommes-nous » et pied de page.
@@ -117,7 +125,11 @@ module.exports = function mountActualites(app, express, publicDir) {
     fs.readFile(file, 'utf8', (err, html) => {
       if (err) return next();
       if (urlPath === '/index.html') html = applyHome(html);
-      if (html.indexOf('id="mna-tagline"') === -1) html = html.replace('</head>', TAGLINE_STYLE + (urlPath === '/index.html' ? HOME_TAGLINE_STYLE : '') + '</head>');
+      if (html.indexOf('id="mna-tagline') === -1) {
+        let headExtra = urlPath === '/index.html' ? HOME_TAGLINE_STYLE : TAGLINE_STYLE;
+        if (path.basename(urlPath) === 'ebk.html') headExtra += EBK_FIX_STYLE;
+        html = html.replace('</head>', headExtra + '</head>');
+      }
       const add = [];
       if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
       if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
