@@ -25,7 +25,7 @@
         panel.id = 'delais-admin-panel';
         panel.innerHTML =
           '<h2 style="margin-bottom:6px;">Délais et compte à rebours</h2>' +
-          '<p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Un livre d\'étude à terminer en 45 jours, une session EBK qui se ferme toute seule : choisissez la durée et les personnes concernées.</p>' +
+          '<p style="color:var(--ink-soft);font-size:13.5px;margin-bottom:14px;">Un livre d\'étude à terminer en 45 jours, une session EBK qui s\'ouvre à une date choisie puis se ferme toute seule : choisissez les dates, la durée et les personnes concernées.</p>' +
           '<a href="/admin-delais.html" class="btn btn-primary">⏳ Gérer les délais</a>';
         area.insertBefore(panel, area.querySelector('.panel'));
       } else if (n > 40) {
@@ -44,6 +44,7 @@
     '.dl-card.dl-warn{background:linear-gradient(135deg,#b7791f,#3a2a0c)}' +
     '.dl-card.dl-danger{background:linear-gradient(135deg,#b3261e,#3b0d0a)}' +
     '.dl-card.dl-expired{background:linear-gradient(135deg,#6b6558,#2b2824)}' +
+    '.dl-card.dl-sched{background:linear-gradient(135deg,#2a7a44,#16130f)}' +
     '.dl-label{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;font-weight:700}' +
     '.dl-title{font-size:18px;font-weight:700;margin:3px 0 12px;line-height:1.3}' +
     '.dl-clock{display:flex;gap:10px}' +
@@ -55,7 +56,7 @@
     '.dl-end{font-size:12.5px;opacity:.85;margin-top:9px}' +
     '.dl-over{font-size:15px;font-weight:600;padding:6px 0}' +
     '.dl-chip{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;background:#e8f1fa;color:#1f5386;font-variant-numeric:tabular-nums}' +
-    '.dl-chip.dl-warn{background:#fff3df;color:#9a5b00}.dl-chip.dl-danger{background:#fdeaea;color:#b3261e}.dl-chip.dl-expired{background:#eee9df;color:#6b6558}' +
+    '.dl-chip.dl-warn{background:#fff3df;color:#9a5b00}.dl-chip.dl-danger{background:#fdeaea;color:#b3261e}.dl-chip.dl-expired{background:#eee9df;color:#6b6558}.dl-chip.dl-sched{background:#e8f6ec;color:#2a7a44}' +
     '@media(max-width:480px){.dl-u b{font-size:21px}.dl-title{font-size:16px}}';
   document.head.appendChild(css);
 
@@ -74,7 +75,9 @@
     try { return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' }); } catch (e) { return iso; }
   }
   function urgency(left) { return left <= 0 ? 'dl-expired' : (left < 86400000 ? 'dl-danger' : (left < 3 * 86400000 ? 'dl-warn' : '')); }
-  function labelFor(it, over) {
+  function isSched(it) { return new Date(it.starts_at).getTime() > nowMs(); }
+  function labelFor(it, over, sched) {
+    if (sched) return it.kind === 'ebk_session' ? 'Session EBK — ouverture dans' : 'Livre à étudier — ouverture dans';
     if (it.kind === 'ebk_session') return over ? 'Session terminée' : 'Session ouverte — fermeture automatique dans';
     return over ? 'Délai terminé' : 'Livre à étudier — temps restant';
   }
@@ -85,10 +88,14 @@
   }
 
   function cardHtml(it) {
+    var sched = isSched(it);
     var left = new Date(it.ends_at).getTime() - nowMs();
-    var over = left <= 0;
-    return '<div class="dl-card ' + urgency(left) + '" data-dl-card data-start="' + esc(it.starts_at) + '" data-end="' + esc(it.ends_at) + '" data-kind="' + esc(it.kind) + '">' +
-      '<div class="dl-label">⏳ ' + labelFor(it, over) + '</div>' +
+    var over = !sched && left <= 0;
+    var endLine = sched
+      ? 'Ouverture le ' + esc(dateText(it.starts_at)) + ' · fermeture le ' + esc(dateText(it.ends_at))
+      : (over ? 'Terminé le ' : 'Jusqu\'au ') + esc(dateText(it.ends_at));
+    return '<div class="dl-card ' + (sched ? 'dl-sched' : urgency(left)) + '" data-dl-card data-sched="' + (sched ? '1' : '') + '" data-start="' + esc(it.starts_at) + '" data-end="' + esc(it.ends_at) + '" data-kind="' + esc(it.kind) + '">' +
+      '<div class="dl-label">⏳ ' + labelFor(it, over, sched) + '</div>' +
       '<div class="dl-title">' + esc(it.title) + '</div>' +
       '<div class="dl-body">' + (over ? '<div class="dl-over">' + overText(it) + '</div>' :
         '<div class="dl-clock">' +
@@ -96,12 +103,24 @@
         '<div class="dl-u"><b data-u="h">00</b><small>heures</small></div>' +
         '<div class="dl-u"><b data-u="m">00</b><small>min</small></div>' +
         '<div class="dl-u"><b data-u="s">00</b><small>sec</small></div></div>' +
-        '<div class="dl-bar"><i></i></div>') + '</div>' +
-      '<div class="dl-end">' + (over ? 'Terminé le ' : 'Jusqu\'au ') + esc(dateText(it.ends_at)) + '</div>' +
+        (sched ? '' : '<div class="dl-bar"><i></i></div>')) + '</div>' +
+      '<div class="dl-end">' + endLine + '</div>' +
       '</div>';
   }
   function chipHtml(it) {
-    return '<span class="dl-chip" data-dl-chip data-end="' + esc(it.ends_at) + '">⏳</span>';
+    return '<span class="dl-chip" data-dl-chip data-start="' + esc(it.starts_at) + '" data-end="' + esc(it.ends_at) + '">⏳</span>';
+  }
+
+  // Quand l'heure d'ouverture arrive, on recharge les données : le compte à rebours de fermeture prend le relais
+  var reloading = false;
+  function refreshSoon() {
+    if (reloading) return;
+    reloading = true;
+    setTimeout(function () {
+      document.querySelectorAll('[data-dl-card],[data-dl-chip]').forEach(function (e) { e.remove(); });
+      load();
+      reloading = false;
+    }, 1500);
   }
 
   function tick() {
@@ -109,13 +128,23 @@
     document.querySelectorAll('[data-dl-card]').forEach(function (c) {
       var end = new Date(c.getAttribute('data-end')).getTime();
       var start = new Date(c.getAttribute('data-start')).getTime();
+      var sched = !!c.getAttribute('data-sched');
+      if (sched) {
+        var toOpen = start - now;
+        if (toOpen <= 0) { refreshSoon(); return; }
+        c.className = 'dl-card dl-sched';
+        var ps = parts(toOpen);
+        var sets = function (k, v) { var e = c.querySelector('[data-u="' + k + '"]'); if (e) e.textContent = v; };
+        sets('d', ps.d); sets('h', pad(ps.h)); sets('m', pad(ps.m)); sets('s', pad(ps.s));
+        return;
+      }
       var left = end - now;
       c.className = 'dl-card ' + urgency(left);
       if (left <= 0) {
         if (!c.getAttribute('data-over')) {
           c.setAttribute('data-over', '1');
           var it = { kind: c.getAttribute('data-kind') };
-          c.querySelector('.dl-label').textContent = '⏳ ' + labelFor(it, true);
+          c.querySelector('.dl-label').textContent = '⏳ ' + labelFor(it, true, false);
           c.querySelector('.dl-body').innerHTML = '<div class="dl-over">' + overText(it) + '</div>';
         }
         return;
@@ -127,6 +156,13 @@
       if (bar && end > start) bar.style.width = Math.min(100, Math.max(0, (now - start) / (end - start) * 100)) + '%';
     });
     document.querySelectorAll('[data-dl-chip]').forEach(function (c) {
+      var toOpen = new Date(c.getAttribute('data-start')).getTime() - nowMs();
+      if (toOpen > 0) {
+        var po = parts(toOpen);
+        c.className = 'dl-chip dl-sched';
+        c.textContent = '🔒 Ouvre dans ' + (po.d > 0 ? po.d + ' j ' : '') + pad(po.h) + ':' + pad(po.m) + ':' + pad(po.s);
+        return;
+      }
       var left = new Date(c.getAttribute('data-end')).getTime() - nowMs();
       c.className = 'dl-chip ' + urgency(left);
       if (left <= 0) { c.textContent = '⏳ Délai terminé'; return; }
@@ -141,7 +177,7 @@
     var keep = kind === 'ebk_session' ? 60 * DAY : 30 * DAY;
     return items.filter(function (it) {
       if (it.kind !== kind) return false;
-      return it.state === 'active' || nowMs() - new Date(it.ends_at).getTime() < keep;
+      return it.state === 'active' || it.state === 'scheduled' || nowMs() - new Date(it.ends_at).getTime() < keep;
     });
   }
 
@@ -193,12 +229,16 @@
     } finally { decorating = false; }
   }
 
+  var watching = false;
   function watch() {
     if (!onStudy) return;
-    ['books-panel', 'book-panel'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) new MutationObserver(decorate).observe(el, { childList: true });
-    });
+    if (!watching) {
+      watching = true;
+      ['books-panel', 'book-panel'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) new MutationObserver(decorate).observe(el, { childList: true });
+      });
+    }
     decorate();
   }
 
