@@ -38,7 +38,7 @@
   .badge.expired { background: #eee9df; color: #6b6558; }
   .badge.scheduled { background: #fff3df; color: #9a5b00; }
   .clock { font-size: 22px; font-weight: 700; margin: 8px 0 2px; font-variant-numeric: tabular-nums; color: #1f5386; }
-  .clock.warn { color: #b7791f; } .clock.danger { color: #b3261e; } .clock.over { color: #6b6558; font-size: 15px; }
+  .clock.warn { color: #b7791f; } .clock.danger { color: #b3261e; } .clock.over { color: #6b6558; font-size: 15px; } .clock.sched { color: #2a7a44; }
   .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .acts .btn { padding: 7px 12px; font-size: 13px; }
   .small { font-size: 13px; color: var(--ink-soft, #6b5f4d); }
@@ -48,7 +48,7 @@
 <div class="wrap">
   <a href="/admin.html" style="font-size:14px;">← Administration</a>
   <h1 style="font-family:'Fraunces',serif;margin:10px 0 6px;">Délais et compte à rebours</h1>
-  <p class="small" style="margin-bottom:20px;">Donnez une durée à un livre d'étude ou à une session EBK. Le compte à rebours s'affiche pour les personnes concernées, et l'accès se ferme tout seul à la fin. Le fonctionnement actuel du site ne change pas.</p>
+  <p class="small" style="margin-bottom:20px;">Donnez une durée à un livre d'étude ou à une session EBK, avec une date d'ouverture si vous le souhaitez. Le compte à rebours (jusqu'à l'ouverture, puis jusqu'à la fermeture) s'affiche pour les personnes concernées, et l'accès s'ouvre et se ferme tout seul. Le fonctionnement actuel du site ne change pas.</p>
 
   <div id="denied" class="hidden panel">Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></div>
 
@@ -77,8 +77,9 @@
           <label class="f">Date et heure de fin (remplace la durée)</label>
           <input type="datetime-local" id="endAt">
           <div id="start-box">
-            <label class="f">Début différé (facultatif — par défaut : maintenant)</label>
+            <label class="f">Date et heure d'ouverture (facultatif — par défaut : maintenant)</label>
             <input type="datetime-local" id="startAt">
+            <p class="hint">Si vous choisissez une date d'ouverture à venir, un compte à rebours « ouverture dans… » s'affiche d'ici là, puis l'accès s'ouvre tout seul à cette date.</p>
           </div>
         </details>
 
@@ -140,12 +141,11 @@
     $('dur').value = study ? 45 : 6;
     $('unit').value = study ? 'jours' : 'mois';
     $('aud-box').classList.toggle('hidden', !study);
-    $('start-box').classList.toggle('hidden', !study);
     $('o-reg').classList.toggle('hidden', study);
-    $('o-open-t').textContent = study ? 'Ouvrir le livre maintenant dans l\'espace d\'étude' : 'Ouvrir la salle de classe maintenant (les autres sessions sont fermées)';
+    $('o-open-t').textContent = study ? 'Ouvrir le livre dans l\'espace d\'étude à la date d\'ouverture' : 'Ouvrir la salle de classe à la date d\'ouverture (les autres sessions sont fermées)';
     $('hint').textContent = study
       ? 'Tous les membres : chacun voit le livre et le compte à rebours, puis le livre est bloqué pour tous à la fin. Certaines personnes : seules elles (et les administrateurs) voient le livre et le compte à rebours ; pour les autres il reste invisible et bloqué ; à la fin il est bloqué pour elles aussi. Le brevet déjà obtenu reste téléchargeable.'
-      : 'À la fin de la durée, la salle de classe et les inscriptions de la session sont fermées automatiquement, et la session passe en « terminée ».';
+      : 'À la date d\'ouverture, la salle de classe de la session s\'ouvre ; à la fin de la durée, la salle de classe et les inscriptions sont fermées automatiquement et la session passe en « terminée ».';
     fillTargets();
   }
   function fillTargets() {
@@ -219,6 +219,7 @@
     api('/api/admin/delais').then(function (d) {
       offset = new Date(d.now).getTime() - Date.now();
       items = d.items;
+      reloading = false;
       render();
     }).catch(function (err) { $('list').innerHTML = '<div class="msg error">' + esc(err.message) + '</div>'; });
   }
@@ -227,10 +228,11 @@
     $('list').innerHTML = items.map(function (it) {
       var who = it.kind === 'ebk_session' ? 'Session EBK' : (it.audience === 'all' ? 'Livre d\'étude — tous les membres' : 'Livre d\'étude — ' + it.users.length + ' personne(s) : ' + it.users.map(function (u) { return esc(u.full_name || u.email); }).join(', '));
       var label = { active: 'En cours', expired: 'Terminé', scheduled: 'Programmé' }[it.state];
+      var sched = it.state === 'scheduled';
       return '<div class="item" data-id="' + it.id + '">' +
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><h3>' + esc(it.title) + '</h3><div class="small">' + who + '</div></div><span class="badge ' + it.state + '">' + label + '</span></div>' +
-        '<div class="clock" data-end="' + esc(it.ends_at) + '" data-state="' + it.state + '"></div>' +
-        '<div class="small">Fin : ' + esc(dt(it.ends_at)) + '</div>' +
+        '<div class="clock" data-start="' + esc(it.starts_at) + '" data-end="' + esc(it.ends_at) + '" data-state="' + it.state + '"></div>' +
+        '<div class="small">' + (sched ? 'Ouverture : ' + esc(dt(it.starts_at)) + ' · ' : '') + 'Fin : ' + esc(dt(it.ends_at)) + '</div>' +
         '<div class="acts">' +
         '<button class="btn btn-ghost" data-act="plus7">+7 jours</button>' +
         '<button class="btn btn-ghost" data-act="plus1m">+1 mois</button>' +
@@ -241,9 +243,19 @@
     }).join('');
     tick();
   }
+  var reloading = false;
   function tick() {
     Array.prototype.forEach.call(document.querySelectorAll('.clock'), function (c) {
-      var left = new Date(c.getAttribute('data-end')).getTime() - nowMs();
+      var now = nowMs();
+      var toOpen = new Date(c.getAttribute('data-start')).getTime() - now;
+      if (c.getAttribute('data-state') === 'scheduled' || toOpen > 0) {
+        if (toOpen <= 0) { if (!reloading) { reloading = true; setTimeout(load, 1500); } c.className = 'clock over'; c.textContent = 'Ouverture en cours…'; return; }
+        var po = Math.floor(toOpen / 1000);
+        c.className = 'clock sched';
+        c.textContent = 'Ouvre dans ' + Math.floor(po / 86400) + ' j ' + pad(Math.floor(po % 86400 / 3600)) + ' h ' + pad(Math.floor(po % 3600 / 60)) + ' min ' + pad(po % 60) + ' s';
+        return;
+      }
+      var left = new Date(c.getAttribute('data-end')).getTime() - now;
       if (left <= 0) { c.className = 'clock over'; c.textContent = 'Délai terminé'; return; }
       var s = Math.floor(left / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
       c.className = 'clock' + (left < 86400000 ? ' danger' : (left < 3 * 86400000 ? ' warn' : ''));
