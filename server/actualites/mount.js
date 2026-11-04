@@ -19,7 +19,7 @@ const NAV_SCRIPT = '<script src="/js/actualites-nav.js" defer></script>';
 const EBK_SCRIPT = '<script src="/js/ebk-nav.js" defer></script>';
 const DELAIS_SCRIPT = '<script src="/js/delais.js" defer></script>';
 const BREVETS_SCRIPT = '<script src="/js/brevets.js" defer></script>';
-const BREVETS_PAGES = new Set(['espace-etude.html', 'admin.html']); // seules pages où le script des brevets est ajouté
+const BREVETS_PAGES = new Set(['espace-etude.html', 'ebk.html', 'admin.html']); // seules pages où le script des brevets est ajouté
 
 // Titre du ministère (en-tête de TOUTES les pages) : le sous-titre « Bibliothèque numérique » est défini
 // dans style.css (header .brand::after). Il est remplacé ici, sans toucher à style.css, par la phrase
