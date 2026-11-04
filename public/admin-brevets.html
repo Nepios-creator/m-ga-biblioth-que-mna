@@ -9,6 +9,10 @@
   .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
   .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 22px; }
   .hidden { display: none; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tab { border: 1px solid var(--line); background: #fffdf8; color: inherit; border-radius: 999px; padding: 9px 16px; font: 600 14px inherit; font-family: inherit; cursor: pointer; }
+  .tab.on { background: #14263f; color: #fff; border-color: #14263f; }
+  .tab .n { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #fff3df; color: #9a5b00; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
   .toolbar input[type=search] { flex: 1; min-width: 200px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14.5px; font-family: inherit; }
   .toolbar label { font-size: 13.5px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -53,11 +57,15 @@
   <div id="admin-area" class="hidden">
     <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:18px;">← Panneau administrateur</a>
     <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Classeur des brevets</h1>
-    <p style="color:var(--ink-soft);margin-bottom:20px;">Les brevets envoyés par les lecteurs, rangés par livre étudié. Ouvrez un livre pour voir ses brevets, le message qui les accompagne et toutes leurs références.</p>
+    <p style="color:var(--ink-soft);margin-bottom:20px;">Les brevets envoyés par les lecteurs et par les étudiants de l'EBK. Ouvrez un dossier pour voir ses brevets, le message qui les accompagne et toutes leurs références.</p>
 
     <div class="panel">
+      <div class="tabs">
+        <button type="button" class="tab on" id="tab-livres" data-mode="livres">📚 Livres d'étude <span class="n hidden" id="n-livres"></span></button>
+        <button type="button" class="tab" id="tab-ebk" data-mode="ebk">🎓 École Biblique Kainos <span class="n hidden" id="n-ebk"></span></button>
+      </div>
       <div class="toolbar">
-        <input type="search" id="q" placeholder="Rechercher un nom, un e-mail, un code ou un livre…">
+        <input type="search" id="q" placeholder="Rechercher un nom, un e-mail, un code…">
         <label><input type="checkbox" id="only-new"> Seulement les non consultés</label>
       </div>
       <div class="summary" id="summary">Chargement…</div>
@@ -75,15 +83,24 @@ const userRaw = localStorage.getItem('mna_user');
 const user = userRaw ? JSON.parse(userRaw) : null;
 const authHeaders = { Authorization: `Bearer ${token}` };
 
-let data = { total: 0, unread: 0, books: [] };
-const opened = new Set();
-let firstRender = true;
+// Deux classeurs : les livres d'étude et l'École Biblique Kainos (même présentation, deux sources)
+const APIS = { livres: '/api/admin/brevets', ebk: '/api/admin/brevets-ebk' };
+const LABELS = {
+  livres: { empty: 'Aucun brevet de livre reçu pour le moment.' },
+  ebk: { empty: 'Aucun brevet de l\'École Biblique Kainos reçu pour le moment.' },
+};
+const state = {
+  livres: { data: null, error: '', opened: new Set(), first: true },
+  ebk: { data: null, error: '', opened: new Set(), first: true },
+};
+let mode = 'livres';
 
 if (!token || !user || user.role !== 'admin') {
   $('not-admin').classList.remove('hidden');
 } else {
   $('admin-area').classList.remove('hidden');
-  load();
+  load('livres');
+  load('ebk');
 }
 
 function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -97,20 +114,24 @@ function dOnly(iso) {
   try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return iso; }
 }
 
-async function load() {
+async function load(m) {
+  const s = state[m];
   try {
-    const r = await fetch('/api/admin/brevets/classeur', { headers: authHeaders });
+    const r = await fetch(APIS[m] + '/classeur', { headers: authHeaders });
     const d = await r.json();
-    if (!r.ok) { $('error-box').innerHTML = `<div class="msg error">${esc(d.message || 'Erreur de chargement')}</div>`; $('summary').textContent = ''; return; }
-    data = d;
-    if (firstRender) {
-      data.books.forEach((b) => { if (b.unread > 0) opened.add(b.book_id); });
-      firstRender = false;
+    if (!r.ok) { s.error = d.message || 'Erreur de chargement'; }
+    else {
+      s.error = '';
+      s.data = d;
+      if (s.first) {
+        d.books.forEach((b) => { if (b.unread > 0) s.opened.add(b.book_id); });
+        s.first = false;
+      }
     }
-    render();
   } catch (e) {
-    $('error-box').innerHTML = '<div class="msg error">Erreur réseau — réessayez.</div>';
+    s.error = 'Erreur réseau — réessayez.';
   }
+  render();
 }
 
 function rowHtml(it) {
@@ -125,7 +146,7 @@ function rowHtml(it) {
           <div class="bv-meta">
             ✉️ ${esc(it.email || '—')}<br>
             🎯 Résultat au grand test : ${score} · 🔁 ${esc(tries)}<br>
-            🎓 Brevet obtenu le ${esc(dOnly(it.obtained_at))} · 📤 Envoyé le ${esc(dt(it.sent_at))}<br>
+            ${it.started_at ? `📅 Début : ${esc(dOnly(it.started_at))} · ` : ''}🎓 Brevet obtenu le ${esc(dOnly(it.obtained_at))} · 📤 Envoyé le ${esc(dt(it.sent_at))}<br>
             🔑 Code de vérification : <b>${esc(it.certificate_code || '—')}</b>
             ${it.read_at ? `<br>👁 Consulté le ${esc(dt(it.read_at))}` : ''}
           </div>
@@ -140,7 +161,28 @@ function rowHtml(it) {
     </div>`;
 }
 
+function updateTabs() {
+  ['livres', 'ebk'].forEach((m) => {
+    const d = state[m].data;
+    const n = $('n-' + m);
+    if (d && d.unread > 0) { n.textContent = d.unread + ' nouveau(x)'; n.classList.remove('hidden'); }
+    else n.classList.add('hidden');
+    $('tab-' + m).classList.toggle('on', m === mode);
+  });
+}
+
 function render() {
+  updateTabs();
+  const s = state[mode];
+  if (s.error) {
+    $('error-box').innerHTML = `<div class="msg error">${esc(s.error)}</div>`;
+    $('summary').textContent = '';
+    $('classeur').innerHTML = '';
+    return;
+  }
+  $('error-box').innerHTML = '';
+  if (!s.data) { $('summary').textContent = 'Chargement…'; $('classeur').innerHTML = ''; return; }
+  const data = s.data;
   const q = norm($('q').value.trim());
   const onlyNew = $('only-new').checked;
   let shown = 0;
@@ -152,7 +194,7 @@ function render() {
     if (!items.length) return '';
     shown += items.length;
     const unread = items.filter((it) => !it.read_at).length;
-    const open = opened.has(b.book_id) || q || onlyNew;
+    const open = s.opened.has(b.book_id) || q || onlyNew;
     return `
       <details class="binder" data-book="${b.book_id}" ${open ? 'open' : ''}>
         <summary>📁 <strong>${esc(b.title)}</strong>
@@ -162,11 +204,13 @@ function render() {
         ${items.map(rowHtml).join('')}
       </details>`;
   }).join('');
-  $('classeur').innerHTML = html || `<div class="panel empty">${data.total ? 'Aucun brevet ne correspond à votre recherche.' : 'Aucun brevet reçu pour le moment.'}</div>`;
+  $('classeur').innerHTML = html || `<div class="panel empty">${data.total ? 'Aucun brevet ne correspond à votre recherche.' : esc(LABELS[mode].empty)}</div>`;
   $('summary').textContent = `${data.total} brevet(s) reçu(s) · ${data.unread} non consulté(s)` + (q || onlyNew ? ` · ${shown} affiché(s)` : '');
 }
 
 function findItem(id) {
+  const data = state[mode].data;
+  if (!data) return null;
   for (const b of data.books) { const it = b.items.find((x) => x.id === id); if (it) return { b, it }; }
   return null;
 }
@@ -174,16 +218,23 @@ function findItem(id) {
 function setRead(id, readAt) {
   const f = findItem(id);
   if (!f) return;
+  const data = state[mode].data;
   const was = !!f.it.read_at;
   f.it.read_at = readAt;
   if (was && !readAt) { f.b.unread++; data.unread++; }
   if (!was && readAt) { f.b.unread--; data.unread--; }
 }
 
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+  mode = t.dataset.mode;
+  render();
+}));
+
 $('classeur').addEventListener('toggle', (e) => {
   const d = e.target;
   if (!d || !d.dataset || !d.dataset.book) return;
   const id = Number(d.dataset.book);
+  const opened = state[mode].opened;
   if (d.open) opened.add(id); else opened.delete(id);
 }, true);
 
@@ -193,6 +244,7 @@ $('classeur').addEventListener('click', async (e) => {
   const row = btn.closest('.bv-row');
   const id = Number(row.dataset.id);
   const act = btn.dataset.act;
+  const base = APIS[mode];
 
   if (act === 'msg') {
     row.querySelector('.bv-msg').classList.toggle('hidden');
@@ -203,7 +255,7 @@ $('classeur').addEventListener('click', async (e) => {
     // La fenêtre est ouverte tout de suite (le navigateur du téléphone refuse sinon), puis dirigée vers le brevet
     const w = window.open('', '_blank');
     try {
-      const r = await fetch(`/api/admin/brevets/${id}/link`, { headers: authHeaders });
+      const r = await fetch(`${base}/${id}/link`, { headers: authHeaders });
       const d = await r.json();
       if (!r.ok) { if (w) w.close(); alert(d.message || 'Erreur'); return; }
       if (w) w.location = d.url; else location.href = d.url;
@@ -222,7 +274,7 @@ $('classeur').addEventListener('click', async (e) => {
     const makeRead = !f.it.read_at;
     btn.disabled = true;
     try {
-      const r = await fetch(`/api/admin/brevets/${id}/read`, {
+      const r = await fetch(`${base}/${id}/read`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ read: makeRead }),
       });
