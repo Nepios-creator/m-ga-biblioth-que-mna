@@ -4,6 +4,7 @@
 //  3. Quotidien   : lance la recherche quotidienne d'actualités dans les sources officielles
 //  4. EBK         : branche l'API /api/ebk (École Biblique Kainos) et ajoute l'onglet « EBK » dans les pages
 //  5. Délais      : livres d'étude et sessions EBK à durée limitée, avec compte à rebours
+//  6. Brevets     : brevets envoyés à l'administration, classés par livre étudié
 const fs = require('fs');
 const path = require('path');
 const pool = require('../db/pool');
@@ -17,6 +18,8 @@ const NO_INJECT = new Set(['ebk-verification.html']); // page autonome (ouverte 
 const NAV_SCRIPT = '<script src="/js/actualites-nav.js" defer></script>';
 const EBK_SCRIPT = '<script src="/js/ebk-nav.js" defer></script>';
 const DELAIS_SCRIPT = '<script src="/js/delais.js" defer></script>';
+const BREVETS_SCRIPT = '<script src="/js/brevets.js" defer></script>';
+const BREVETS_PAGES = new Set(['espace-etude.html', 'admin.html']); // seules pages où le script des brevets est ajouté
 
 // Titre du ministère (en-tête de TOUTES les pages) : le sous-titre « Bibliothèque numérique » est défini
 // dans style.css (header .brand::after). Il est remplacé ici, sans toucher à style.css, par la phrase
@@ -91,6 +94,14 @@ module.exports = function mountActualites(app, express, publicDir) {
     console.error('[délais] module non chargé :', err.message);
   }
 
+  // Brevets envoyés à l'administration : si ce module échoue, le reste du site continue de fonctionner normalement
+  try {
+    require('../brevets/mount')(app, express);
+    console.log('[brevets] module branché');
+  } catch (err) {
+    console.error('[brevets] module non chargé :', err.message);
+  }
+
   // École Biblique Kainos : si ce module échoue, le reste du site continue de fonctionner normalement
   try {
     app.use('/api/ebk', require('../routes/ebk'));
@@ -150,6 +161,7 @@ module.exports = function mountActualites(app, express, publicDir) {
       if (!own && !html.includes('actualites-nav.js')) add.push(NAV_SCRIPT);
       if (!html.includes('ebk-nav.js')) add.push(EBK_SCRIPT);
       if (!html.includes('delais.js')) add.push(DELAIS_SCRIPT);
+      if (BREVETS_PAGES.has(path.basename(urlPath)) && !html.includes('brevets.js')) add.push(BREVETS_SCRIPT);
       if (add.length) {
         const i = html.toLowerCase().lastIndexOf('</body>');
         const tags = add.join('\n');
