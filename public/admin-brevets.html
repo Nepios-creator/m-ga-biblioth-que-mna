@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classeur des brevets — Ministère de la Nouvelle Alliance</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 22px; }
+  .hidden { display: none; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .toolbar input[type=search] { flex: 1; min-width: 200px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14.5px; font-family: inherit; }
+  .toolbar label { font-size: 13.5px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .summary { font-size: 14px; color: var(--ink-soft); margin-bottom: 6px; }
+  .binder { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; background: #fffdf8; overflow: hidden; }
+  .binder > summary { cursor: pointer; padding: 14px 16px; font-size: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; list-style: none; }
+  .binder > summary::-webkit-details-marker { display: none; }
+  .binder > summary .count { font-size: 12.5px; color: var(--ink-soft); margin-left: auto; }
+  .badge-new { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #fff3df; color: #9a5b00; text-transform: uppercase; }
+  .bv-row { padding: 14px 16px; border-top: 1px solid var(--line); }
+  .bv-row.new { border-left: 4px solid #c9a24b; padding-left: 12px; }
+  .bv-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .bv-meta { font-size: 13px; color: var(--ink-soft); margin-top: 4px; line-height: 1.6; }
+  .bv-meta b { color: inherit; font-weight: 600; }
+  .bv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bv-actions .btn { padding: 7px 12px; font-size: 12.5px; }
+  .bv-msg { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 13.5px; margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  .msg { font-size: 14px; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; }
+  .msg.error { background: #fdeaea; color: #a33; }
+  .empty { text-align: center; color: var(--ink-soft); padding: 30px 10px; }
+</style>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#16130f">
+</head>
+<body>
+
+<header>
+  <div class="brand">Ministère de la <span>Nouvelle Alliance</span></div>
+  <nav><a href="/">Accueil</a><a href="/a-propos.html">À propos</a>
+    <a href="/catalogue.html">Catalogue</a><a href="/login.html">Mon compte</a></nav>
+</header>
+
+<div class="wrap">
+  <div id="not-admin" class="hidden">
+    <div class="panel">
+      <h2>Accès refusé</h2>
+      <p>Cette page est réservée aux administrateurs. <a href="/login.html">Se connecter</a></p>
+    </div>
+  </div>
+
+  <div id="admin-area" class="hidden">
+    <a href="/admin.html" class="btn btn-ghost" style="margin-bottom:18px;">← Panneau administrateur</a>
+    <h1 style="font-family:'Fraunces',serif;margin-bottom:6px;">Classeur des brevets</h1>
+    <p style="color:var(--ink-soft);margin-bottom:20px;">Les brevets envoyés par les lecteurs, rangés par livre étudié. Ouvrez un livre pour voir ses brevets, le message qui les accompagne et toutes leurs références.</p>
+
+    <div class="panel">
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Rechercher un nom, un e-mail, un code ou un livre…">
+        <label><input type="checkbox" id="only-new"> Seulement les non consultés</label>
+      </div>
+      <div class="summary" id="summary">Chargement…</div>
+    </div>
+
+    <div id="error-box"></div>
+    <div id="classeur"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const token = localStorage.getItem('mna_token');
+const userRaw = localStorage.getItem('mna_user');
+const user = userRaw ? JSON.parse(userRaw) : null;
+const authHeaders = { Authorization: `Bearer ${token}` };
+
+let data = { total: 0, unread: 0, books: [] };
+const opened = new Set();
+let firstRender = true;
+
+if (!token || !user || user.role !== 'admin') {
+  $('not-admin').classList.remove('hidden');
+} else {
+  $('admin-area').classList.remove('hidden');
+  load();
+}
+
+function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function norm(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function dt(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' }); } catch (e) { return iso; }
+}
+function dOnly(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return iso; }
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/admin/brevets/classeur', { headers: authHeaders });
+    const d = await r.json();
+    if (!r.ok) { $('error-box').innerHTML = `<div class="msg error">${esc(d.message || 'Erreur de chargement')}</div>`; $('summary').textContent = ''; return; }
+    data = d;
+    if (firstRender) {
+      data.books.forEach((b) => { if (b.unread > 0) opened.add(b.book_id); });
+      firstRender = false;
+    }
+    render();
+  } catch (e) {
+    $('error-box').innerHTML = '<div class="msg error">Erreur réseau — réessayez.</div>';
+  }
+}
+
+function rowHtml(it) {
+  const score = it.final_score != null ? `<b>${esc(it.final_score)} %</b>` : '—';
+  const tries = it.grand_attempts > 0 ? `${it.grand_attempts} tentative(s) au grand test` : 'tentatives non disponibles';
+  return `
+    <div class="bv-row ${it.read_at ? '' : 'new'}" data-id="${it.id}">
+      <div class="bv-top">
+        <div>
+          <strong>${esc(it.full_name || it.email || 'Lecteur')}</strong>
+          ${it.read_at ? '' : '<span class="badge-new">Nouveau</span>'}
+          <div class="bv-meta">
+            ✉️ ${esc(it.email || '—')}<br>
+            🎯 Résultat au grand test : ${score} · 🔁 ${esc(tries)}<br>
+            🎓 Brevet obtenu le ${esc(dOnly(it.obtained_at))} · 📤 Envoyé le ${esc(dt(it.sent_at))}<br>
+            🔑 Code de vérification : <b>${esc(it.certificate_code || '—')}</b>
+            ${it.read_at ? `<br>👁 Consulté le ${esc(dt(it.read_at))}` : ''}
+          </div>
+        </div>
+        <div class="bv-actions">
+          <button class="btn btn-primary" data-act="open">📄 Ouvrir le brevet</button>
+          <button class="btn btn-ghost" data-act="msg">✉️ Message</button>
+          <button class="btn btn-ghost" data-act="read">${it.read_at ? '↺ Marquer non consulté' : '✓ Marquer consulté'}</button>
+        </div>
+      </div>
+      <pre class="bv-msg hidden">${esc(it.message)}</pre>
+    </div>`;
+}
+
+function render() {
+  const q = norm($('q').value.trim());
+  const onlyNew = $('only-new').checked;
+  let shown = 0;
+  const html = data.books.map((b) => {
+    const items = b.items.filter((it) =>
+      (!onlyNew || !it.read_at) &&
+      (!q || norm([it.full_name, it.email, it.certificate_code, b.title].join(' ')).includes(q))
+    );
+    if (!items.length) return '';
+    shown += items.length;
+    const unread = items.filter((it) => !it.read_at).length;
+    const open = opened.has(b.book_id) || q || onlyNew;
+    return `
+      <details class="binder" data-book="${b.book_id}" ${open ? 'open' : ''}>
+        <summary>📁 <strong>${esc(b.title)}</strong>
+          ${unread ? `<span class="badge-new">${unread} nouveau(x)</span>` : ''}
+          <span class="count">${items.length} brevet(s)</span>
+        </summary>
+        ${items.map(rowHtml).join('')}
+      </details>`;
+  }).join('');
+  $('classeur').innerHTML = html || `<div class="panel empty">${data.total ? 'Aucun brevet ne correspond à votre recherche.' : 'Aucun brevet reçu pour le moment.'}</div>`;
+  $('summary').textContent = `${data.total} brevet(s) reçu(s) · ${data.unread} non consulté(s)` + (q || onlyNew ? ` · ${shown} affiché(s)` : '');
+}
+
+function findItem(id) {
+  for (const b of data.books) { const it = b.items.find((x) => x.id === id); if (it) return { b, it }; }
+  return null;
+}
+
+function setRead(id, readAt) {
+  const f = findItem(id);
+  if (!f) return;
+  const was = !!f.it.read_at;
+  f.it.read_at = readAt;
+  if (was && !readAt) { f.b.unread++; data.unread++; }
+  if (!was && readAt) { f.b.unread--; data.unread--; }
+}
+
+$('classeur').addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d || !d.dataset || !d.dataset.book) return;
+  const id = Number(d.dataset.book);
+  if (d.open) opened.add(id); else opened.delete(id);
+}, true);
+
+$('classeur').addEventListener('click', async (e) => {
+  const btn = e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!btn) return;
+  const row = btn.closest('.bv-row');
+  const id = Number(row.dataset.id);
+  const act = btn.dataset.act;
+
+  if (act === 'msg') {
+    row.querySelector('.bv-msg').classList.toggle('hidden');
+    return;
+  }
+
+  if (act === 'open') {
+    // La fenêtre est ouverte tout de suite (le navigateur du téléphone refuse sinon), puis dirigée vers le brevet
+    const w = window.open('', '_blank');
+    try {
+      const r = await fetch(`/api/admin/brevets/${id}/link`, { headers: authHeaders });
+      const d = await r.json();
+      if (!r.ok) { if (w) w.close(); alert(d.message || 'Erreur'); return; }
+      if (w) w.location = d.url; else location.href = d.url;
+      setRead(id, d.read_at || new Date().toISOString());
+      keepScrollRender();
+    } catch (err) {
+      if (w) w.close();
+      alert('Erreur réseau — réessayez.');
+    }
+    return;
+  }
+
+  if (act === 'read') {
+    const f = findItem(id);
+    if (!f) return;
+    const makeRead = !f.it.read_at;
+    btn.disabled = true;
+    try {
+      const r = await fetch(`/api/admin/brevets/${id}/read`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ read: makeRead }),
+      });
+      const d = await r.json();
+      if (!r.ok) { alert(d.message || 'Erreur'); btn.disabled = false; return; }
+      setRead(id, d.read_at);
+      keepScrollRender();
+    } catch (err) {
+      alert('Erreur réseau — réessayez.');
+      btn.disabled = false;
+    }
+  }
+});
+
+function keepScrollRender() {
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+}
+
+$('q').addEventListener('input', render);
+$('only-new').addEventListener('change', render);
+</script>
+
+<script src="/js/pwa.js"></script>
+</body>
+</html>
