@@ -199,4 +199,11 @@ module.exports = function mountBrevets(app, express) {
   app.use('/api/brevets', express.json(), requireAuth, pub);
 
   ensureSchema().catch((err) => console.error('[brevets] base de données :', err.message));
+
+  // École Biblique Kainos : brevets EBK (module séparé ; s'il échoue, les brevets des livres continuent de fonctionner)
+  try {
+    require('./ebk')(app, express);
+  } catch (err) {
+    console.error('[brevets] module EBK non chargé :', err.message);
+  }
 };
