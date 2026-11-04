@@ -8,12 +8,20 @@
 <style>
   .wrap { max-width: 820px; margin: 0 auto; padding: 40px 24px 90px; }
   .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; margin-bottom: 22px; }
-  .study-book { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+
+  /* Liste des livres : même présentation que le catalogue (cadre doré, lignes simples, titre bleu, texte courant sans gras) */
+  html body #books-panel { padding: 0; border: 2px solid var(--gold-deep); border-radius: 20px; overflow: hidden; }
+  #books-panel > p { margin: 0; padding: 18px 16px; }
+  .study-book { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
   .study-book:last-child { border-bottom: none; }
   .study-book.locked { opacity: 0.5; }
-  .study-book h3 { font-size: 17px; margin-bottom: 4px; }
-  .study-book .meta { font-size: 13px; color: var(--ink-soft); }
-  .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; }
+  .study-book .sb-main { flex: 1; min-width: 0; }
+  .study-book .sb-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+  .study-book h3 { font-family: 'Inter', sans-serif; font-size: 16.5px; font-weight: 600; line-height: 1.4; color: var(--blue-deep); margin: 0 0 2px; }
+  .study-book.locked h3 { color: var(--ink-soft); }
+  .study-book .meta { font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+  .study-book .btn { padding: 7px 14px; font-size: 13px; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; white-space: nowrap; }
   .badge.locked { background: #f2ece0; color: var(--ink-soft); }
   .badge.unlocked { background: #e8f1fa; color: var(--blue-deep); }
   .badge.done { background: #e8f6ec; color: #2a7a44; }
@@ -55,7 +63,7 @@
 
   /* Livres étudiés, tests réussis, correction des tests */
   .study-book.finished { border-left: 4px solid #2a7a44; padding-left: 14px; }
-  .studied-mark { color: #2a7a44; font-weight: 700; font-size: 13px; margin-top: 6px; }
+  .studied-mark { color: #2a7a44; font-weight: 500; font-size: 13px; margin-top: 4px; }
   .done-banner { background: #e8f6ec; color: #2a7a44; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: 14px; font-weight: 600; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .review-title { font-size: 16px; margin: 22px 0 10px; }
@@ -151,15 +159,15 @@ async function loadBooks() {
   if (!books.length) { $('books-panel').innerHTML = '<p style="color:var(--ink-soft);">Aucun livre dans l\'espace d\'étude pour le moment.</p>'; return; }
   $('books-panel').innerHTML = books.map(b => `
     <div class="study-book ${b.unlocked ? '' : 'locked'} ${b.certificate_issued ? 'finished' : ''}">
-      <div>
-        <h3>${b.title}</h3>
+      <div class="sb-main">
+        <h3 ${b.unlocked ? `onclick="openBook(${b.id})" style="cursor:pointer;"` : ''}>${b.title}</h3>
         <div class="meta">${b.author || ''} · ${b.total_parts} partie(s)</div>
         ${b.certificate_issued ? `<div class="studied-mark">✅ Livre étudié${b.final_score != null ? ' — ' + b.final_score + ' %' : ''}</div>` : ''}
       </div>
-      <div style="text-align:right;">
-        ${b.certificate_issued ? '<span class="badge done">Brevet obtenu</span><br>' : ''}
+      <div class="sb-side">
+        ${b.certificate_issued ? '<span class="badge done">Brevet obtenu</span>' : ''}
         ${b.unlocked
-          ? `<button class="btn ${b.certificate_issued ? 'btn-ghost' : 'btn-primary'}" style="margin-top:6px;" onclick="openBook(${b.id})">${b.certificate_issued ? 'Reprendre l\'étude' : 'Continuer'}</button>`
+          ? `<button class="btn ${b.certificate_issued ? 'btn-ghost' : 'btn-primary'}" onclick="openBook(${b.id})">${b.certificate_issued ? 'Reprendre l\'étude' : 'Continuer'}</button>`
           : '<span class="badge locked">Verrouillé</span>'}
       </div>
     </div>
