@@ -199,6 +199,71 @@ function gradeQuiz(questions, orderedIds, answers) {
   return { correct, total, score: total ? correct / total : 0, wrong };
 }
 
+// ---------- Pré-inscriptions : ouverture programmée de la salle de classe + notification des inscrits ----------
+let webpush = null;
+try { webpush = require('web-push'); } catch (e) { console.warn('[ebk] module web-push absent : notifications indisponibles'); }
+let vapidReady = null;
+// Clés des notifications : créées automatiquement au premier besoin et gardées en base (aucune réglage manuel)
+function ensureVapid() {
+  if (!webpush) return Promise.resolve(null);
+  if (!vapidReady) {
+    vapidReady = (async () => {
+      const m = {};
+      (await pool.query(`SELECT key, value FROM ebk_settings WHERE key IN ('vapid_public','vapid_private')`)).rows.forEach((r) => { m[r.key] = r.value; });
+      if (!m.vapid_public || !m.vapid_private) {
+        const k = webpush.generateVAPIDKeys();
+        await pool.query(`INSERT INTO ebk_settings (key, value) VALUES ('vapid_public',$1) ON CONFLICT (key) DO UPDATE SET value=$1`, [k.publicKey]);
+        await pool.query(`INSERT INTO ebk_settings (key, value) VALUES ('vapid_private',$1) ON CONFLICT (key) DO UPDATE SET value=$1`, [k.privateKey]);
+        m.vapid_public = k.publicKey; m.vapid_private = k.privateKey;
+      }
+      webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://mna-world.org', m.vapid_public, m.vapid_private);
+      return m.vapid_public;
+    })().catch((err) => { vapidReady = null; console.error('[ebk] clés de notification :', err.message); return null; });
+  }
+  return vapidReady;
+}
+
+async function pushToUsers(userIds, payload) {
+  if (!webpush || !userIds.length) return 0;
+  if (!(await ensureVapid())) return 0;
+  const subs = (await pool.query('SELECT id, endpoint, p256dh, auth FROM ebk_push WHERE user_id = ANY($1::int[])', [userIds])).rows;
+  let sent = 0;
+  await Promise.all(subs.map(async (s) => {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 86400, urgency: 'high' });
+      sent++;
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) await pool.query('DELETE FROM ebk_push WHERE id=$1', [s.id]).catch(() => {});
+      else console.error('[ebk] notification :', err.statusCode || err.message);
+    }
+  }));
+  return sent;
+}
+
+// Au jour J (date de début programmée par l'administration) : la salle de classe de la session s'ouvre toute seule
+// et les inscrits validés sont prévenus par notification. Chaque session n'est traitée qu'une seule fois.
+let dueRunning = false, dueLast = 0;
+async function openDueSessions() {
+  if (dueRunning) return;
+  dueRunning = true;
+  try {
+    await ensureSchema();
+    const due = (await pool.query('SELECT id, title FROM ebk_sessions WHERE starts_at IS NOT NULL AND starts_at <= now() AND NOT opened_notified ORDER BY starts_at, id')).rows;
+    for (const s of due) {
+      const claimed = (await pool.query('UPDATE ebk_sessions SET opened_notified=true WHERE id=$1 AND NOT opened_notified RETURNING id', [s.id])).rows[0];
+      if (!claimed) continue;
+      await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [s.id]);
+      await pool.query(`UPDATE ebk_sessions SET classroom_open=true, status='en_cours' WHERE id=$1`, [s.id]);
+      const ids = (await pool.query(`SELECT DISTINCT user_id FROM ebk_students WHERE session_id=$1 AND payment_status='confirme'`, [s.id])).rows.map((r) => r.user_id);
+      const n = await pushToUsers(ids, { title: 'École Biblique Kainos', body: `La salle de classe de « ${s.title} » est ouverte. Entrez maintenant !`, url: '/ebk.html#classe', tag: 'ebk-session-' + s.id });
+      console.log(`[ebk] session ${s.id} ouverte ; ${n} notification(s) envoyée(s)`);
+    }
+  } catch (err) { console.error('[ebk] ouverture programmée :', err.message); }
+  finally { dueRunning = false; dueLast = Date.now(); }
+}
+function maybeOpenDue() { if (Date.now() - dueLast > 15000) openDueSessions(); }
+ensureSchema().then(() => { openDueSessions(); setInterval(openDueSessions, 60000); }).catch(() => {});
+
 // ---------- Public ----------
 router.get('/info', wrap(async (req, res) => {
   const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd FROM ebk_sessions ORDER BY position, id')).rows;
