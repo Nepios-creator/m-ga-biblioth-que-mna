@@ -143,7 +143,7 @@ function ensureSchema() {
 ensureSchema().catch((err) => console.error('[ebk] base de données :', err.message));
 
 router.use(async (req, res, next) => {
-  try { await ensureSchema(); next(); }
+  try { await ensureSchema(); maybeOpenDue(); next(); }
   catch (err) { res.status(503).json({ message: 'L\'espace EBK est momentanément indisponible.' }); }
 });
 
