@@ -111,6 +111,18 @@ function ensureSchema() {
         ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
         ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
         ALTER TABLE ebk_certificates ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS opened_notified BOOLEAN NOT NULL DEFAULT false;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS whatsapp TEXT;
+        CREATE TABLE IF NOT EXISTS ebk_push (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint TEXT UNIQUE NOT NULL,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
       `);
       if (!hadPrice) {
         await pool.query("UPDATE ebk_sessions SET price_usd = 10 WHERE position = 1 AND price_usd IS NULL");
