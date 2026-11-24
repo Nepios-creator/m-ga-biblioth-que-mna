@@ -435,7 +435,7 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
   const name = cleanName(req.body.full_name);
   if (name.length < 5 || !name.includes(' ')) return res.status(400).json({ message: 'Écrivez votre nom complet (prénom et nom), tel qu\'il doit figurer sur le brevet.' });
   if (name.length > 120) return res.status(400).json({ message: 'Nom trop long.' });
-  const session = await openSession();
+  const session = await pickSession(req.body.session_id);
   if (!session) return res.status(404).json({ message: 'Aucune session n\'est ouverte pour le moment.' });
   const existing = (await pool.query('SELECT id FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (existing) return res.status(409).json({ message: 'Vous êtes déjà inscrit.' });
