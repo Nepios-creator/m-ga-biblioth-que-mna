@@ -371,8 +371,8 @@ router.get('/syllabus-file/:id', wrap(async (req, res) => {
 // ---------- Espace étudiant (connexion requise) ----------
 router.use(requireAuth);
 
-async function studentState(userId) {
-  const session = await openSession();
+async function studentState(userId, forced) {
+  const session = forced || (await openSession()) || (await upcomingSession());
   if (!session) return { session: null };
   const settings = await getSettings();
   const out = {
