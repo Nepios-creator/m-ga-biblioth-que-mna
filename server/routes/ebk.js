@@ -159,6 +159,10 @@ async function getSettings() {
   return s;
 }
 const openSession = async () => (await pool.query('SELECT * FROM ebk_sessions WHERE classroom_open ORDER BY position, id LIMIT 1')).rows[0] || null;
+// Session proposée à l'inscription quand aucune salle n'est ouverte : la prochaine session programmée dont les inscriptions sont ouvertes
+const upcomingSession = async () => (await pool.query('SELECT * FROM ebk_sessions WHERE NOT classroom_open AND registration_open ORDER BY (starts_at IS NULL), starts_at, position, id LIMIT 1')).rows[0] || null;
+const sessionById = async (id) => { const n = parseInt(id, 10); return Number.isInteger(n) ? ((await pool.query('SELECT * FROM ebk_sessions WHERE id=$1', [n])).rows[0] || null) : null; };
+const pickSession = async (id) => { if (id) { const s = await sessionById(id); if (s) return s; } return (await openSession()) || (await upcomingSession()); };
 const coursesOf = async (sid) => (await pool.query('SELECT id, position, title, teacher, description, youtube_url, syllabus_url, (syllabus_file IS NOT NULL) AS has_file, (COALESCE(length(syllabus_text),0) > 0) AS has_text FROM ebk_courses WHERE session_id=$1 ORDER BY position, id', [sid])).rows;
 async function passedSet(userId, sid) {
   const r = await pool.query('SELECT DISTINCT course_id FROM ebk_attempts WHERE user_id=$1 AND session_id=$2 AND course_id IS NOT NULL AND passed=true', [userId, sid]);
