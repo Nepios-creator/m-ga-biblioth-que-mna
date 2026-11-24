@@ -403,6 +403,22 @@ async function studentState(userId, forced) {
 
 router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id, req.query.session_id ? await sessionById(req.query.session_id) : null))));
 
+// Notifications : clé publique, puis enregistrement de l'appareil (pour être prévenu à l'ouverture de la salle de classe)
+router.get('/push-key', wrap(async (req, res) => {
+  const key = await ensureVapid();
+  if (!key) return res.status(503).json({ message: 'Les notifications sont indisponibles pour le moment.' });
+  res.json({ key });
+}));
+router.post('/push-subscribe', wrap(async (req, res) => {
+  const sub = req.body && req.body.subscription;
+  if (!sub || typeof sub.endpoint !== 'string' || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return res.status(400).json({ message: 'Abonnement invalide.' });
+  await pool.query(
+    'INSERT INTO ebk_push (user_id, endpoint, p256dh, auth) VALUES ($1,$2,$3,$4) ON CONFLICT (endpoint) DO UPDATE SET user_id=$1, p256dh=$3, auth=$4',
+    [req.user.id, sub.endpoint.slice(0, 1000), String(sub.keys.p256dh), String(sub.keys.auth)]
+  );
+  res.json({ ok: true });
+}));
+
 // Capture d'écran du paiement (envoyée depuis le champ d'inscription)
 const proofUpload = multer ? multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }).single('proof') : null;
 const withProof = (req, res, next) => {
