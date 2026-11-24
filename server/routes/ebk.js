@@ -401,7 +401,7 @@ async function studentState(userId, forced) {
   return out;
 }
 
-router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id))));
+router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id, req.query.session_id ? await sessionById(req.query.session_id) : null))));
 
 // Capture d'écran du paiement (envoyée depuis le champ d'inscription)
 const proofUpload = multer ? multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }).single('proof') : null;
