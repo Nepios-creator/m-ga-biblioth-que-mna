@@ -266,7 +266,7 @@ ensureSchema().then(() => { openDueSessions(); setInterval(openDueSessions, 6000
 
 // ---------- Public ----------
 router.get('/info', wrap(async (req, res) => {
-  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd FROM ebk_sessions ORDER BY position, id')).rows;
+  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd, starts_at, ends_at FROM ebk_sessions ORDER BY position, id')).rows;
   const courses = (await pool.query('SELECT id, session_id, position, title, teacher, description FROM ebk_courses ORDER BY position, id')).rows;
   res.json({ settings: await getSettings(), sessions: sessions.map((s) => ({ ...s, courses: courses.filter((c) => c.session_id === s.id) })) });
 }));
