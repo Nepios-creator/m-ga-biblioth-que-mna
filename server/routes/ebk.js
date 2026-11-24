@@ -376,7 +376,7 @@ async function studentState(userId, forced) {
   if (!session) return { session: null };
   const settings = await getSettings();
   const out = {
-    session: { id: session.id, title: session.title, period_label: session.period_label, registration_open: session.registration_open },
+    session: { id: session.id, title: session.title, period_label: session.period_label, registration_open: session.registration_open, classroom_open: session.classroom_open, starts_at: session.starts_at, ends_at: session.ends_at, server_now: new Date().toISOString() },
     payment: { price_usd: Number(session.price_usd || 0), pay_number: settings.pay_number },
     student: null, courses: [], all_passed: false, certificate: null, dates: null,
   };
