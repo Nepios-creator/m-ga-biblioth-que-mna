@@ -385,6 +385,7 @@ async function studentState(userId, forced) {
   )).rows[0];
   if (!student) return out;
   out.student = { full_name: student.full_name, payment_status: student.payment_status, payment_note: student.payment_note, has_proof: student.has_proof };
+  if (!session.classroom_open && student.payment_status === 'confirme') return out;   // validé, mais la salle ne s'ouvre qu'au jour J
   if (student.payment_status !== 'confirme') return out;   // accès à la salle de classe après confirmation de l'administration
   const courses = await coursesOf(session.id);
   const passed = await passedSet(userId, session.id);
