@@ -111,6 +111,18 @@ function ensureSchema() {
         ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
         ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
         ALTER TABLE ebk_certificates ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
+        ALTER TABLE ebk_sessions ADD COLUMN IF NOT EXISTS opened_notified BOOLEAN NOT NULL DEFAULT false;
+        ALTER TABLE ebk_students ADD COLUMN IF NOT EXISTS whatsapp TEXT;
+        CREATE TABLE IF NOT EXISTS ebk_push (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint TEXT UNIQUE NOT NULL,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
       `);
       if (!hadPrice) {
         await pool.query("UPDATE ebk_sessions SET price_usd = 10 WHERE position = 1 AND price_usd IS NULL");
@@ -131,7 +143,7 @@ function ensureSchema() {
 ensureSchema().catch((err) => console.error('[ebk] base de données :', err.message));
 
 router.use(async (req, res, next) => {
-  try { await ensureSchema(); next(); }
+  try { await ensureSchema(); maybeOpenDue(); next(); }
   catch (err) { res.status(503).json({ message: 'L\'espace EBK est momentanément indisponible.' }); }
 });
 
@@ -147,6 +159,10 @@ async function getSettings() {
   return s;
 }
 const openSession = async () => (await pool.query('SELECT * FROM ebk_sessions WHERE classroom_open ORDER BY position, id LIMIT 1')).rows[0] || null;
+// Session proposée à l'inscription quand aucune salle n'est ouverte : la prochaine session programmée dont les inscriptions sont ouvertes
+const upcomingSession = async () => (await pool.query('SELECT * FROM ebk_sessions WHERE NOT classroom_open AND registration_open ORDER BY (starts_at IS NULL), starts_at, position, id LIMIT 1')).rows[0] || null;
+const sessionById = async (id) => { const n = parseInt(id, 10); return Number.isInteger(n) ? ((await pool.query('SELECT * FROM ebk_sessions WHERE id=$1', [n])).rows[0] || null) : null; };
+const pickSession = async (id) => { if (id) { const s = await sessionById(id); if (s) return s; } return (await openSession()) || (await upcomingSession()); };
 const coursesOf = async (sid) => (await pool.query('SELECT id, position, title, teacher, description, youtube_url, syllabus_url, (syllabus_file IS NOT NULL) AS has_file, (COALESCE(length(syllabus_text),0) > 0) AS has_text FROM ebk_courses WHERE session_id=$1 ORDER BY position, id', [sid])).rows;
 async function passedSet(userId, sid) {
   const r = await pool.query('SELECT DISTINCT course_id FROM ebk_attempts WHERE user_id=$1 AND session_id=$2 AND course_id IS NOT NULL AND passed=true', [userId, sid]);
@@ -183,11 +199,76 @@ function gradeQuiz(questions, orderedIds, answers) {
   return { correct, total, score: total ? correct / total : 0, wrong };
 }
 
+// ---------- Pré-inscriptions : ouverture programmée de la salle de classe + notification des inscrits ----------
+let webpush = null;
+try { webpush = require('web-push'); } catch (e) { console.warn('[ebk] module web-push absent : notifications indisponibles'); }
+let vapidReady = null;
+// Clés des notifications : créées automatiquement au premier besoin et gardées en base (aucune réglage manuel)
+function ensureVapid() {
+  if (!webpush) return Promise.resolve(null);
+  if (!vapidReady) {
+    vapidReady = (async () => {
+      const m = {};
+      (await pool.query(`SELECT key, value FROM ebk_settings WHERE key IN ('vapid_public','vapid_private')`)).rows.forEach((r) => { m[r.key] = r.value; });
+      if (!m.vapid_public || !m.vapid_private) {
+        const k = webpush.generateVAPIDKeys();
+        await pool.query(`INSERT INTO ebk_settings (key, value) VALUES ('vapid_public',$1) ON CONFLICT (key) DO UPDATE SET value=$1`, [k.publicKey]);
+        await pool.query(`INSERT INTO ebk_settings (key, value) VALUES ('vapid_private',$1) ON CONFLICT (key) DO UPDATE SET value=$1`, [k.privateKey]);
+        m.vapid_public = k.publicKey; m.vapid_private = k.privateKey;
+      }
+      webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://mna-world.org', m.vapid_public, m.vapid_private);
+      return m.vapid_public;
+    })().catch((err) => { vapidReady = null; console.error('[ebk] clés de notification :', err.message); return null; });
+  }
+  return vapidReady;
+}
+
+async function pushToUsers(userIds, payload) {
+  if (!webpush || !userIds.length) return 0;
+  if (!(await ensureVapid())) return 0;
+  const subs = (await pool.query('SELECT id, endpoint, p256dh, auth FROM ebk_push WHERE user_id = ANY($1::int[])', [userIds])).rows;
+  let sent = 0;
+  await Promise.all(subs.map(async (s) => {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 86400, urgency: 'high' });
+      sent++;
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) await pool.query('DELETE FROM ebk_push WHERE id=$1', [s.id]).catch(() => {});
+      else console.error('[ebk] notification :', err.statusCode || err.message);
+    }
+  }));
+  return sent;
+}
+
+// Au jour J (date de début programmée par l'administration) : la salle de classe de la session s'ouvre toute seule
+// et les inscrits validés sont prévenus par notification. Chaque session n'est traitée qu'une seule fois.
+let dueRunning = false, dueLast = 0;
+async function openDueSessions() {
+  if (dueRunning) return;
+  dueRunning = true;
+  try {
+    await ensureSchema();
+    const due = (await pool.query('SELECT id, title FROM ebk_sessions WHERE starts_at IS NOT NULL AND starts_at <= now() AND NOT opened_notified ORDER BY starts_at, id')).rows;
+    for (const s of due) {
+      const claimed = (await pool.query('UPDATE ebk_sessions SET opened_notified=true WHERE id=$1 AND NOT opened_notified RETURNING id', [s.id])).rows[0];
+      if (!claimed) continue;
+      await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [s.id]);
+      await pool.query(`UPDATE ebk_sessions SET classroom_open=true, status='en_cours' WHERE id=$1`, [s.id]);
+      const ids = (await pool.query(`SELECT DISTINCT user_id FROM ebk_students WHERE session_id=$1 AND payment_status='confirme'`, [s.id])).rows.map((r) => r.user_id);
+      const n = await pushToUsers(ids, { title: 'École Biblique Kainos', body: `La salle de classe de « ${s.title} » est ouverte. Entrez maintenant !`, url: '/ebk.html#classe', tag: 'ebk-session-' + s.id });
+      console.log(`[ebk] session ${s.id} ouverte ; ${n} notification(s) envoyée(s)`);
+    }
+  } catch (err) { console.error('[ebk] ouverture programmée :', err.message); }
+  finally { dueRunning = false; dueLast = Date.now(); }
+}
+function maybeOpenDue() { if (Date.now() - dueLast > 15000) openDueSessions(); }
+ensureSchema().then(() => { openDueSessions(); setInterval(openDueSessions, 60000); }).catch(() => {});
+
 // ---------- Public ----------
 router.get('/info', wrap(async (req, res) => {
-  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd FROM ebk_sessions ORDER BY position, id')).rows;
+  const sessions = (await pool.query('SELECT id, title, period_label, status, description, registration_open, classroom_open, price_usd, starts_at, ends_at FROM ebk_sessions ORDER BY position, id')).rows;
   const courses = (await pool.query('SELECT id, session_id, position, title, teacher, description FROM ebk_courses ORDER BY position, id')).rows;
-  res.json({ settings: await getSettings(), sessions: sessions.map((s) => ({ ...s, courses: courses.filter((c) => c.session_id === s.id) })) });
+  res.json({ now: new Date().toISOString(), settings: await getSettings(), sessions: sessions.map((s) => ({ ...s, courses: courses.filter((c) => c.session_id === s.id) })) });
 }));
 
 // Vérification d'un brevet (page ouverte par le code QR) — n'expose que le nom, la session, la date et le résultat
@@ -290,12 +371,12 @@ router.get('/syllabus-file/:id', wrap(async (req, res) => {
 // ---------- Espace étudiant (connexion requise) ----------
 router.use(requireAuth);
 
-async function studentState(userId) {
-  const session = await openSession();
+async function studentState(userId, forced) {
+  const session = forced || (await openSession()) || (await upcomingSession());
   if (!session) return { session: null };
   const settings = await getSettings();
   const out = {
-    session: { id: session.id, title: session.title, period_label: session.period_label, registration_open: session.registration_open },
+    session: { id: session.id, title: session.title, period_label: session.period_label, registration_open: session.registration_open, classroom_open: session.classroom_open, starts_at: session.starts_at, ends_at: session.ends_at, server_now: new Date().toISOString() },
     payment: { price_usd: Number(session.price_usd || 0), pay_number: settings.pay_number },
     student: null, courses: [], all_passed: false, certificate: null, dates: null,
   };
@@ -304,6 +385,7 @@ async function studentState(userId) {
   )).rows[0];
   if (!student) return out;
   out.student = { full_name: student.full_name, payment_status: student.payment_status, payment_note: student.payment_note, has_proof: student.has_proof };
+  if (!session.classroom_open && student.payment_status === 'confirme') return out;   // validé, mais la salle ne s'ouvre qu'au jour J
   if (student.payment_status !== 'confirme') return out;   // accès à la salle de classe après confirmation de l'administration
   const courses = await coursesOf(session.id);
   const passed = await passedSet(userId, session.id);
@@ -319,7 +401,23 @@ async function studentState(userId) {
   return out;
 }
 
-router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id))));
+router.get('/me', wrap(async (req, res) => res.json(await studentState(req.user.id, req.query.session_id ? await sessionById(req.query.session_id) : null))));
+
+// Notifications : clé publique, puis enregistrement de l'appareil (pour être prévenu à l'ouverture de la salle de classe)
+router.get('/push-key', wrap(async (req, res) => {
+  const key = await ensureVapid();
+  if (!key) return res.status(503).json({ message: 'Les notifications sont indisponibles pour le moment.' });
+  res.json({ key });
+}));
+router.post('/push-subscribe', wrap(async (req, res) => {
+  const sub = req.body && req.body.subscription;
+  if (!sub || typeof sub.endpoint !== 'string' || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return res.status(400).json({ message: 'Abonnement invalide.' });
+  await pool.query(
+    'INSERT INTO ebk_push (user_id, endpoint, p256dh, auth) VALUES ($1,$2,$3,$4) ON CONFLICT (endpoint) DO UPDATE SET user_id=$1, p256dh=$3, auth=$4',
+    [req.user.id, sub.endpoint.slice(0, 1000), String(sub.keys.p256dh), String(sub.keys.auth)]
+  );
+  res.json({ ok: true });
+}));
 
 // Capture d'écran du paiement (envoyée depuis le champ d'inscription)
 const proofUpload = multer ? multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }).single('proof') : null;
@@ -337,7 +435,9 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
   const name = cleanName(req.body.full_name);
   if (name.length < 5 || !name.includes(' ')) return res.status(400).json({ message: 'Écrivez votre nom complet (prénom et nom), tel qu\'il doit figurer sur le brevet.' });
   if (name.length > 120) return res.status(400).json({ message: 'Nom trop long.' });
-  const session = await openSession();
+  const wa = String(req.body.whatsapp || '').replace(/[^\d+]/g, '').slice(0, 20);
+  if (wa.replace(/\D/g, '').length < 8) return res.status(400).json({ message: "Indiquez votre numéro WhatsApp, avec l'indicatif du pays (ex. +243...)." });
+  const session = await pickSession(req.body.session_id);
   if (!session) return res.status(404).json({ message: 'Aucune session n\'est ouverte pour le moment.' });
   const existing = (await pool.query('SELECT id FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (existing) return res.status(409).json({ message: 'Vous êtes déjà inscrit.' });
@@ -349,16 +449,16 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
     if (!PROOF_MIME.test(file.mimetype)) return res.status(400).json({ message: 'La capture doit être une image (JPG, PNG ou WEBP).' });
   }
   await pool.query(
-    `INSERT INTO ebk_students (user_id, session_id, full_name, payment_status, payment_proof, payment_proof_mime, confirmed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [req.user.id, session.id, name, paid ? 'en_attente' : 'confirme', paid ? file.buffer : null, paid ? file.mimetype : null, paid ? null : new Date()]
+    `INSERT INTO ebk_students (user_id, session_id, full_name, payment_status, payment_proof, payment_proof_mime, confirmed_at, whatsapp)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [req.user.id, session.id, name, (paid || !session.classroom_open) ? 'en_attente' : 'confirme', paid ? file.buffer : null, paid ? file.mimetype : null, (paid || !session.classroom_open) ? null : new Date(), wa]
   );
-  res.status(201).json(await studentState(req.user.id));
+  res.status(201).json(await studentState(req.user.id, session));
 }));
 
 // Nouvel envoi de la capture (paiement refusé ou capture illisible)
 router.post('/payment-proof', withProof, wrap(async (req, res) => {
-  const session = await openSession();
+  const session = await pickSession(req.body.session_id);
   if (!session) return res.status(404).json({ message: 'Aucune session ouverte.' });
   const st = (await pool.query('SELECT payment_status FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (!st) return res.status(404).json({ message: 'Inscrivez-vous d\'abord.' });
@@ -370,7 +470,7 @@ router.post('/payment-proof', withProof, wrap(async (req, res) => {
     "UPDATE ebk_students SET payment_proof=$3, payment_proof_mime=$4, payment_status='en_attente', payment_note=NULL WHERE user_id=$1 AND session_id=$2",
     [req.user.id, session.id, file.buffer, file.mimetype]
   );
-  res.json(await studentState(req.user.id));
+  res.json(await studentState(req.user.id, session));
 }));
 
 // Correction du nom — impossible une fois le brevet délivré
@@ -559,9 +659,13 @@ admin.put('/sessions/:id', wrap(async (req, res) => {
   const b = { ...req.body };
   if (b.status !== undefined && !STATUSES.includes(b.status)) return res.status(400).json({ message: 'Statut invalide' });
   ['registration_open', 'classroom_open'].forEach((k) => { if (b[k] !== undefined) b[k] = !!b[k]; });
+  ['starts_at', 'ends_at'].forEach((k) => { if (b[k] !== undefined) { const d = b[k] ? new Date(b[k]) : null; b[k] = d && !isNaN(d) ? d.toISOString() : null; } });
+  if (b.starts_at && b.ends_at && new Date(b.ends_at) < new Date(b.starts_at)) return res.status(400).json({ message: 'La fin de la session doit être après son début.' });
+  // Date de début dans le futur : l'ouverture automatique est (re)programmée ; dans le passé : on ne rouvre rien tout seul
+  if (b.starts_at !== undefined) b.opened_notified = !!(b.starts_at && new Date(b.starts_at) <= new Date());
   if (b.price_usd !== undefined) { const p = b.price_usd === '' || b.price_usd === null ? null : Number(b.price_usd); b.price_usd = Number.isFinite(p) && p >= 0 ? p : null; }
   if (b.classroom_open === true) await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [req.params.id]);
-  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd']);
+  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd', 'starts_at', 'ends_at', 'opened_notified']);
   if (!u) return res.status(400).json({ message: 'Rien à modifier' });
   const r = await pool.query(u.sql, u.vals);
   if (!r.rows[0]) return res.status(404).json({ message: 'Session introuvable' });
@@ -738,7 +842,7 @@ Règles impératives :
 
 admin.get('/students', wrap(async (req, res) => {
   const r = await pool.query(
-    `SELECT st.id, st.full_name, st.created_at, st.payment_status, u.email, s.title AS session_title,
+    `SELECT st.id, st.full_name, st.created_at, st.payment_status, st.whatsapp, st.session_id, u.email, s.title AS session_title, s.starts_at,
             (SELECT COUNT(DISTINCT a.course_id)::int FROM ebk_attempts a WHERE a.user_id = st.user_id AND a.session_id = st.session_id AND a.course_id IS NOT NULL AND a.passed) AS courses_passed,
             (SELECT COUNT(*)::int FROM ebk_courses c WHERE c.session_id = st.session_id) AS courses_total,
             (SELECT ce.code FROM ebk_certificates ce WHERE ce.user_id = st.user_id AND ce.session_id = st.session_id) AS certificate_code
@@ -751,7 +855,7 @@ admin.get('/students', wrap(async (req, res) => {
 // Paiements : l'administration consulte la capture puis confirme (ou refuse) l'inscription
 admin.get('/payments', wrap(async (req, res) => {
   const r = await pool.query(
-    `SELECT st.id, st.full_name, st.payment_status, st.payment_note, st.created_at, st.confirmed_at,
+    `SELECT st.id, st.full_name, st.payment_status, st.payment_note, st.created_at, st.confirmed_at, st.whatsapp,
             (st.payment_proof IS NOT NULL) AS has_proof, u.email, s.title AS session_title, s.price_usd
        FROM ebk_students st JOIN users u ON u.id = st.user_id JOIN ebk_sessions s ON s.id = st.session_id
       ORDER BY (st.payment_status = 'en_attente') DESC, st.created_at DESC`

@@ -140,7 +140,7 @@
       rows.forEach(function (r) {
         var p = PAY[r.payment_status] || ['', ''];
         h += '<div class="item"><div class="row"><div class="grow"><b>' + esc(r.full_name) + '</b> <span class="tag ' + p[1] + '">' + p[0] + '</span>' +
-          '<div class="small">' + esc(r.email) + ' · ' + esc(r.session_title) + (r.price_usd ? ' · ' + Number(r.price_usd) + ' $' : '') + ' · ' + fmt(r.created_at) + '</div>' +
+          '<div class="small">' + esc(r.email) + (r.whatsapp ? ' · WhatsApp ' + esc(r.whatsapp) : '') + ' · ' + esc(r.session_title) + (r.price_usd ? ' · ' + Number(r.price_usd) + ' $' : '') + ' · ' + fmt(r.created_at) + '</div>' +
           (r.payment_note ? '<div class="small">Motif du refus : ' + esc(r.payment_note) + '</div>' : '') + '</div>' +
           '<div class="row">' + (r.has_proof ? '<button class="btn btn-ghost" data-proof="' + r.id + '">🖼 Voir la capture</button>' : '<span class="small">Pas de capture</span>') +
           (r.payment_status !== 'confirme' ? '<button class="btn btn-primary" data-ok="' + r.id + '">✓ Confirmer</button>' : '') +
@@ -158,6 +158,13 @@
   }
 
   // ---------- Sessions ----------
+  function dtLocal(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d)) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
   function renderSessions() {
     var h = '<div class="panel"><h3 style="margin:0 0 6px;">Sessions</h3><p class="small">« Salle de classe ouverte » = la session dont les cours sont accessibles aux étudiants (une seule à la fois). « Inscriptions ouvertes » = les nouveaux étudiants peuvent s\'inscrire.</p></div>';
     ov.sessions.forEach(function (s) {
@@ -166,6 +173,9 @@
         '<div class="grow"><label class="l">Période</label><input class="f" data-f="period_label" value="' + esc(s.period_label) + '" placeholder="Juillet 2026"></div>' +
         '<div><label class="l">Statut</label><select class="f" data-f="status">' + Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (s.status === k ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('') + '</select></div></div>' +
         '<div class="row"><div><label class="l">Prix d\'inscription (en $, 0 ou vide = gratuit)</label><input class="f" type="number" min="0" step="0.5" data-f="price_usd" value="' + esc(s.price_usd == null ? '' : Number(s.price_usd)) + '"></div></div>' +
+        '<div class="row"><div class="grow"><label class="l">Début de la session (la salle de classe s’ouvre à cette date)</label><input class="f" type="datetime-local" data-f="starts_at" value="' + dtLocal(s.starts_at) + '"></div>' +
+        '<div class="grow"><label class="l">Fin de la session</label><input class="f" type="datetime-local" data-f="ends_at" value="' + dtLocal(s.ends_at) + '"></div></div>' +
+        '<p class="small" style="margin-bottom:10px;">Le public voit ces dates avec un compte à rebours et peut s’inscrire dès que « Inscriptions ouvertes » est coché. À la date de début, la salle de classe s’ouvre toute seule pour les inscrits validés et leur téléphone est notifié (elle remplace la salle ouverte à ce moment-là). Laissez vide pour ne rien programmer.</p>' +
         '<label class="l">Description</label><textarea class="f" data-f="description">' + esc(s.description) + '</textarea>' +
         '<div class="row" style="margin-bottom:10px;"><label><input type="checkbox" data-f="classroom_open"' + (s.classroom_open ? ' checked' : '') + '> Salle de classe ouverte</label>' +
         '<label><input type="checkbox" data-f="registration_open"' + (s.registration_open ? ' checked' : '') + '> Inscriptions ouvertes</label></div>' +
@@ -177,7 +187,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-save]'), function (b) {
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-save'), root = document.querySelector('[data-sid="' + id + '"]'), body = {};
-        Array.prototype.forEach.call(root.querySelectorAll('[data-f]'), function (el) { body[el.getAttribute('data-f')] = el.type === 'checkbox' ? el.checked : el.value; });
+        Array.prototype.forEach.call(root.querySelectorAll('[data-f]'), function (el) { body[el.getAttribute('data-f')] = el.type === 'checkbox' ? el.checked : (el.type === 'datetime-local' ? (el.value ? new Date(el.value).toISOString() : '') : el.value); });
         api('/sessions/' + id, { method: 'PUT', body: body }).then(function () { return loadOverview(); }).then(function () { renderSessions(); note('ns-' + id, 'Enregistré ✓', true); }).catch(function (e) { note('ns-' + id, e.message); });
       });
     });
@@ -289,8 +299,42 @@
   }
 
   // ---------- Inscrits / Brevets / Réglages ----------
+  // Inscrits classés par session : à valider d’abord, avec identité, e-mail, numéro WhatsApp (lien direct) et statut
+  var stFilter = '';
+  function waCell(n) { var d = String(n || '').replace(/\D/g, ''); return d ? '<a href="https://wa.me/' + d + '" target="_blank" rel="noopener">' + esc(n) + '</a>' : '—'; }
+  function fmtDT(v) { try { return new Date(v).toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  function renderStudentsGrouped(rows) {
+    var rank = { en_attente: 0, confirme: 1, refuse: 2 }, q = stFilter.toLowerCase(), by = {};
+    rows.forEach(function (r) { (by[r.session_id] = by[r.session_id] || []).push(r); });
+    var h = '<div class="panel"><h3 style="margin:0 0 6px;">Inscrits (' + rows.length + ')</h3><p class="small" style="margin-bottom:8px;">Classés par session, les inscriptions à traiter d’abord. Pour valider ou rejeter une inscription, utilisez l’onglet « Paiements ».</p>' +
+      '<input class="f" id="st-q" placeholder="Rechercher un nom, un e-mail ou un numéro…" value="' + esc(stFilter) + '" style="margin-bottom:0;"></div>';
+    ov.sessions.forEach(function (s) {
+      var all = by[s.id] || [];
+      if (!all.length) return;
+      var list = all.filter(function (r) { return !q || (r.full_name + ' ' + r.email + ' ' + (r.whatsapp || '')).toLowerCase().indexOf(q) >= 0; });
+      list.sort(function (a, b) { return ((rank[a.payment_status] || 0) - (rank[b.payment_status] || 0)) || String(a.full_name).localeCompare(String(b.full_name)); });
+      var c = { en_attente: 0, confirme: 0, refuse: 0 };
+      all.forEach(function (r) { c[r.payment_status] = (c[r.payment_status] || 0) + 1; });
+      h += '<div class="panel"><h3 style="margin:0 0 4px;">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</h3>' +
+        '<p class="small" style="margin-bottom:10px;">' + (s.starts_at ? 'Début : ' + esc(fmtDT(s.starts_at)) + ' · ' : '') + all.length + ' inscrit(s) · <span class="tag g">' + c.confirme + ' validé(s)</span><span class="tag">' + c.en_attente + ' en attente</span><span class="tag">' + c.refuse + ' refusé(s)</span></p>' +
+        (list.length ? '<div style="overflow-x:auto;"><table><tr><th>Nom complet</th><th>E-mail</th><th>WhatsApp</th><th>Statut</th><th>Cours réussis</th><th>Brevet</th><th>Inscrit le</th></tr>' +
+          list.map(function (r) {
+            var p = PAY[r.payment_status] || ['', ''];
+            return '<tr><td>' + esc(r.full_name) + '</td><td>' + esc(r.email) + '</td><td>' + waCell(r.whatsapp) + '</td><td><span class="tag ' + p[1] + '">' + esc(p[0]) + '</span></td><td>' + r.courses_passed + ' / ' + r.courses_total + '</td><td>' + (r.certificate_code ? '<span class="tag g">' + esc(r.certificate_code) + '</span>' : '—') + '</td><td>' + fmt(r.created_at) + '</td></tr>';
+          }).join('') + '</table></div>' : '<p class="small">Aucun résultat pour cette recherche.</p>') + '</div>';
+    });
+    if (!rows.length) h += '<div class="panel"><p class="small">Personne ne s’est encore inscrit.</p></div>';
+    $('out').innerHTML = h;
+    $('st-q').addEventListener('input', function () {
+      stFilter = $('st-q').value;
+      renderStudentsGrouped(rows);
+      var el = $('st-q'); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+    });
+    return true;
+  }
   function renderStudents() {
     api('/students').then(function (rows) {
+      if (renderStudentsGrouped(rows)) return;
       $('out').innerHTML = '<div class="panel"><h3 style="margin:0 0 10px;">Inscrits (' + rows.length + ')</h3>' + (rows.length ? '<div style="overflow-x:auto;"><table><tr><th>Nom complet</th><th>E-mail</th><th>Session</th><th>Paiement</th><th>Cours réussis</th><th>Brevet</th><th>Inscrit le</th></tr>' +
         rows.map(function (r) { return '<tr><td>' + esc(r.full_name) + '</td><td>' + esc(r.email) + '</td><td>' + esc(r.session_title) + '</td><td>' + esc((PAY[r.payment_status] || [''])[0]) + '</td><td>' + r.courses_passed + ' / ' + r.courses_total + '</td><td>' + (r.certificate_code ? '<span class="tag g">' + esc(r.certificate_code) + '</span>' : '—') + '</td><td>' + fmt(r.created_at) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="small">Personne ne s\'est encore inscrit.</p>') + '</div>';
     }).catch(function (e) { $('out').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });

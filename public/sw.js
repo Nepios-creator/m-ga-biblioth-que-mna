@@ -120,3 +120,30 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) event.respondWith(apiStrategy(req, url));
   else event.respondWith(pageStrategy(req, url));
 });
+
+// Notification d'ouverture d'une session de l'École Biblique Kainos : le téléphone sonne / vibre, un clic ouvre la salle de classe
+self.addEventListener('push', (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(d.title || 'École Biblique Kainos', {
+    body: d.body || 'Une session vient de s\'ouvrir.',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: d.tag || 'ebk',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 150, 300, 150, 600],
+    data: { url: d.url || '/ebk.html#classe' }
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/ebk.html#classe';
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) {
+      if ('focus' in c) { if (c.navigate) c.navigate(url).catch(() => {}); return c.focus(); }
+    }
+    return self.clients.openWindow(url);
+  }));
+});
