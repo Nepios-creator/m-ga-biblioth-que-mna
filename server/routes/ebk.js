@@ -838,7 +838,7 @@ Règles impératives :
 
 admin.get('/students', wrap(async (req, res) => {
   const r = await pool.query(
-    `SELECT st.id, st.full_name, st.created_at, st.payment_status, u.email, s.title AS session_title,
+    `SELECT st.id, st.full_name, st.created_at, st.payment_status, st.whatsapp, st.session_id, u.email, s.title AS session_title, s.starts_at,
             (SELECT COUNT(DISTINCT a.course_id)::int FROM ebk_attempts a WHERE a.user_id = st.user_id AND a.session_id = st.session_id AND a.course_id IS NOT NULL AND a.passed) AS courses_passed,
             (SELECT COUNT(*)::int FROM ebk_courses c WHERE c.session_id = st.session_id) AS courses_total,
             (SELECT ce.code FROM ebk_certificates ce WHERE ce.user_id = st.user_id AND ce.session_id = st.session_id) AS certificate_code
