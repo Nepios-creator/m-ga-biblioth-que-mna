@@ -458,7 +458,7 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
 
 // Nouvel envoi de la capture (paiement refusé ou capture illisible)
 router.post('/payment-proof', withProof, wrap(async (req, res) => {
-  const session = await openSession();
+  const session = await pickSession(req.body.session_id);
   if (!session) return res.status(404).json({ message: 'Aucune session ouverte.' });
   const st = (await pool.query('SELECT payment_status FROM ebk_students WHERE user_id=$1 AND session_id=$2', [req.user.id, session.id])).rows[0];
   if (!st) return res.status(404).json({ message: 'Inscrivez-vous d\'abord.' });
