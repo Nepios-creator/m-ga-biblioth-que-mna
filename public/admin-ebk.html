@@ -166,6 +166,9 @@
         '<div class="grow"><label class="l">Période</label><input class="f" data-f="period_label" value="' + esc(s.period_label) + '" placeholder="Juillet 2026"></div>' +
         '<div><label class="l">Statut</label><select class="f" data-f="status">' + Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (s.status === k ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('') + '</select></div></div>' +
         '<div class="row"><div><label class="l">Prix d\'inscription (en $, 0 ou vide = gratuit)</label><input class="f" type="number" min="0" step="0.5" data-f="price_usd" value="' + esc(s.price_usd == null ? '' : Number(s.price_usd)) + '"></div></div>' +
+        '<div class="row"><div class="grow"><label class="l">Début de la session (la salle de classe s’ouvre à cette date)</label><input class="f" type="datetime-local" data-f="starts_at" value="' + dtLocal(s.starts_at) + '"></div>' +
+        '<div class="grow"><label class="l">Fin de la session</label><input class="f" type="datetime-local" data-f="ends_at" value="' + dtLocal(s.ends_at) + '"></div></div>' +
+        '<p class="small" style="margin-bottom:10px;">Le public voit ces dates avec un compte à rebours et peut s’inscrire dès que « Inscriptions ouvertes » est coché. À la date de début, la salle de classe s’ouvre toute seule pour les inscrits validés et leur téléphone est notifié (elle remplace la salle ouverte à ce moment-là). Laissez vide pour ne rien programmer.</p>' +
         '<label class="l">Description</label><textarea class="f" data-f="description">' + esc(s.description) + '</textarea>' +
         '<div class="row" style="margin-bottom:10px;"><label><input type="checkbox" data-f="classroom_open"' + (s.classroom_open ? ' checked' : '') + '> Salle de classe ouverte</label>' +
         '<label><input type="checkbox" data-f="registration_open"' + (s.registration_open ? ' checked' : '') + '> Inscriptions ouvertes</label></div>' +
