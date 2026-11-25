@@ -450,7 +450,7 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
   }
   await pool.query(
     `INSERT INTO ebk_students (user_id, session_id, full_name, payment_status, payment_proof, payment_proof_mime, confirmed_at, whatsapp)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [req.user.id, session.id, name, paid ? 'en_attente' : 'confirme', paid ? file.buffer : null, paid ? file.mimetype : null, paid ? null : new Date()]
   );
   res.status(201).json(await studentState(req.user.id));
