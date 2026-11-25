@@ -419,7 +419,7 @@
     }).catch(function (e) { box(back('Mes cours') + '<div class="k-msg err">' + esc(e.message) + '</div>'); onBack(refreshHome); });
   }
 
-  function refreshHome() { api('/me').then(function (d) { st = d; renderHome(); }); }
+  function refreshHome() { api(sq('/me')).then(function (d) { st = d; renderHome(); }); }
 
   // ---------- Tests ----------
   var quiz = null;
