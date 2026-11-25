@@ -221,6 +221,7 @@
         return '<div class="k-card"><span class="k-tag ' + esc(x.status) + '">' + esc(STATUS[x.status] || x.status) + '</span>' +
           '<h3>' + esc(x.title) + (x.period_label ? ' — ' + esc(x.period_label) : '') + '</h3>' +
           '<p>' + esc(x.description || '') + '</p>' +
+          sessionPlan(x) +
           (Number(x.price_usd) > 0 ? '<p style="margin-top:10px;"><b>Inscription : ' + esc(Number(x.price_usd)) + ' $</b> (Airtel Money)</p>' : '') +
           (x.classroom_open ? '<p style="margin-top:8px;"><b>Cours disponibles en ligne</b>' + (x.registration_open ? ' · inscriptions ouvertes' : ' · inscriptions fermées') + '</p><p style="margin-top:8px;">Votre date de début est celle de l\'ouverture de votre premier cours ; votre date de fin est celle de la réussite du grand test, également date de délivrance de votre brevet.</p>' : '') +
           (x.classroom_open ? '<p style="margin-top:12px;"><a class="btn btn-primary" href="#classe">Entrer en salle de classe</a></p>' : '') + '</div>';
