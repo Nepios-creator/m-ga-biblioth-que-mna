@@ -659,6 +659,10 @@ admin.put('/sessions/:id', wrap(async (req, res) => {
   const b = { ...req.body };
   if (b.status !== undefined && !STATUSES.includes(b.status)) return res.status(400).json({ message: 'Statut invalide' });
   ['registration_open', 'classroom_open'].forEach((k) => { if (b[k] !== undefined) b[k] = !!b[k]; });
+  ['starts_at', 'ends_at'].forEach((k) => { if (b[k] !== undefined) { const d = b[k] ? new Date(b[k]) : null; b[k] = d && !isNaN(d) ? d.toISOString() : null; } });
+  if (b.starts_at && b.ends_at && new Date(b.ends_at) < new Date(b.starts_at)) return res.status(400).json({ message: 'La fin de la session doit être après son début.' });
+  // Date de début dans le futur : l'ouverture automatique est (re)programmée ; dans le passé : on ne rouvre rien tout seul
+  if (b.starts_at !== undefined) b.opened_notified = !!(b.starts_at && new Date(b.starts_at) <= new Date());
   if (b.price_usd !== undefined) { const p = b.price_usd === '' || b.price_usd === null ? null : Number(b.price_usd); b.price_usd = Number.isFinite(p) && p >= 0 ? p : null; }
   if (b.classroom_open === true) await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [req.params.id]);
   const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd']);
