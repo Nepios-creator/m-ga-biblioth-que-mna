@@ -140,7 +140,7 @@
       rows.forEach(function (r) {
         var p = PAY[r.payment_status] || ['', ''];
         h += '<div class="item"><div class="row"><div class="grow"><b>' + esc(r.full_name) + '</b> <span class="tag ' + p[1] + '">' + p[0] + '</span>' +
-          '<div class="small">' + esc(r.email) + ' · ' + esc(r.session_title) + (r.price_usd ? ' · ' + Number(r.price_usd) + ' $' : '') + ' · ' + fmt(r.created_at) + '</div>' +
+          '<div class="small">' + esc(r.email) + (r.whatsapp ? ' · WhatsApp ' + esc(r.whatsapp) : '') + ' · ' + esc(r.session_title) + (r.price_usd ? ' · ' + Number(r.price_usd) + ' $' : '') + ' · ' + fmt(r.created_at) + '</div>' +
           (r.payment_note ? '<div class="small">Motif du refus : ' + esc(r.payment_note) + '</div>' : '') + '</div>' +
           '<div class="row">' + (r.has_proof ? '<button class="btn btn-ghost" data-proof="' + r.id + '">🖼 Voir la capture</button>' : '<span class="small">Pas de capture</span>') +
           (r.payment_status !== 'confirme' ? '<button class="btn btn-primary" data-ok="' + r.id + '">✓ Confirmer</button>' : '') +
