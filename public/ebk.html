@@ -350,6 +350,7 @@
   // Inscription reçue : en attente de confirmation (ou paiement refusé)
   function renderPayment() {
     var s = st.student, refused = s.payment_status === 'refuse';
+    if (!(Number((st.payment || {}).price_usd) > 0)) { renderFreeWait(s, refused); return; }
     var h = '<div class="k-panel"><h2>' + (refused ? 'Paiement non validé' : '⏳ En attente de confirmation') + '</h2>' +
       '<p class="k-muted">Inscrit(e) sous le nom : <b>' + esc(s.full_name) + '</b></p>';
     if (refused) h += '<div class="k-msg err">Votre paiement n\'a pas pu être validé.' + (s.payment_note ? ' Motif : ' + esc(s.payment_note) : '') + ' Envoyez une nouvelle capture ci-dessous.</div>';
