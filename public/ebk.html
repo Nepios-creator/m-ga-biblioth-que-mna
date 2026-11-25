@@ -260,7 +260,7 @@
       return;
     }
     box('<p class="k-muted">Chargement…</p>');
-    api('/me').then(function (d) { st = d; renderHome(); })
+    api(sq('/me')).then(function (d) { st = d; renderHome(); })
       .catch(function (e) {
         if (e.status === 401) box('<div class="k-panel"><h2>Session expirée</h2><p class="k-muted">Reconnectez-vous pour continuer.</p><p style="margin-top:14px;"><a class="btn btn-primary" href="/login.html">Se connecter</a></p></div>');
         else box('<div class="k-msg err">' + esc(e.message) + '</div>');
