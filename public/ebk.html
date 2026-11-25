@@ -364,7 +364,7 @@
     $('k-resend').addEventListener('click', function () {
       var f = $('k-proof2').files[0];
       if (!f) { $('k-err').innerHTML = '<div class="k-msg err">Choisissez d\'abord une image.</div>'; return; }
-      var fd = new FormData(); fd.append('proof', f);
+      var fd = new FormData(); fd.append('proof', f); if (forced) fd.append('session_id', forced);
       $('k-resend').disabled = true;
       api('/payment-proof', { method: 'POST', form: fd }).then(function (d) { st = d; renderHome(); })
         .catch(function (e) { $('k-resend').disabled = false; $('k-err').innerHTML = '<div class="k-msg err">' + esc(e.message) + '</div>'; });
