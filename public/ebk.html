@@ -441,7 +441,7 @@
       '<input class="k-field" id="k-name" placeholder="Ex. Jean Mukendi Kabasele" autocomplete="name" value="' + esc((me && me.full_name) || '') + '">' +
       '<label class="k-muted" for="k-wa" style="display:block;"><b>Numéro WhatsApp</b> (avec l’indicatif du pays, ex. +243…)</label><input class="k-field" id="k-wa" type="tel" placeholder="+243 …" autocomplete="tel">' +
       (price ? '<label class="k-muted" for="k-proof" style="display:block;"><b>Capture d\'écran du paiement</b></label><input class="k-field" id="k-proof" type="file" accept="image/*">' : '') +
-      '<div id="k-err"></div><button class="btn btn-primary" id="k-enroll">' + (price ? 'Envoyer mon inscription' : 'Commencer les cours') + '</button></div>');
+      '<div id="k-err"></div><button class="btn btn-primary" id="k-enroll">' + (price ? 'Envoyer mon inscription' : (s.classroom_open ? 'Commencer les cours' : 'M’inscrire')) + '</button></div>');
     $('k-enroll').addEventListener('click', function () {
       var fd = new FormData();
       fd.append('full_name', $('k-name').value);
