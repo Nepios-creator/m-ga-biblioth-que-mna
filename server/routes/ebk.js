@@ -453,7 +453,7 @@ router.post('/enroll', withProof, wrap(async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [req.user.id, session.id, name, (paid || !session.classroom_open) ? 'en_attente' : 'confirme', paid ? file.buffer : null, paid ? file.mimetype : null, (paid || !session.classroom_open) ? null : new Date(), wa]
   );
-  res.status(201).json(await studentState(req.user.id));
+  res.status(201).json(await studentState(req.user.id, session));
 }));
 
 // Nouvel envoi de la capture (paiement refusé ou capture illisible)
