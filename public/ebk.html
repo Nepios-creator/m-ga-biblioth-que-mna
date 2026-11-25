@@ -206,6 +206,111 @@
   }
   window.addEventListener('hashchange', route);
 
+  // ---------- Sessions programmées : dates, compte à rebours, inscription anticipée, notification ----------
+  var serverOff = 0, tickT = null, forced = null;
+  function nowMs() { return Date.now() + serverOff; }
+  function sq(path) { return forced ? path + (path.indexOf('?') < 0 ? '?' : '&') + 'session_id=' + forced : path; }
+  function fmtDateTime(d) { try { return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kinshasa' }); } catch (e) { return ''; } }
+  function fmtCount(ms) {
+    var s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d + ' j ' + p(h) + ' h ' + p(m) + ' min ' + p(x) + ' s';
+  }
+  function tickCounts() {
+    var els = document.querySelectorAll('[data-count]');
+    if (!els.length) { if (tickT) { clearInterval(tickT); tickT = null; } return; }
+    if (!tickT) tickT = setInterval(tickCounts, 1000);
+    Array.prototype.forEach.call(els, function (el) {
+      var left = Date.parse(el.getAttribute('data-count')) - nowMs();
+      if (left > 0) { el.textContent = '⏳ Ouverture dans ' + fmtCount(left); return; }
+      el.textContent = '✅ C’est le jour J : la salle de classe s’ouvre…';
+      if (!el.getAttribute('data-done')) {
+        el.setAttribute('data-done', '1');
+        setTimeout(function () { if (location.hash === '#classe') { if (token && me) refreshHome(); } else loadSchool(); }, 6000);
+      }
+    });
+  }
+  function sessionPlan(x) {
+    var h = '', future = x.starts_at && Date.parse(x.starts_at) > nowMs();
+    if (x.starts_at || x.ends_at) h += '<p style="margin-top:10px;"><b>' + (x.starts_at ? 'Du ' + esc(fmtDate(x.starts_at)) : 'Début à annoncer') + (x.ends_at ? ' au ' + esc(fmtDate(x.ends_at)) : '') + '</b></p>';
+    if (!x.classroom_open && x.status !== 'terminee') {
+      if (future) h += '<p class="k-count" data-count="' + esc(x.starts_at) + '" style="margin-top:8px;font-weight:700;color:var(--k-navy2);"></p>';
+      h += x.registration_open
+        ? '<p style="margin-top:12px;"><a class="btn btn-primary" href="#classe" data-pre="' + x.id + '">S’inscrire / voir mon inscription</a></p>'
+        : (future ? '<p class="k-muted" style="margin-top:8px;">Les inscriptions ne sont pas encore ouvertes.</p>' : '');
+    }
+    return h;
+  }
+  function planLine(s) {
+    if (!s.starts_at || s.classroom_open) return '';
+    return '<p class="k-muted" style="margin-top:6px;">Ouverture de la salle de classe : <b>' + esc(fmtDateTime(s.starts_at)) + '</b>' + (s.ends_at ? ' · fin le ' + esc(fmtDate(s.ends_at)) : '') + '</p>' +
+      (Date.parse(s.starts_at) > nowMs() ? '<p class="k-count" data-count="' + esc(s.starts_at) + '" style="font-weight:700;color:var(--k-navy2);"></p>' : '');
+  }
+  // Bouton d’une session à venir : on ouvre la salle de classe sur CETTE session ; tout autre lien vers la salle revient à la session ouverte
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href="#classe"],[data-pre]') : null;
+    if (!a) return;
+    forced = a.getAttribute('data-pre') || null;
+    st = null; current = null;
+    if (location.hash === '#classe') { e.preventDefault(); loadClass(); }
+  });
+
+  // Notifications : l’étudiant autorise la notification, son téléphone est prévenu à l’ouverture de la salle de classe
+  function b64ToU8(s) {
+    var pad = '='.repeat((4 - s.length % 4) % 4), b = (s + pad).replace(/-/g, '+').replace(/_/g, '/'), raw = atob(b), out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function subscribePush(silent) {
+    return Promise.resolve().then(function () {
+      if (Notification.permission === 'denied') throw new Error('Les notifications sont bloquées dans les réglages de votre téléphone.');
+      if (Notification.permission === 'granted') return 'granted';
+      return silent ? 'default' : Notification.requestPermission();
+    }).then(function (perm) {
+      if (perm !== 'granted') throw new Error('Notification non autorisée.');
+      return Promise.all([navigator.serviceWorker.ready, api('/push-key')]);
+    }).then(function (r) {
+      var reg = r[0];
+      return reg.pushManager.getSubscription().then(function (sub) {
+        return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(r[1].key) });
+      });
+    }).then(function (sub) { return api('/push-subscribe', { method: 'POST', body: { subscription: sub.toJSON() } }); });
+  }
+  function pushWire() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window) || $('k-pushbox')) return;
+    $('k-box').insertAdjacentHTML('beforeend', '<div class="k-panel" id="k-pushbox"><h3>🔔 Être prévenu à l’ouverture</h3><p class="k-muted">Activez la notification : votre téléphone sonnera dès que la salle de classe sera ouverte (application installée sur l’écran d’accueil).</p><div id="k-pushmsg"></div><button class="btn btn-primary" id="k-push">Activer la notification</button></div>');
+    var b = $('k-push');
+    var done = function () { b.disabled = true; b.textContent = '✓ Notification activée'; };
+    if (Notification.permission === 'granted') subscribePush(true).then(done).catch(function () {});
+    b.addEventListener('click', function () {
+      b.disabled = true;
+      subscribePush(false).then(function () { done(); $('k-pushmsg').innerHTML = '<div class="k-msg ok">C’est activé : vous serez prévenu(e) à l’ouverture.</div>'; })
+        .catch(function (e) { b.disabled = false; $('k-pushmsg').innerHTML = '<div class="k-msg err">' + esc(e.message || 'Activation impossible.') + '</div>'; });
+    });
+  }
+
+  // Inscrit(e) validé(e) mais la salle de classe n’est pas encore ouverte : attente du jour J
+  function renderWaiting() {
+    var s = st.session, future = s.starts_at && Date.parse(s.starts_at) > nowMs();
+    box('<div class="k-panel"><span class="k-tag ok">✓ Inscription validée</span><h2>Bienvenue, ' + esc(st.student.full_name) + '</h2>' +
+      '<p class="k-muted"><b>' + esc(s.title) + '</b>' + (s.starts_at ? ' · ouverture le ' + esc(fmtDateTime(s.starts_at)) : '') + (s.ends_at ? ' · fin le ' + esc(fmtDate(s.ends_at)) : '') + '</p>' +
+      (future ? '<p class="k-count" data-count="' + esc(s.starts_at) + '" style="font-weight:700;color:var(--k-navy2);margin:10px 0;"></p>' : '') +
+      '<div class="k-msg ok">Votre inscription est validée. La salle de classe s’ouvrira le jour J : reconnectez-vous ici à ce moment-là, vous y entrerez directement.</div>' +
+      '<p style="margin:12px 0;"><button class="btn btn-primary" id="k-refresh">Actualiser</button></p></div>');
+    $('k-refresh').addEventListener('click', refreshHome);
+    pushWire();
+  }
+  // Session gratuite : inscription reçue, en attente de la décision de l’administration (validée ou non)
+  function renderFreeWait(s, refused) {
+    var h = '<div class="k-panel"><h2>' + (refused ? 'Inscription non validée' : '⏳ Inscription reçue') + '</h2><p class="k-muted">Inscrit(e) sous le nom : <b>' + esc(s.full_name) + '</b></p>' + planLine(st.session);
+    if (refused) h += '<div class="k-msg err">Votre inscription n’a pas été retenue.' + (s.payment_note ? ' Motif : ' + esc(s.payment_note) : '') + '</div>';
+    else h += '<div class="k-msg ok">Votre inscription a bien été reçue. L’administration va l’examiner : vous verrez ici si elle est validée ou non, et la salle de classe s’ouvrira à la date prévue.</div>';
+    h += '<p style="margin:12px 0;"><button class="btn btn-primary" id="k-refresh">Actualiser</button></p></div>';
+    box(h);
+    $('k-refresh').addEventListener('click', refreshHome);
+    if (!refused) pushWire();
+  }
+
   // ---------- Site de l'école ----------
   function loadSchool() {
     api('/info').then(function (d) {
