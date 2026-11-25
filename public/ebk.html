@@ -225,6 +225,7 @@
           (x.classroom_open ? '<p style="margin-top:8px;"><b>Cours disponibles en ligne</b>' + (x.registration_open ? ' · inscriptions ouvertes' : ' · inscriptions fermées') + '</p><p style="margin-top:8px;">Votre date de début est celle de l\'ouverture de votre premier cours ; votre date de fin est celle de la réussite du grand test, également date de délivrance de votre brevet.</p>' : '') +
           (x.classroom_open ? '<p style="margin-top:12px;"><a class="btn btn-primary" href="#classe">Entrer en salle de classe</a></p>' : '') + '</div>';
       }).join('') || '<p class="k-muted">Aucune session pour le moment.</p>';
+      tickCounts();
       var open = sessions.filter(function (x) { return x.classroom_open; })[0];
       var courses = open ? open.courses : [];
       $('k-prog-lead').textContent = courses.length
