@@ -358,6 +358,7 @@
     h += '<h3 style="margin-top:18px;">' + (refused ? 'Nouvelle capture' : 'Capture illisible ? Envoyez-en une autre') + '</h3>' +
       '<input class="k-field" id="k-proof2" type="file" accept="image/*"><div id="k-err"></div><button class="btn btn-ghost" id="k-resend">Envoyer cette capture</button></div>';
     box(h);
+    pushWire();
     $('k-refresh').addEventListener('click', refreshHome);
     $('k-resend').addEventListener('click', function () {
       var f = $('k-proof2').files[0];
