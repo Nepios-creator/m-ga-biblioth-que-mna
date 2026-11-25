@@ -158,6 +158,13 @@
   }
 
   // ---------- Sessions ----------
+  function dtLocal(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d)) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
   function renderSessions() {
     var h = '<div class="panel"><h3 style="margin:0 0 6px;">Sessions</h3><p class="small">« Salle de classe ouverte » = la session dont les cours sont accessibles aux étudiants (une seule à la fois). « Inscriptions ouvertes » = les nouveaux étudiants peuvent s\'inscrire.</p></div>';
     ov.sessions.forEach(function (s) {
