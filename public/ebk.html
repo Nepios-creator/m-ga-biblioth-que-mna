@@ -249,7 +249,7 @@
   }
 
   // ---------- Salle de classe ----------
-  function box(html) { $('k-box').innerHTML = html; }
+  function box(html) { $('k-box').innerHTML = html; tickCounts(); }
   function back(label, fn) { return '<button class="btn btn-ghost k-back" id="k-back">← ' + label + '</button>'; }
   function onBack(fn) { var b = $('k-back'); if (b) b.addEventListener('click', fn); }
 
