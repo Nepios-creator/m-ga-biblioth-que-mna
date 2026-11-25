@@ -851,7 +851,7 @@ admin.get('/students', wrap(async (req, res) => {
 // Paiements : l'administration consulte la capture puis confirme (ou refuse) l'inscription
 admin.get('/payments', wrap(async (req, res) => {
   const r = await pool.query(
-    `SELECT st.id, st.full_name, st.payment_status, st.payment_note, st.created_at, st.confirmed_at,
+    `SELECT st.id, st.full_name, st.payment_status, st.payment_note, st.created_at, st.confirmed_at, st.whatsapp,
             (st.payment_proof IS NOT NULL) AS has_proof, u.email, s.title AS session_title, s.price_usd
        FROM ebk_students st JOIN users u ON u.id = st.user_id JOIN ebk_sessions s ON s.id = st.session_id
       ORDER BY (st.payment_status = 'en_attente') DESC, st.created_at DESC`
