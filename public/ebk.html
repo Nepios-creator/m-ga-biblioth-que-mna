@@ -209,7 +209,7 @@
   // ---------- Site de l'école ----------
   function loadSchool() {
     api('/info').then(function (d) {
-      info = d;
+      info = d; if (d.now) serverOff = Date.parse(d.now) - Date.now();
       var s = d.settings || {};
       if (s.about) $('k-about').textContent = s.about;
       if (s.contact) $('k-contact').textContent = s.contact;
