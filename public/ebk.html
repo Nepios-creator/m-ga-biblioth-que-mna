@@ -272,6 +272,7 @@
     if (!st.session) { box('<div class="k-panel"><h2>Salle de classe</h2><p class="k-muted">Aucune session n\'est ouverte pour le moment. Revenez bientôt.</p></div>'); return; }
     if (!st.student) { renderEnroll(); return; }
     if (st.student.payment_status !== 'confirme') { renderPayment(); return; }
+    if (st.session.classroom_open === false) { renderWaiting(); return; }
     var total = st.courses.length, done = st.courses.filter(function (c) { return c.passed; }).length;
     var pct = total ? Math.round(done * 100 / total) : 0;
     var h = '<div class="k-panel"><h2>Bienvenue, ' + esc(st.student.full_name) + '</h2>' +
