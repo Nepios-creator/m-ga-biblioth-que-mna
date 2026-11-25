@@ -327,7 +327,7 @@
       return;
     }
     box('<div class="k-panel"><h2>Inscription à la salle de classe</h2>' +
-      '<p class="k-muted">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</p>' + payBlock() +
+      '<p class="k-muted">' + esc(s.title) + (s.period_label ? ' — ' + esc(s.period_label) : '') + '</p>' + planLine(s) + payBlock() +
       '<p class="k-muted" style="margin-top:12px;">Écrivez votre <b>nom complet</b> (prénom et nom). Il figurera sur votre brevet : vérifiez bien l\'orthographe.</p>' +
       '<input class="k-field" id="k-name" placeholder="Ex. Jean Mukendi Kabasele" autocomplete="name" value="' + esc((me && me.full_name) || '') + '">' +
       '<label class="k-muted" for="k-wa" style="display:block;"><b>Numéro WhatsApp</b> (avec l’indicatif du pays, ex. +243…)</label><input class="k-field" id="k-wa" type="tel" placeholder="+243 …" autocomplete="tel">' +
