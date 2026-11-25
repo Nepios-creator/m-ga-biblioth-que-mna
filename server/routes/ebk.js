@@ -470,7 +470,7 @@ router.post('/payment-proof', withProof, wrap(async (req, res) => {
     "UPDATE ebk_students SET payment_proof=$3, payment_proof_mime=$4, payment_status='en_attente', payment_note=NULL WHERE user_id=$1 AND session_id=$2",
     [req.user.id, session.id, file.buffer, file.mimetype]
   );
-  res.json(await studentState(req.user.id));
+  res.json(await studentState(req.user.id, session));
 }));
 
 // Correction du nom — impossible une fois le brevet délivré
