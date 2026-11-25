@@ -665,7 +665,7 @@ admin.put('/sessions/:id', wrap(async (req, res) => {
   if (b.starts_at !== undefined) b.opened_notified = !!(b.starts_at && new Date(b.starts_at) <= new Date());
   if (b.price_usd !== undefined) { const p = b.price_usd === '' || b.price_usd === null ? null : Number(b.price_usd); b.price_usd = Number.isFinite(p) && p >= 0 ? p : null; }
   if (b.classroom_open === true) await pool.query('UPDATE ebk_sessions SET classroom_open=false WHERE id<>$1', [req.params.id]);
-  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd']);
+  const u = buildUpdate('ebk_sessions', req.params.id, b, ['title', 'period_label', 'status', 'description', 'registration_open', 'classroom_open', 'position', 'price_usd', 'starts_at', 'ends_at', 'opened_notified']);
   if (!u) return res.status(400).json({ message: 'Rien à modifier' });
   const r = await pool.query(u.sql, u.vals);
   if (!r.rows[0]) return res.status(404).json({ message: 'Session introuvable' });
